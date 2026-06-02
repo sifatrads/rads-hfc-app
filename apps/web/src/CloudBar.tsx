@@ -30,8 +30,6 @@ export function CloudBar({ model, onLoadProject }: { model: ProjectModel | null;
     setBusy(true);
     setMsg("Saving…");
     try {
-      if (!getDriveAccessToken()) await signIn(); // refresh Drive token if needed
-      const driveFileId = await backupToDrive(model); // full project (plain JSON) → user's Drive
       let result: { requiredPressurePsi?: number; systemFlowGpm?: number } = {};
       try {
         const s = solveProject(model).summary;
@@ -39,8 +37,21 @@ export function CloudBar({ model, onLoadProject }: { model: ProjectModel | null;
       } catch {
         /* geometry-only */
       }
-      await saveProject(user.uid, model, { driveFileId, ...result }); // full sync to Firestore
-      setMsg("Synced to Firestore + Drive ✓");
+      // Firestore always syncs; Drive backup is best-effort (needs a live token
+      // + the Drive API enabled), so it never blocks the Firestore sync.
+      let driveFileId: string | undefined;
+      let note = "";
+      if (getDriveAccessToken()) {
+        try {
+          driveFileId = await backupToDrive(model);
+        } catch (e) {
+          note = ` · Drive skipped (${(e as Error).message})`;
+        }
+      } else {
+        note = " · sign in again for Drive backup";
+      }
+      await saveProject(user.uid, model, { ...(driveFileId ? { driveFileId } : {}), ...result });
+      setMsg(`Synced to Firestore${driveFileId ? " + Drive" : ""} ✓${note}`);
     } catch (e) {
       setMsg(`Save failed: ${(e as Error).message}`);
     } finally {
