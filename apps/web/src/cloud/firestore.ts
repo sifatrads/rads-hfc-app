@@ -32,6 +32,8 @@ export interface CloudProjectMeta {
   /** Headline calc result, if solved. */
   requiredPressurePsi?: number;
   systemFlowGpm?: number;
+  /** Drive file id of the full encrypted .rhfc backup. */
+  driveFileId?: string;
   updatedAt?: unknown;
 }
 

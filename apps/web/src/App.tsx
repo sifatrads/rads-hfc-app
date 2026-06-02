@@ -75,7 +75,7 @@ export function App(): JSX.Element {
         <button style={reportBtn} disabled={!model} onClick={() => setReports(true)}>Reports</button>
         <span style={{ marginLeft: 12, fontSize: 12, color: "#cfd8dc" }}>{status}</span>
         <span style={{ flex: 1 }} />
-        <CloudBar model={model} />
+        <CloudBar model={model} onLoadProject={(m) => show(m, `Restored ${m.meta.name} from Drive`)} />
       </header>
       <main style={{ flex: 1, position: "relative" }}>
         {scene ? <Viewer scene={scene} /> : <div style={{ padding: 20 }}>Loading…</div>}
