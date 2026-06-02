@@ -10,6 +10,8 @@ coverage/
 NFPA/
 standards-reference/
 *.standard.pdf
+# Local sample / test project data (bulky, not for publication)
+test_data/
 # build artifacts / local
 apps/*/ios/
 apps/*/android/
