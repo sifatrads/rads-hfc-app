@@ -8,12 +8,15 @@
 import { useMemo, type CSSProperties } from "react";
 import type { ProjectModel } from "@rads/model";
 import { solveProject } from "@rads/solve";
-import { reportSheets, type Sheet } from "@rads/report";
+import { buildScene } from "@rads/scene";
+import { reportSheets, renderDrawingSheetSvg, type Sheet } from "@rads/report";
 
 function printSheets(sheets: Sheet[], title: string): void {
   const w = window.open("", "_blank");
   if (!w) return;
-  const style = "@page{size:A4;margin:0}body{margin:0}.sheet{page-break-after:always}.sheet:last-child{page-break-after:auto}.sheet svg{width:210mm;height:297mm;display:block}";
+  // max-width keeps each sheet undistorted (portrait fills the page; landscape
+  // drawing sheets fit the width and keep their aspect), centered on A4.
+  const style = "@page{size:A4;margin:8mm}body{margin:0}.sheet{page-break-after:always;text-align:center}.sheet:last-child{page-break-after:auto}.sheet svg{max-width:100%;height:auto;display:inline-block}";
   w.document.write(`<!doctype html><html><head><title>${title}</title><style>${style}</style></head><body>${sheets.map((s) => `<div class="sheet">${s.svg}</div>`).join("")}</body></html>`);
   w.document.close();
   w.focus();
@@ -23,7 +26,14 @@ function printSheets(sheets: Sheet[], title: string): void {
 export function ReportsPanel({ model, onClose }: { model: ProjectModel; onClose: () => void }): JSX.Element {
   const { sheets, error } = useMemo(() => {
     try {
-      return { sheets: reportSheets(model, solveProject(model)), error: undefined as string | undefined };
+      const sol = solveProject(model);
+      const scene = buildScene(model, { results: sol.results });
+      const views: [("iso" | "plan" | "front"), string][] = [["iso", "Isometric"], ["plan", "Plan View"], ["front", "Elevation"]];
+      const drawings: Sheet[] = views.map(([view, name]) => ({
+        title: `Working Plan — ${name}`,
+        svg: renderDrawingSheetSvg(scene, { paper: "A4", orientation: "landscape", view, colorMetric: "size", title: `${model.meta.name} — ${name}` }),
+      }));
+      return { sheets: [...drawings, ...reportSheets(model, sol)], error: undefined as string | undefined };
     } catch (e) {
       return { sheets: [] as Sheet[], error: (e as Error).message };
     }
