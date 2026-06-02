@@ -23,8 +23,27 @@ describe("standards-engine: NFPA 13", () => {
     expect(s.standardKFactors()).toContain(5.6);
   });
 
-  it("registry lists nfpa13 and rejects unimplemented standards", () => {
+  it("registry lists implemented standards and rejects unimplemented ones", () => {
     expect(availableStandards()).toContain("nfpa13");
-    expect(() => getStandard("en12845")).toThrow(/not implemented/i);
+    expect(availableStandards()).toContain("en12845");
+    expect(() => getStandard("fmds")).toThrow(/not implemented/i);
+  });
+});
+
+describe("standards-engine: EN 12845", () => {
+  const s = getStandard("en12845");
+
+  it("is metric with a flat C = 100 for all materials", () => {
+    expect(s.units).toBe("metric");
+    expect(s.cFactor("steel")).toBe(100);
+    expect(s.cFactor("copper")).toBe(100);
+    expect(s.cFactor("anything")).toBe(100);
+  });
+
+  it("exposes metric density/area and stricter minimum pressure", () => {
+    expect(s.designDensity("oh1")).toEqual({ hazardClassId: "oh1", density: 5.0, area: 72 });
+    expect(s.designDensity("lh")?.density).toBe(2.25);
+    expect(s.minResidualPressure()).toBe(0.5); // bar
+    expect(s.standardKFactors()).toContain(80); // metric K80 ≈ NFPA K5.6
   });
 });

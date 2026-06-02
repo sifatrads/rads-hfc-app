@@ -1,12 +1,14 @@
 import type { StandardId, StandardModule } from "./types";
 import { nfpa13 } from "./nfpa13";
+import { en12845 } from "./en12845";
 
 export * from "./types";
-export { nfpa13 };
+export { nfpa13, en12845 };
 
 const REGISTRY: Partial<Record<StandardId, StandardModule>> = {
   nfpa13,
-  // nfpa13r, nfpa13d, en12845, fmds, iso — scaffolded next (plan: all standards from day 1)
+  en12845,
+  // nfpa13r, nfpa13d, fmds, iso — scaffolded next (plan: all standards from day 1)
 };
 
 /** Get an implemented standard module, or throw if not yet available. */
