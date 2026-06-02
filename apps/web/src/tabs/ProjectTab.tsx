@@ -6,10 +6,10 @@
  * live. Nodes are numbered 1..N; "Renumber" normalizes ids after edits.
  */
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import type { ProjectModel, NetworkNode, Pipe, Direction } from "@rads/model";
+import type { ProjectModel, NetworkNode, Pipe, Valve, Pump, PumpCurvePoint, Direction } from "@rads/model";
 import {
-  NOMINAL_SIZES, PIPE_ROLES, NODE_TYPES, DIRECTIONS, DIRECTION_LABEL,
-  renumberNetwork, normalizePipe, withModel,
+  NOMINAL_SIZES, PIPE_ROLES, NODE_TYPES, VALVE_TYPES, PUMP_TYPES, PUMP_DRIVERS, VALVE_EQUIV_FT,
+  DIRECTIONS, DIRECTION_LABEL, renumberNetwork, normalizePipe, withModel,
 } from "../network-edit";
 import { C, FONT, card, sectionTitle, field, fieldLabel, input, select, btnPrimary, btnGhost, btnDanger, th, td } from "../ui";
 
@@ -17,8 +17,13 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
   const ds = (model.designBasis ?? {}) as Record<string, unknown>;
   const ws = (model.waterSupply ?? {}) as Record<string, unknown>;
   const ft = (ws["flowTest"] ?? {}) as Record<string, unknown>;
-  const fp = (ws["firePump"] ?? {}) as Record<string, unknown>;
   const res = (model.network.reservoir ?? {}) as Record<string, unknown>;
+  const suc = (model.network.suction ?? {}) as Record<string, unknown>;
+  const pump = model.network.pump;
+  const pds = (pump?.datasheet ?? {}) as Record<string, unknown>;
+  const ratedCurve = pump?.ratedCurve ?? [];
+  const shopTest = pump?.shopTest ?? [];
+  const valves = model.network.valves ?? [];
   const nodes = model.network.nodes;
   const pipes = model.network.pipes;
   const nodeIds = useMemo(() => nodes.map((n) => n.id), [nodes]);
@@ -28,18 +33,39 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
   const setBasis = (k: string, v: unknown) => onChange(withModel(model, { designBasis: { ...ds, [k]: v } }));
   const setSupply = (k: string, v: unknown) => onChange(withModel(model, { waterSupply: { ...ws, [k]: v } }));
   const setFlow = (k: string, v: unknown) => onChange(withModel(model, { waterSupply: { ...ws, flowTest: { ...ft, [k]: v } } }));
-  const setPump = (k: string, v: unknown) => onChange(withModel(model, { waterSupply: { ...ws, type: "city+fire-pump", firePump: { ...fp, [k]: v } } }));
-  const togglePump = (on: boolean) =>
-    onChange(withModel(model, {
-      waterSupply: on
-        ? { ...ws, type: "city+fire-pump", firePump: { ratedFlowGpm: 750, ratedPsi: 100, churnPsi: 115 } }
-        : { ...ws, type: "city", firePump: undefined },
-    }));
   const setRes = (k: string, v: unknown) => onChange(withModel(model, { network: { ...model.network, reservoir: { ...res, [k]: v } } }));
   const toggleRes = (on: boolean) =>
     onChange(withModel(model, {
       network: { ...model.network, reservoir: on ? { kind: "ground-tank", capacityGal: 20000, heightFt: 12, lengthFt: 20, widthFt: 20, connectedNode: nodeIds[0] } : undefined },
     }));
+
+  // ── suction line ──
+  const setSuc = (k: string, v: unknown) => onChange(withModel(model, { network: { ...model.network, suction: { ...suc, [k]: v } } }));
+  const toggleSuc = (on: boolean) =>
+    onChange(withModel(model, { network: { ...model.network, suction: on ? { sizeIn: 6, lengthFt: 20, material: "ductile-iron", cFactor: 140, liftFt: 0, fittings: [] } : undefined } }));
+
+  // ── fire pump (datasheet + curves) — also feeds the supply curve in the calc ──
+  /** Re-derive waterSupply.firePump from the datasheet so the solve uses the pump. */
+  const syncPump = (next: Pump | undefined): ProjectModel => {
+    const d = (next?.datasheet ?? {}) as Record<string, unknown>;
+    const hasPump = typeof d["ratedFlowGpm"] === "number";
+    const firePump = hasPump
+      ? { ratedFlowGpm: d["ratedFlowGpm"], ratedPsi: d["ratedPsi"] ?? 0, churnPsi: d["churnPsi"] ?? (d["ratedPsi"] as number) * 1.2, ...(typeof d["overloadFlowGpm"] === "number" ? { overloadFlowGpm: d["overloadFlowGpm"] } : {}), ...(typeof d["overloadPsi"] === "number" ? { overloadPsi: d["overloadPsi"] } : {}) }
+      : undefined;
+    return withModel(model, { network: { ...model.network, pump: next }, waterSupply: { ...ws, type: hasPump ? "city+fire-pump" : "city", firePump } });
+  };
+  const setDs = (k: string, v: unknown) => onChange(syncPump({ ...pump, datasheet: { ...pds, [k]: v } }));
+  const togglePump = (on: boolean) =>
+    onChange(syncPump(on
+      ? { datasheet: { type: "horizontal-split-case", ratedFlowGpm: 750, ratedPsi: 100, churnPsi: 115, overloadFlowGpm: 1125, overloadPsi: 65, driver: "electric" }, ratedCurve: [{ flowGpm: 0, psi: 115 }, { flowGpm: 750, psi: 100 }, { flowGpm: 1125, psi: 65 }], shopTest: [] }
+      : undefined));
+  const setCurve = (which: "ratedCurve" | "shopTest", pts: PumpCurvePoint[]) => onChange(withModel(model, { network: { ...model.network, pump: { ...pump, [which]: pts } } }));
+
+  // ── valves ──
+  const commitValves = (v: Valve[]) => onChange(withModel(model, { network: { ...model.network, valves: v } }));
+  const setValve = (i: number, patch: Partial<Valve>) => { const v = valves.slice(); v[i] = { ...v[i]!, ...patch }; commitValves(v); };
+  const addValve = () => commitValves([...valves, { id: `V-${valves.length + 1}`, type: "gate-valve", onPipe: pipes[0]?.id, sizeIn: "4", equivalentLengthFt: VALVE_EQUIV_FT["gate-valve"] }]);
+  const delValve = (i: number) => commitValves(valves.filter((_, j) => j !== i).map((v, j) => ({ ...v, id: `V-${j + 1}` })));
 
   const commit = (n: NetworkNode[], p: Pipe[]) =>
     onChange(withModel(model, { network: { ...model.network, nodes: n, pipes: p.map(normalizePipe) } }));
@@ -121,16 +147,27 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
             <Num label="Residual (psi)" value={num(ft["residualPsi"])} step={1} onChange={(v) => setFlow("residualPsi", v)} />
             <Num label="Test flow (gpm)" value={num(ft["testFlowGpm"])} step={50} onChange={(v) => setFlow("testFlowGpm", v)} />
           </Row>
+          <div style={hint}>Add a fire pump in the Fire Pump section below — it feeds this supply curve.</div>
+        </Section>
+
+        {/* Suction */}
+        <Section title="Pump suction line">
           <label style={checkRow}>
-            <input type="checkbox" checked={!!ws["firePump"]} onChange={(e) => togglePump(e.target.checked)} />
-            <span>Fire pump on supply</span>
+            <input type="checkbox" checked={!!model.network.suction} onChange={(e) => toggleSuc(e.target.checked)} />
+            <span>This system has a pump suction line</span>
           </label>
-          {!!ws["firePump"] && (
-            <Row>
-              <Num label="Rated flow (gpm)" value={num(fp["ratedFlowGpm"])} step={50} onChange={(v) => setPump("ratedFlowGpm", v)} />
-              <Num label="Rated (psi)" value={num(fp["ratedPsi"])} step={5} onChange={(v) => setPump("ratedPsi", v)} />
-              <Num label="Churn (psi)" value={num(fp["churnPsi"])} step={5} onChange={(v) => setPump("churnPsi", v)} />
-            </Row>
+          {!!model.network.suction && (
+            <>
+              <Row>
+                <Num label="Size (in)" value={num(suc["sizeIn"])} step={1} onChange={(v) => setSuc("sizeIn", v)} />
+                <Num label="Length (ft)" value={num(suc["lengthFt"])} step={5} onChange={(v) => setSuc("lengthFt", v)} />
+                <Num label="C-factor" value={num(suc["cFactor"])} step={5} onChange={(v) => setSuc("cFactor", v)} />
+              </Row>
+              <Row>
+                <Num label="Lift (ft, − = flooded)" value={num(suc["liftFt"])} step={1} onChange={(v) => setSuc("liftFt", v)} />
+                <Sel label="To pump node" value={str(suc["toPumpNode"], nodeIds[0] ?? "")} options={nodeIds} onChange={(v) => setSuc("toPumpNode", v)} />
+              </Row>
+            </>
           )}
         </Section>
 
@@ -226,6 +263,104 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
         </div>
         <div style={hint}>Tip: direction codes route the schematic — E/W = ±X, N/S = ±Y, U/D = ±Z. Leave “(auto)” to route by pipe role. Internal diameter is set from the nominal size (Sch-40).</div>
       </div>
+
+      {/* Valves */}
+      <div style={{ ...card, padding: 14 }}>
+        <div style={tableHead}>
+          <span style={sectionTitle}>Valves &amp; fittings · {valves.length}</span>
+          <span style={{ flex: 1 }} />
+          <button style={btnPrimary} onClick={addValve} disabled={pipes.length === 0}>+ Add valve</button>
+        </div>
+        <div style={tableScroll}>
+          <table style={table}>
+            <thead><tr>{["#", "Type", "On pipe", "Size (in)", "Equiv. length (ft)", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>
+              {valves.map((v, i) => (
+                <tr key={i} style={i % 2 ? { background: C.zebra } : undefined}>
+                  <td style={{ ...td, fontWeight: 700, color: C.accent }}>{v.id}</td>
+                  <td style={td}><select style={cellInput} value={v.type} onChange={(e) => setValve(i, { type: e.target.value, equivalentLengthFt: VALVE_EQUIV_FT[e.target.value] ?? v.equivalentLengthFt })}>{VALVE_TYPES.map((o) => <option key={o} value={o}>{o}</option>)}</select></td>
+                  <td style={td}><select style={{ ...cellInput, width: 72 }} value={String(v.onPipe ?? "")} onChange={(e) => setValve(i, { onPipe: e.target.value })}>{pipes.map((p) => <option key={p.id} value={p.id}>{p.id}</option>)}</select></td>
+                  <td style={td}><input style={{ ...cellInput, width: 56 }} value={String(v.sizeIn ?? "")} onChange={(e) => setValve(i, { sizeIn: e.target.value })} /></td>
+                  <td style={td}><NumCell value={typeof v.equivalentLengthFt === "number" ? v.equivalentLengthFt : undefined} onChange={(x) => setValve(i, { equivalentLengthFt: x })} /></td>
+                  <td style={td}><button style={btnDanger} onClick={() => delValve(i)} title="Delete valve">✕</button></td>
+                </tr>
+              ))}
+              {valves.length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={6}>No valves — add gate / check / alarm / backflow etc. Equivalent length adds to the host pipe in the calc.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Fire pump */}
+      <div style={{ ...card, padding: 16 }}>
+        <div style={tableHead}>
+          <span style={sectionTitle}>Fire pump — datasheet &amp; test curves</span>
+          <span style={{ flex: 1 }} />
+          <label style={checkRow}>
+            <input type="checkbox" checked={!!pump} onChange={(e) => togglePump(e.target.checked)} />
+            <span>System has a fire pump</span>
+          </label>
+        </div>
+        {pump && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <Row>
+              <Txt label="Make" value={str(pds["make"])} onChange={(v) => setDs("make", v)} />
+              <Txt label="Model" value={str(pds["model"])} onChange={(v) => setDs("model", v)} />
+              <Sel label="Type" value={str(pds["type"], "horizontal-split-case")} options={PUMP_TYPES} onChange={(v) => setDs("type", v)} />
+              <Sel label="Driver" value={str(pds["driver"], "electric")} options={PUMP_DRIVERS} onChange={(v) => setDs("driver", v)} />
+            </Row>
+            <Row>
+              <Num label="Rated flow (gpm)" value={num(pds["ratedFlowGpm"])} step={50} onChange={(v) => setDs("ratedFlowGpm", v)} />
+              <Num label="Rated pressure (psi)" value={num(pds["ratedPsi"])} step={5} onChange={(v) => setDs("ratedPsi", v)} />
+              <Num label="Churn / shutoff (psi)" value={num(pds["churnPsi"])} step={5} onChange={(v) => setDs("churnPsi", v)} />
+            </Row>
+            <Row>
+              <Num label="150% flow (gpm)" value={num(pds["overloadFlowGpm"])} step={50} onChange={(v) => setDs("overloadFlowGpm", v)} />
+              <Num label="150% pressure (psi)" value={num(pds["overloadPsi"])} step={5} onChange={(v) => setDs("overloadPsi", v)} />
+              <Num label="RPM" value={num(pds["rpm"])} step={100} onChange={(v) => setDs("rpm", v)} />
+            </Row>
+            <Row>
+              <Num label="Impeller (in)" value={num(pds["impellerIn"])} step={0.1} onChange={(v) => setDs("impellerIn", v)} />
+              <Num label="Motor (hp)" value={num(pds["motorHp"])} step={5} onChange={(v) => setDs("motorHp", v)} />
+              <Sel label="At node" value={str(pump.atNode, nodeIds[0] ?? "")} options={nodeIds} onChange={(v) => onChange(withModel(model, { network: { ...model.network, pump: { ...pump, atNode: v } } }))} />
+            </Row>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
+              <CurveTable title="Rated curve (datasheet)" rpm={false} pts={ratedCurve} onChange={(p) => setCurve("ratedCurve", p)} />
+              <CurveTable title="Shop test (field/factory)" rpm pts={shopTest} onChange={(p) => setCurve("shopTest", p)} />
+            </div>
+            <div style={hint}>The rated flow/pressure/churn here feed the supply curve in the calc. Curves drive the three pump report sheets (datasheet · hydraulic · shop-test).</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CurveTable({ title, pts, rpm, onChange }: { title: string; pts: PumpCurvePoint[]; rpm: boolean; onChange: (p: PumpCurvePoint[]) => void }): JSX.Element {
+  const set = (i: number, patch: Partial<PumpCurvePoint>) => { const p = pts.slice(); p[i] = { ...p[i]!, ...patch }; onChange(p); };
+  const add = () => onChange([...pts, { flowGpm: 0, psi: 0 }]);
+  const del = (i: number) => onChange(pts.filter((_, j) => j !== i));
+  return (
+    <div style={{ ...card, padding: 10 }}>
+      <div style={tableHead}>
+        <span style={{ ...sectionTitle, marginBottom: 0 }}>{title}</span>
+        <span style={{ flex: 1 }} />
+        <button style={btnGhost} onClick={add}>+ Point</button>
+      </div>
+      <table style={table}>
+        <thead><tr>{["Flow (gpm)", "Pressure (psi)", ...(rpm ? ["RPM"] : []), ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+        <tbody>
+          {pts.map((pt, i) => (
+            <tr key={i}>
+              <td style={td}><NumCell value={pt.flowGpm} onChange={(v) => set(i, { flowGpm: v ?? 0 })} /></td>
+              <td style={td}><NumCell value={pt.psi} onChange={(v) => set(i, { psi: v ?? 0 })} /></td>
+              {rpm && <td style={td}><NumCell value={pt.rpm} onChange={(v) => set(i, { rpm: v })} /></td>}
+              <td style={td}><button style={btnDanger} onClick={() => del(i)} title="Delete point">✕</button></td>
+            </tr>
+          ))}
+          {pts.length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={rpm ? 4 : 3}>No points.</td></tr>}
+        </tbody>
+      </table>
     </div>
   );
 }

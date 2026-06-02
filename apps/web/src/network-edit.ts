@@ -14,6 +14,17 @@ export const PIPE_ROLES = ["branch-line", "cross-main", "feed-main", "riser", "s
 
 export const NODE_TYPES = ["junction", "sprinkler", "hose-station"] as const;
 
+export const VALVE_TYPES = ["gate-valve", "butterfly-valve", "check-valve", "alarm-valve", "backflow-preventer", "prv", "flow-switch", "main-drain"] as const;
+
+export const PUMP_TYPES = ["horizontal-split-case", "vertical-turbine", "end-suction", "vertical-inline"] as const;
+
+export const PUMP_DRIVERS = ["electric", "diesel"] as const;
+
+/** Default valve equivalent length (ft) by type — editable; rough Sch-40 4–6" values. */
+export const VALVE_EQUIV_FT: Record<string, number> = {
+  "gate-valve": 3, "butterfly-valve": 12, "check-valve": 22, "alarm-valve": 5, "backflow-preventer": 40, prv: 0, "flow-switch": 0, "main-drain": 0,
+};
+
 export const DIRECTIONS: Direction[] = ["N", "S", "E", "W", "U", "D"];
 
 /** Human label for each routing direction code. */

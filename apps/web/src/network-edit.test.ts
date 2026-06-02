@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { solveProject } from "@rads/solve";
+import { encodeJSON, decodeJSON } from "@rads/container";
+import { parseProject } from "@rads/model";
 import { newProject, renumberNetwork, normalizePipe, internalDiameterFor, withModel } from "./network-edit";
 import type { NetworkNode, Pipe } from "@rads/model";
 
@@ -46,5 +48,25 @@ describe("in-app data entry → solve", () => {
     expect(sol.summary.sourcePressurePsi).toBeGreaterThan(7);
     expect(sol.summary.mostRemoteSprinkler).toBeDefined();
     expect(Object.keys(sol.results.pipes)).toContain("P-2");
+  });
+
+  it("saves + reloads a full project (.rhfc round-trip) with pump / valves / reservoir / suction", async () => {
+    let m = newProject("2026-06-03T00:00:00.000Z");
+    m = withModel(m, {
+      network: {
+        ...m.network,
+        valves: [{ id: "V-1", type: "check-valve", onPipe: "P-1", sizeIn: "4", equivalentLengthFt: 22 }],
+        reservoir: { kind: "ground-tank", capacityGal: 20000, heightFt: 12 },
+        suction: { sizeIn: 6, lengthFt: 20, cFactor: 140, liftFt: 0, fittings: [] },
+        pump: { datasheet: { make: "Patterson", ratedFlowGpm: 750, ratedPsi: 100, churnPsi: 115 }, ratedCurve: [{ flowGpm: 0, psi: 115 }, { flowGpm: 750, psi: 100 }], shopTest: [] },
+      },
+      waterSupply: { type: "city+fire-pump", flowTest: { staticPsi: 70, residualPsi: 55, testFlowGpm: 1500 }, firePump: { ratedFlowGpm: 750, ratedPsi: 100, churnPsi: 115 } },
+    });
+    const back = parseProject(await decodeJSON(await encodeJSON(m)));
+    expect(back.network.pump?.datasheet?.ratedFlowGpm).toBe(750);
+    expect(back.network.pump?.ratedCurve?.length).toBe(2);
+    expect(back.network.reservoir?.capacityGal).toBe(20000);
+    expect(back.network.suction?.sizeIn).toBe(6);
+    expect(back.network.valves[0]!.type).toBe("check-valve");
   });
 });

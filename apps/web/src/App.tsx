@@ -11,7 +11,7 @@ import { buildScene, type AnnotatedScene } from "@rads/scene";
 import { parseProject, type ProjectModel } from "@rads/model";
 import { parseDxf, analyzeDxf, type DxfDoc, type DxfAnalysis } from "@rads/dxf-import";
 import { solveProject, type ProjectSolution } from "@rads/solve";
-import { decodeJSON, isRhfc } from "@rads/container";
+import { decodeJSON, encodeJSON, isRhfc } from "@rads/container";
 import { sampleProject } from "./sample";
 import { newProject } from "./network-edit";
 import { ImportDialog } from "./ImportDialog";
@@ -65,6 +65,25 @@ export function App(): JSX.Element {
 
   function load(m: ProjectModel, msg: string, goto: TabId = "view"): void { setModel(m); setNote(msg); setTab(goto); }
 
+  function download(name: string, data: BlobPart, type: string): void {
+    const url = URL.createObjectURL(new Blob([data], { type }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+  async function saveRhfc(): Promise<void> {
+    if (!model) return;
+    try { download(`${model.meta.id}.rhfc`, new Uint8Array(await encodeJSON(model)), "application/octet-stream"); setNote(`Saved ${model.meta.id}.rhfc`); }
+    catch (e) { setNote(`Save error: ${(e as Error).message}`); }
+  }
+  function exportJson(): void {
+    if (!model) return;
+    download(`${model.meta.id}.json`, JSON.stringify(model, null, 2), "application/json");
+    setNote(`Exported ${model.meta.id}.json`);
+  }
+
   async function openFile(file: File): Promise<void> {
     setNote(`Loading ${file.name}…`);
     try {
@@ -95,6 +114,8 @@ export function App(): JSX.Element {
           ⤓ Open
           <input type="file" accept=".dxf,.rhfc,.json" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void openFile(f); e.target.value = ""; }} />
         </label>
+        <button style={{ ...fileBtn, ...(model ? {} : disabledBtn) }} disabled={!model} title="Save the project as an encrypted .rhfc file" onClick={() => void saveRhfc()}>💾 Save</button>
+        <button style={{ ...fileBtn, ...(model ? {} : disabledBtn) }} disabled={!model} title="Export plain JSON" onClick={exportJson}>JSON</button>
         <span style={statusPill}>{status}</span>
         <span style={{ flex: 1 }} />
         <CloudBar model={model} onLoadProject={(m) => load(m, `Restored ${m.meta.name}`, "summary")} />
@@ -145,6 +166,7 @@ export function App(): JSX.Element {
 const header: CSSProperties = { display: "flex", alignItems: "center", gap: 10, padding: "9px 16px", background: "linear-gradient(180deg,#0d4099,#0b3d91)", color: "#fff", fontFamily: FONT, boxShadow: "0 2px 12px rgba(11,61,145,0.28)", zIndex: 10 };
 const brand: CSSProperties = { display: "flex", alignItems: "baseline", gap: 8, marginRight: 6 };
 const fileBtn: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 13px", background: "rgba(255,255,255,0.14)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 7, cursor: "pointer", fontSize: 12.5, fontWeight: 600 };
+const disabledBtn: CSSProperties = { opacity: 0.4, cursor: "default" };
 const statusPill: CSSProperties = { marginLeft: 4, fontSize: 11.5, color: "#dbe7fa", background: "rgba(255,255,255,0.1)", padding: "3px 10px", borderRadius: 999, maxWidth: 420, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 const sidebar: CSSProperties = { width: 150, background: "#fff", borderRight: `1px solid ${C.line}`, display: "flex", flexDirection: "column", padding: "10px 8px", gap: 3, flexShrink: 0 };
 const navBtn: CSSProperties = { display: "flex", alignItems: "center", gap: 9, padding: "9px 11px", border: "none", background: "transparent", color: C.ink, borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: FONT, textAlign: "left" };
