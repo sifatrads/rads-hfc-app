@@ -52,7 +52,9 @@ export function App(): JSX.Element {
 
   const scene = useMemo<AnnotatedScene | null>(() => {
     if (!model) return null;
-    try { return buildScene(model, sol ? { results: sol.results } : {}); }
+    // Schematic (NTS) view: compress very long mains so the network stays
+    // balanced instead of one supply run dwarfing the grid.
+    try { return buildScene(model, { ...(sol ? { results: sol.results } : {}), layout: { compressLongRuns: true } }); }
     catch { return null; }
   }, [model, sol]);
 
@@ -143,7 +145,7 @@ export function App(): JSX.Element {
           ) : tab === "analysis" ? (
             <AnalysisTab model={model} solution={sol} error={solveError} />
           ) : tab === "graph" ? (
-            <GraphTab solution={sol} error={solveError} />
+            <GraphTab model={model} solution={sol} error={solveError} />
           ) : (
             <ReportTab model={model} />
           )}

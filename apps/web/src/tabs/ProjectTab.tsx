@@ -5,7 +5,7 @@
  * Every edit re-parses the model and bubbles up so the 3D view + results stay
  * live. Nodes are numbered 1..N; "Renumber" normalizes ids after edits.
  */
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode, type ChangeEvent } from "react";
 import type { ProjectModel, NetworkNode, Pipe, Valve, Pump, PumpCurvePoint, Direction } from "@rads/model";
 import {
   NOMINAL_SIZES, PIPE_ROLES, NODE_TYPES, VALVE_TYPES, PUMP_TYPES, PUMP_DRIVERS, VALVE_EQUIV_FT,
@@ -55,6 +55,16 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
     return withModel(model, { network: { ...model.network, pump: next }, waterSupply: { ...ws, type: hasPump ? "city+fire-pump" : "city", firePump } });
   };
   const setDs = (k: string, v: unknown) => onChange(syncPump({ ...pump, datasheet: { ...pds, [k]: v } }));
+  const setDsMany = (patch: Record<string, unknown>) => onChange(syncPump({ ...pump, datasheet: { ...pds, ...patch } }));
+  const onUploadDatasheet = (e: ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 900 * 1024) window.alert("Heads up: files over ~900 KB may exceed the cloud-save limit. It will still embed in the local .rhfc / JSON.");
+    const reader = new FileReader();
+    reader.onload = () => setDsMany({ attachmentName: file.name, attachmentDataUrl: String(reader.result) });
+    reader.readAsDataURL(file);
+  };
   const togglePump = (on: boolean) =>
     onChange(syncPump(on
       ? { datasheet: { type: "horizontal-split-case", ratedFlowGpm: 750, ratedPsi: 100, churnPsi: 115, overloadFlowGpm: 1125, overloadPsi: 65, driver: "electric" }, ratedCurve: [{ flowGpm: 0, psi: 115 }, { flowGpm: 750, psi: 100 }, { flowGpm: 1125, psi: 65 }], shopTest: [] }
@@ -101,6 +111,19 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
     commitStructural(nodes, [...pipes, { id: `P-${pipes.length + 1}`, from: lastTo, to, role: "branch-line", nominalSize: "1", lengthFt: 10, fittings: [] }]);
   };
   const delPipe = (i: number) => commitStructural(nodes, pipes.filter((_, j) => j !== i));
+  // Divide a pipe: insert a junction at the midpoint, split length (and any
+  // elevation change) in half. Renumber assigns the new node + pipe ids.
+  const splitPipe = (i: number) => {
+    const p = pipes[i]!;
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const e1 = byId.get(p.from)?.elevationFt ?? 0, e2 = byId.get(p.to)?.elevationFt ?? 0;
+    const mid: NetworkNode = { id: "tmp-mid", type: "junction", elevationFt: (e1 + e2) / 2, fittings: [] } as NetworkNode;
+    const halfL = (p.lengthFt ?? 0) / 2;
+    const halfE = p.elevationChangeFt !== undefined ? p.elevationChangeFt / 2 : undefined;
+    const p1: Pipe = { ...p, to: "tmp-mid", lengthFt: halfL, ...(halfE !== undefined ? { elevationChangeFt: halfE } : {}) };
+    const p2: Pipe = { ...p, from: "tmp-mid", to: p.to, lengthFt: halfL, fittings: [], ...(halfE !== undefined ? { elevationChangeFt: halfE } : {}) };
+    commitStructural([...nodes, mid], [...pipes.slice(0, i), p1, p2, ...pipes.slice(i + 1)]);
+  };
 
   const renumber = () => commitStructural(nodes, pipes);
 
@@ -254,7 +277,12 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
                     </select>
                   </td>
                   <td style={td}><NumCell value={p.elevationChangeFt} onChange={(v) => setPipe(i, { elevationChangeFt: v })} /></td>
-                  <td style={td}><button style={btnDanger} onClick={() => delPipe(i)} title="Delete pipe">✕</button></td>
+                  <td style={td}>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <button style={splitBtn} onClick={() => splitPipe(i)} title="Divide pipe (insert a node at the midpoint)">⊟ Split</button>
+                      <button style={btnDanger} onClick={() => delPipe(i)} title="Delete pipe">✕</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {pipes.length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={9}>No pipes yet — add nodes, then connect them. The first node (#1) is the supply source.</td></tr>}
@@ -324,6 +352,19 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
               <Num label="Motor (hp)" value={num(pds["motorHp"])} step={5} onChange={(v) => setDs("motorHp", v)} />
               <Sel label="At node" value={str(pump.atNode, nodeIds[0] ?? "")} options={nodeIds} onChange={(v) => onChange(withModel(model, { network: { ...model.network, pump: { ...pump, atNode: v } } }))} />
             </Row>
+            <div style={uploadRow}>
+              <span style={fieldLabel}>Datasheet file (PDF / image)</span>
+              {pds["attachmentName"] ? (
+                <span style={fileChip}>
+                  📎 <a href={String(pds["attachmentDataUrl"])} target="_blank" rel="noreferrer" style={{ color: C.primary, fontWeight: 600 }}>{String(pds["attachmentName"])}</a>
+                  <button style={btnDanger} onClick={() => setDsMany({ attachmentName: undefined, attachmentDataUrl: undefined })} title="Remove">✕</button>
+                </span>
+              ) : (
+                <label style={uploadBtn}>⤓ Upload datasheet
+                  <input type="file" accept=".pdf,image/*" style={{ display: "none" }} onChange={onUploadDatasheet} />
+                </label>
+              )}
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
               <CurveTable title="Rated curve (datasheet)" rpm={false} pts={ratedCurve} onChange={(p) => setCurve("ratedCurve", p)} />
               <CurveTable title="Shop test (field/factory)" rpm pts={shopTest} onChange={(p) => setCurve("shopTest", p)} />
@@ -407,3 +448,7 @@ const tableScroll: CSSProperties = { overflow: "auto", maxHeight: 420, border: `
 const table: CSSProperties = { width: "100%", borderCollapse: "collapse", fontFamily: FONT };
 const cellInput: CSSProperties = { fontSize: 12.5, padding: "3px 5px", border: `1px solid ${C.line}`, borderRadius: 5, background: "#fff", color: C.ink, fontFamily: FONT, width: "100%", boxSizing: "border-box" };
 const hint: CSSProperties = { fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.5 };
+const splitBtn: CSSProperties = { fontSize: 11, fontWeight: 600, color: C.accent, background: "#eef3fb", border: `1px solid ${C.line}`, borderRadius: 5, padding: "3px 7px", cursor: "pointer", whiteSpace: "nowrap" };
+const uploadRow: CSSProperties = { display: "flex", alignItems: "center", gap: 12 };
+const uploadBtn: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: C.primary, background: "#eef3fb", border: `1px solid ${C.line}`, borderRadius: 7, padding: "6px 12px", cursor: "pointer" };
+const fileChip: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, background: "#f6f9fd", border: `1px solid ${C.line}`, borderRadius: 7, padding: "5px 10px" };

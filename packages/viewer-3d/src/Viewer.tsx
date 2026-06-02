@@ -6,6 +6,7 @@
  * lives here — it only renders an AnnotatedScene.
  */
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { MOUSE } from "three";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
@@ -18,7 +19,9 @@ const METRICS: ColorMetric[] = ["size", "role", "material", "velocity", "flow", 
 const VIEWS = ["iso", "plan", "front", "side"] as const;
 const TOGGLEABLE: LabelCategory[] = ["nodeNo", "pipeNo", "pipeSize", "valve", "elevation", "kFactor", "flow", "velocity", "pressureTotal", "source", "pump"];
 
-function CameraRig({ view }: { view: string }): null {
+/** Snaps the camera to a preset view + recenters the orbit target. Re-runs when
+ * `view` changes or `fitNonce` increments (the Fit button). */
+function CameraRig({ view, fitNonce }: { view: string; fitNonce: number }): null {
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as { target: { set: (x: number, y: number, z: number) => void }; update: () => void } | null;
   useEffect(() => {
@@ -30,7 +33,7 @@ function CameraRig({ view }: { view: string }): null {
       controls.target.set(0, 0, 0);
       controls.update();
     }
-  }, [view, camera, controls]);
+  }, [view, fitNonce, camera, controls]);
   return null;
 }
 
@@ -43,7 +46,9 @@ export function Viewer({ scene, initialMetric = "size" }: ViewerProps): JSX.Elem
   const t = useMemo(() => computeTransform(scene), [scene]);
   const [metric, setMetric] = useState<ColorMetric>(initialMetric);
   const [view, setView] = useState<string>("iso");
+  const [fitNonce, setFitNonce] = useState(0);
   const [enabled, setEnabled] = useState<Set<LabelCategory>>(new Set<LabelCategory>(["nodeNo", "pipeSize", "valve"]));
+  const fit = () => setFitNonce((n) => n + 1);
   const { pipeColors, legend } = useMemo(() => colorize(scene, metric), [scene, metric]);
 
   const toggle = (c: LabelCategory) =>
@@ -66,18 +71,31 @@ export function Viewer({ scene, initialMetric = "size" }: ViewerProps): JSX.Elem
         <Nodes scene={scene} t={t} />
         <Devices scene={scene} t={t} />
         <LabelOverlay scene={scene} t={t} enabled={enabled} />
-        <CameraRig view={view} />
-        <OrbitControls makeDefault enablePan enableZoom enableRotate />
+        <CameraRig view={view} fitNonce={fitNonce} />
+        {/* AutoCAD-style: left = orbit, middle (wheel) drag = pan, scroll = zoom. */}
+        <OrbitControls
+          makeDefault
+          enablePan
+          enableZoom
+          enableRotate
+          screenSpacePanning
+          panSpeed={0.9}
+          zoomToCursor
+          mouseButtons={{ LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.PAN, RIGHT: MOUSE.PAN }}
+        />
       </Canvas>
 
       {/* toolbar */}
       <div style={panel}>
         <div style={panelTitle}>{scene.name}</div>
 
-        <div style={groupLabel}>View</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={groupLabel}>View</div>
+          <button onClick={fit} style={fitBtn} title="Fit model to screen (recenter)">⤢ Fit</button>
+        </div>
         <div style={segment}>
           {VIEWS.map((v) => (
-            <button key={v} onClick={() => setView(v)} style={{ ...segBtn, ...(view === v ? segBtnActive : {}) }}>{v}</button>
+            <button key={v} onClick={() => { setView(v); fit(); }} style={{ ...segBtn, ...(view === v ? segBtnActive : {}) }}>{v}</button>
           ))}
         </div>
 
@@ -94,6 +112,8 @@ export function Viewer({ scene, initialMetric = "size" }: ViewerProps): JSX.Elem
             <button key={c} onClick={() => toggle(c)} style={{ ...chip, ...(enabled.has(c) ? chipActive : {}) }}>{c}</button>
           ))}
         </div>
+
+        <div style={controlsHint}>Orbit: left-drag · Pan: middle-drag (wheel) · Zoom: scroll</div>
       </div>
 
       {/* legend */}
@@ -121,6 +141,8 @@ const groupLabel: CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing
 const segment: CSSProperties = { display: "flex", background: "#eef2f7", borderRadius: 7, padding: 2, gap: 2 };
 const segBtn: CSSProperties = { flex: 1, fontSize: 11.5, padding: "4px 0", border: "none", background: "transparent", borderRadius: 5, cursor: "pointer", textTransform: "capitalize", color: "#475569", fontWeight: 600 };
 const segBtnActive: CSSProperties = { background: "#fff", color: "#0b3d91", boxShadow: "0 1px 3px rgba(0,0,0,0.14)" };
+const fitBtn: CSSProperties = { fontSize: 10.5, fontWeight: 700, color: "#0b3d91", background: "#eef2f7", border: "1px solid #d7dee6", borderRadius: 6, padding: "2px 8px", cursor: "pointer" };
+const controlsHint: CSSProperties = { marginTop: 10, paddingTop: 8, borderTop: "1px solid #eef2f7", fontSize: 10, color: "#94a3b8", lineHeight: 1.5 };
 const sel: CSSProperties = { width: "100%", fontSize: 12.5, padding: "5px 7px", border: "1px solid #cfd8e3", borderRadius: 6, background: "#fff", color: "#16243a", fontFamily: FONT, textTransform: "capitalize" };
 const chip: CSSProperties = { fontSize: 10.5, padding: "3px 8px", border: "1px solid #d7dee6", background: "#fff", color: "#64748b", borderRadius: 999, cursor: "pointer" };
 const chipActive: CSSProperties = { background: "#0b3d91", color: "#fff", borderColor: "#0b3d91", fontWeight: 600 };
