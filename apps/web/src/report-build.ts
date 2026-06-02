@@ -9,7 +9,9 @@ import { reportSheets, renderDrawingSheetSvg, type Sheet } from "@rads/report";
 export function buildReportSheets(model: ProjectModel): { sheets: Sheet[]; error?: string } {
   try {
     const sol = solveProject(model);
-    const scene = buildScene(model, { results: sol.results });
+    // Drawings are schematic (NTS): compress very long mains so a dense grid
+    // isn't squeezed into a corner by one long supply run.
+    const scene = buildScene(model, { results: sol.results, layout: { compressLongRuns: true } });
     const views: [("iso" | "plan" | "front"), string][] = [["iso", "Isometric"], ["plan", "Plan View"], ["front", "Elevation"]];
     const drawings: Sheet[] = views.map(([view, name]) => ({
       title: `Working Plan — ${name}`,

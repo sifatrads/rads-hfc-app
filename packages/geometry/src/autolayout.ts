@@ -38,6 +38,13 @@ export interface LayoutOptions {
   standpipeGap?: number;
   /** Run the coincident-node de-overlap pass. Default: true. */
   deoverlap?: boolean;
+  /**
+   * Soft-compress runs much longer than the median so one long main (e.g. a
+   * 278-ft supply) doesn't dwarf a dense sprinkler grid in a schematic (NTS)
+   * drawing. Lengths past 4× the median are drawn at 20% scale. Default: false
+   * (true geometry — used by the interactive viewer + coordinate tests).
+   */
+  compressLongRuns?: boolean;
 }
 
 export interface BBox {
@@ -56,9 +63,9 @@ export function directionOf(pipe: Pipe): Direction {
   return pipe.direction ?? ROLE_DIR[pipe.role ?? ""] ?? "E";
 }
 
-function magnitudeOf(pipe: Pipe, dir: Direction): number {
-  if (dir === "U" || dir === "D") return Math.abs(pipe.elevationChangeFt || pipe.lengthFt || 0);
-  return pipe.lengthFt || 0;
+function magnitudeOf(pipe: Pipe, dir: Direction, cap: number): number {
+  const base = dir === "U" || dir === "D" ? Math.abs(pipe.elevationChangeFt || pipe.lengthFt || 0) : pipe.lengthFt || 0;
+  return base > cap ? cap + (base - cap) * 0.2 : base;
 }
 
 function standpipeIndexFromId(id: string): number {
@@ -109,6 +116,10 @@ export function autoLayout(network: Network, opts: LayoutOptions = {}): LayoutRe
     incoming.add(p.to);
   }
 
+  // schematic long-run compression cap (Infinity = off → true geometry)
+  const medianLen = median(network.pipes.map((p) => p.lengthFt || 0));
+  const cap = opts.compressLongRuns ? Math.max(4 * medianLen, 1) : Infinity;
+
   // roots: ids that are never a pipe's `to`. Fall back to first id when fully cyclic.
   let roots = ids.filter((id) => !incoming.has(id));
   if (roots.length === 0 && ids.length > 0) roots = [ids[0]!];
@@ -126,7 +137,7 @@ export function autoLayout(network: Network, opts: LayoutOptions = {}): LayoutRe
     const base = positions.get(id)!;
     for (const pipe of byFrom.get(id) ?? []) {
       const dir = directionOf(pipe);
-      const mag = magnitudeOf(pipe, dir);
+      const mag = magnitudeOf(pipe, dir, cap);
       const v = DIR_VEC[dir] ?? DIR_VEC.E;
       if (!explicit.has(pipe.to) && !positions.has(pipe.to)) {
         positions.set(pipe.to, { x: base.x + v[0] * mag, y: base.y + v[1] * mag, z: base.z + v[2] * mag });
@@ -139,8 +150,6 @@ export function autoLayout(network: Network, opts: LayoutOptions = {}): LayoutRe
   }
   // any unreached id (disconnected) → origin
   for (const id of ids) if (!positions.has(id)) positions.set(id, { x: 0, y: 0, z: 0 });
-
-  const medianLen = median(network.pipes.map((p) => p.lengthFt || 0));
 
   // spread standpipe riser bundles horizontally so they don't stack on one line
   const gap = opts.standpipeGap ?? Math.max(medianLen, 1);

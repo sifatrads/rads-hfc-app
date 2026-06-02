@@ -5,12 +5,14 @@
  * label engine decides which actually render given the active toggles + zoom.
  */
 import type { ProjectModel, Vec3, Valve } from "@rads/model";
-import { autoLayout, directionOf } from "@rads/geometry";
+import { autoLayout, directionOf, type LayoutOptions } from "@rads/geometry";
 import type { AnnotatedScene, SceneNode, ScenePipe, SceneDevice, SceneEquipment, SceneLabel, SceneResults, NodeKind } from "./types";
 import { nominalSizeToMm, formatterFor } from "./units";
 
 export interface BuildOptions {
   results?: SceneResults;
+  /** Auto-layout tuning (e.g. compressLongRuns for schematic drawings). */
+  layout?: LayoutOptions;
 }
 
 const num = (o: unknown, k: string): number | undefined => {
@@ -49,7 +51,7 @@ export function buildScene(model: ProjectModel, opts: BuildOptions = {}): Annota
   const units = model.meta.units;
   const fmt = formatterFor(units);
   const results = opts.results;
-  const { positions, bbox } = autoLayout(model.network);
+  const { positions, bbox } = autoLayout(model.network, opts.layout);
   const at = (id: string): Vec3 => positions.get(id) ?? { x: 0, y: 0, z: 0 };
 
   // ── nodes ──
