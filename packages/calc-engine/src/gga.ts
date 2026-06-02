@@ -75,9 +75,12 @@ export interface GgaOptions {
 /** Floor on |Q| when forming the gradient, to keep the matrix conditioned near zero flow. */
 const Q_FLOOR = 1e-4;
 
-/** Hazen-Williams resistance r for hL(psi) = r·Q^1.85 (Q in gpm). */
+/**
+ * Hazen-Williams resistance r for hL(psi) = r·Q^1.85 (Q in gpm), per NFPA 13
+ * §27.2.2.1.1 where p is psi/ft:  r = 4.52·L / (C^1.85·d^4.87).
+ */
 export function hwResistance(cFactor: number, internalDiameterIn: number, totalLengthFt: number): number {
-  return (4.52 * totalLengthFt) / (100 * Math.pow(cFactor, HW_EXPONENT) * Math.pow(internalDiameterIn, 4.87));
+  return (4.52 * totalLengthFt) / (Math.pow(cFactor, HW_EXPONENT) * Math.pow(internalDiameterIn, 4.87));
 }
 
 export interface HwPipeParams {

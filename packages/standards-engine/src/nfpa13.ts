@@ -5,19 +5,28 @@ import type { StandardModule, HazardClass, DesignDensityPoint } from "./types";
  * independent snapshot audit against the printed code (validation strategy, P1).
  */
 
-// Hazen-Williams C-factors (NFPA 13 Table 23.4.3.1.1).
+// Hazen-Williams C-factors (NFPA 13 2019 Table 27.2.4.8.1).
 const C_FACTORS: Record<string, number> = {
-  steel: 120,
-  "black-steel": 120,
-  "black-steel-dry": 100,
-  galvanized: 120,
-  copper: 150,
+  "cast-iron": 100, // unlined cast or ductile iron
+  "ductile-iron": 100, // unlined
+  "cement-lined-cast-iron": 140,
+  "cement-lined-ductile-iron": 140,
+  "cement-lined": 140,
+  steel: 120, // black steel, wet (default)
+  "black-steel": 120, // wet system
+  "black-steel-wet": 120,
+  "black-steel-dry": 100, // dry / preaction system
+  galvanized: 120, // wet system
+  "galvanized-wet": 120,
+  "galvanized-dry": 100, // dry / preaction system
+  copper: 150, // copper tube, brass, or stainless steel
+  brass: 150,
+  stainless: 150,
+  plastic: 150, // listed plastic, all
   cpvc: 150,
   pvc: 150,
-  plastic: 150,
-  "cement-lined": 140,
-  "ductile-iron": 140,
-  "cast-iron": 100,
+  "asbestos-cement": 140,
+  concrete: 140,
 };
 
 const HAZARDS: HazardClass[] = [

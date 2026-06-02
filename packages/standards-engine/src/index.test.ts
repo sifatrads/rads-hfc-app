@@ -11,6 +11,17 @@ describe("standards-engine: NFPA 13", () => {
     expect(s.cFactor("unobtanium")).toBeUndefined();
   });
 
+  it("C-factors match NFPA 13 (2019) Table 27.2.4.8.1", () => {
+    expect(s.cFactor("black-steel-wet")).toBe(120);
+    expect(s.cFactor("black-steel-dry")).toBe(100);
+    expect(s.cFactor("galvanized-dry")).toBe(100);
+    expect(s.cFactor("ductile-iron")).toBe(100); // unlined
+    expect(s.cFactor("cement-lined")).toBe(140);
+    expect(s.cFactor("plastic")).toBe(150);
+    expect(s.cFactor("stainless")).toBe(150);
+    expect(s.cFactor("concrete")).toBe(140);
+  });
+
   it("exposes density/area and hose allowance", () => {
     expect(s.designDensity("oh1")).toEqual({ hazardClassId: "oh1", density: 0.15, area: 1500 });
     expect(s.hoseAllowance("oh1")).toBe(250);
