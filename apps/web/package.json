@@ -1,0 +1,34 @@
+{
+  "name": "@rads/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@rads/container": "*",
+    "@rads/dxf-import": "*",
+    "@rads/model": "*",
+    "@rads/report": "*",
+    "@rads/scene": "*",
+    "@rads/solve": "*",
+    "@rads/viewer-3d": "*",
+    "@react-three/drei": "^9.114.0",
+    "@react-three/fiber": "^8.17.10",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/three": "^0.169.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.21",
+    "vite-plugin-pwa": "^0.21.1"
+  }
+}
