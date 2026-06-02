@@ -64,16 +64,18 @@ export function App(): JSX.Element {
   }
 
   return (
-    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", fontFamily: "Helvetica, Arial, sans-serif" }}>
+    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", fontFamily: FONT, background: "#eef2f6" }}>
       <header style={header}>
-        <strong style={{ color: "#fff" }}>RADS‑HFC‑APP</strong>
-        <span style={{ color: "#9fb6d6" }}>· 3D Viewer</span>
-        <label style={fileBtn}>
-          Open .dxf / .rhfc / .json
+        <div style={brand}>
+          <span style={{ fontWeight: 800, letterSpacing: 0.3, fontSize: 16 }}>RADS·HFC</span>
+          <span style={{ opacity: 0.62, fontWeight: 500, fontSize: 12 }}>Hydraulic Calc</span>
+        </div>
+        <label style={fileBtn} title="Open a .dxf, .rhfc or .json project">
+          ＋ Open
           <input type="file" accept=".dxf,.rhfc,.json" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void openFile(f); e.target.value = ""; }} />
         </label>
-        <button style={reportBtn} disabled={!model} onClick={() => setReports(true)}>Reports</button>
-        <span style={{ marginLeft: 12, fontSize: 12, color: "#cfd8dc" }}>{status}</span>
+        <button style={{ ...reportBtn, ...(model ? {} : disabledBtn) }} disabled={!model} onClick={() => setReports(true)}>Report</button>
+        <span style={statusPill}>{status}</span>
         <span style={{ flex: 1 }} />
         <CloudBar model={model} onLoadProject={(m) => show(m, `Restored ${m.meta.name} from Drive`)} />
       </header>
@@ -97,6 +99,10 @@ export function App(): JSX.Element {
   );
 }
 
-const header: CSSProperties = { display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", background: "#0b3d91", color: "#fff", fontSize: 14 };
-const fileBtn: CSSProperties = { marginLeft: 16, padding: "4px 10px", background: "#1565c0", color: "#fff", borderRadius: 4, cursor: "pointer", fontSize: 12 };
-const reportBtn: CSSProperties = { marginLeft: 8, padding: "4px 12px", background: "#2e7d32", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 12 };
+const FONT = "'Segoe UI', system-ui, Helvetica, Arial, sans-serif";
+const header: CSSProperties = { display: "flex", alignItems: "center", gap: 10, padding: "9px 16px", background: "linear-gradient(180deg,#0d4099,#0b3d91)", color: "#fff", fontFamily: FONT, boxShadow: "0 2px 12px rgba(11,61,145,0.28)", zIndex: 10 };
+const brand: CSSProperties = { display: "flex", alignItems: "baseline", gap: 8, marginRight: 6 };
+const fileBtn: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, marginLeft: 8, padding: "5px 13px", background: "rgba(255,255,255,0.14)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 7, cursor: "pointer", fontSize: 12.5, fontWeight: 600 };
+const reportBtn: CSSProperties = { padding: "5px 14px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 12.5, fontWeight: 600 };
+const disabledBtn: CSSProperties = { opacity: 0.45, cursor: "default", background: "#64748b" };
+const statusPill: CSSProperties = { marginLeft: 4, fontSize: 11.5, color: "#dbe7fa", background: "rgba(255,255,255,0.1)", padding: "3px 10px", borderRadius: 999, maxWidth: 380, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };

@@ -30,13 +30,15 @@ describe("NFPA §27.4 report sheets", () => {
   it("produces the ordered sheet set with valid SVGs", () => {
     const sol = solveProject(model);
     const sheets = reportSheets(model, sol);
-    expect(sheets.length).toBeGreaterThanOrEqual(5); // summary, graph, supply, node, pipe
+    expect(sheets.length).toBeGreaterThanOrEqual(6); // cover, summary, graph, supply, node, pipe
     for (const s of sheets) {
       expect(s.svg.startsWith("<svg")).toBe(true);
       expect(s.svg).toContain("</svg>");
       expect(s.svg).toContain("RADS-HFC-APP"); // attribution
+      expect(s.svg).toContain("Page "); // page numbering in the footer
     }
-    const summary = sheets[0]!.svg;
+    expect(sheets[0]!.title).toBe("Cover");
+    const summary = sheets.find((s) => s.title === "Summary Sheet")!.svg;
     expect(summary).toContain("Summary Sheet");
     expect(summary).toContain("Total demand");
   });

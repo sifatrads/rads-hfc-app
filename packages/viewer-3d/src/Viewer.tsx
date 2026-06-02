@@ -72,41 +72,41 @@ export function Viewer({ scene, initialMetric = "size" }: ViewerProps): JSX.Elem
 
       {/* toolbar */}
       <div style={panel}>
-        <div style={{ fontWeight: 700, color: "#0b3d91", marginBottom: 6 }}>{scene.name}</div>
-        <div style={row}>
-          <label style={lbl}>Color by</label>
-          <select value={metric} onChange={(e) => setMetric(e.target.value as ColorMetric)} style={sel}>
-            {METRICS.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-        </div>
-        <div style={{ ...row, flexWrap: "wrap", gap: 4 }}>
+        <div style={panelTitle}>{scene.name}</div>
+
+        <div style={groupLabel}>View</div>
+        <div style={segment}>
           {VIEWS.map((v) => (
-            <button key={v} onClick={() => setView(v)} style={{ ...btn, ...(view === v ? btnActive : {}) }}>{v}</button>
+            <button key={v} onClick={() => setView(v)} style={{ ...segBtn, ...(view === v ? segBtnActive : {}) }}>{v}</button>
           ))}
         </div>
-        <div style={{ marginTop: 6, fontSize: 11, color: "#546e7a" }}>Labels</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 8px", maxWidth: 220 }}>
+
+        <div style={groupLabel}>Color by</div>
+        <select value={metric} onChange={(e) => setMetric(e.target.value as ColorMetric)} style={sel}>
+          {METRICS.map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+
+        <div style={groupLabel}>Labels</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 6px" }}>
           {TOGGLEABLE.map((c) => (
-            <label key={c} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 3 }}>
-              <input type="checkbox" checked={enabled.has(c)} onChange={() => toggle(c)} /> {c}
-            </label>
+            <button key={c} onClick={() => toggle(c)} style={{ ...chip, ...(enabled.has(c) ? chipActive : {}) }}>{c}</button>
           ))}
         </div>
       </div>
 
       {/* legend */}
       <div style={legendPanel}>
-        <div style={{ fontWeight: 700, marginBottom: 4 }}>
+        <div style={legendTitle}>
           {legend.title}
-          {legend.units ? ` (${legend.units})` : ""}
-          {legend.needsCalc ? " — run calc" : ""}
+          {legend.units ? <span style={{ color: "#94a3b8", fontWeight: 400 }}> · {legend.units}</span> : null}
+          {legend.needsCalc ? <span style={{ color: "#c2410c", fontWeight: 400 }}> — run calc</span> : null}
         </div>
         {legend.entries.map((e, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-            <span style={{ width: 16, height: 10, background: e.swatch, display: "inline-block", border: "1px solid #b0bec5" }} />
-            <span style={{ fontSize: 11 }}>{e.label}</span>
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 3 }}>
+            <span style={{ width: 18, height: 11, background: e.swatch, display: "inline-block", borderRadius: 2, boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.12)" }} />
+            <span style={{ fontSize: 11.5, color: "#16243a" }}>{e.label}</span>
           </div>
         ))}
       </div>
@@ -114,10 +114,15 @@ export function Viewer({ scene, initialMetric = "size" }: ViewerProps): JSX.Elem
   );
 }
 
-const panel: CSSProperties = { position: "absolute", top: 10, left: 10, background: "rgba(255,255,255,0.92)", border: "1px solid #cfd8dc", borderRadius: 6, padding: 10, fontFamily: "Helvetica, Arial, sans-serif", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" };
-const legendPanel: CSSProperties = { position: "absolute", bottom: 10, left: 10, background: "rgba(255,255,255,0.92)", border: "1px solid #cfd8dc", borderRadius: 6, padding: "8px 10px", fontFamily: "Helvetica, Arial, sans-serif", fontSize: 12 };
-const row: CSSProperties = { display: "flex", alignItems: "center", gap: 6, margin: "3px 0" };
-const lbl: CSSProperties = { fontSize: 11, color: "#546e7a", width: 52 };
-const sel: CSSProperties = { fontSize: 12, padding: "2px 4px" };
-const btn: CSSProperties = { fontSize: 11, padding: "2px 8px", border: "1px solid #b0bec5", background: "#fff", borderRadius: 4, cursor: "pointer", textTransform: "capitalize" };
-const btnActive: CSSProperties = { background: "#0b3d91", color: "#fff", borderColor: "#0b3d91" };
+const FONT = "'Segoe UI', system-ui, Helvetica, Arial, sans-serif";
+const panel: CSSProperties = { position: "absolute", top: 12, left: 12, width: 232, background: "rgba(255,255,255,0.97)", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 14px", fontFamily: FONT, boxShadow: "0 6px 22px rgba(15,30,60,0.16)", backdropFilter: "blur(2px)" };
+const panelTitle: CSSProperties = { fontWeight: 700, color: "#0b3d91", fontSize: 13.5, marginBottom: 10, lineHeight: 1.25, borderBottom: "1px solid #eef2f7", paddingBottom: 8 };
+const groupLabel: CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: "#94a3b8", textTransform: "uppercase", margin: "10px 0 5px" };
+const segment: CSSProperties = { display: "flex", background: "#eef2f7", borderRadius: 7, padding: 2, gap: 2 };
+const segBtn: CSSProperties = { flex: 1, fontSize: 11.5, padding: "4px 0", border: "none", background: "transparent", borderRadius: 5, cursor: "pointer", textTransform: "capitalize", color: "#475569", fontWeight: 600 };
+const segBtnActive: CSSProperties = { background: "#fff", color: "#0b3d91", boxShadow: "0 1px 3px rgba(0,0,0,0.14)" };
+const sel: CSSProperties = { width: "100%", fontSize: 12.5, padding: "5px 7px", border: "1px solid #cfd8e3", borderRadius: 6, background: "#fff", color: "#16243a", fontFamily: FONT, textTransform: "capitalize" };
+const chip: CSSProperties = { fontSize: 10.5, padding: "3px 8px", border: "1px solid #d7dee6", background: "#fff", color: "#64748b", borderRadius: 999, cursor: "pointer" };
+const chipActive: CSSProperties = { background: "#0b3d91", color: "#fff", borderColor: "#0b3d91", fontWeight: 600 };
+const legendPanel: CSSProperties = { position: "absolute", bottom: 12, left: 12, background: "rgba(255,255,255,0.97)", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 13px", fontFamily: FONT, boxShadow: "0 6px 22px rgba(15,30,60,0.16)" };
+const legendTitle: CSSProperties = { fontWeight: 700, color: "#0b3d91", fontSize: 12, marginBottom: 5 };

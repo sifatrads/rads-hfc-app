@@ -1,409 +1,452 @@
 /**
- * NFPA 13 §27.4 report sheets as vector SVG (the @react-pdf primitive set; also
- * directly rasterizable / browser-printable). Each sheet maps to a clause:
- *   Summary §27.4.5.2 · Graph §27.4.5.3 · Supply Analysis §27.4.5.4 ·
- *   Node Analysis §27.4.5.5 · Detailed Worksheet / Pipe Information §27.4.5.6.
+ * NFPA 13 §27.4 report sheets — A4 portrait vector SVG using the shared report
+ * theme (branded header band + metadata strip + footer + page numbers, stat
+ * cards, zebra tables with units in the header). Maps to:
+ *   Cover · Summary §27.4.5.2 · Graph §27.4.5.3 · Supply §27.4.5.4 ·
+ *   Node §27.4.5.5 · Detailed Worksheet §27.4.5.6 · references · pump sheets.
  */
 import type { ProjectModel } from "@rads/model";
-import { formatterFor } from "@rads/scene";
 import type { ProjectSolution } from "@rads/solve";
 import { getStandard, C_VALUE_MULTIPLIER, FITTING_EQUIV_LENGTH_FT, type StandardId } from "@rads/standards-engine";
 import { mm } from "./paper";
-
-const ATTRIBUTION = "© Sifat Sarower — RADS-HFC-APP";
-const DISCLAIMER = "Calculation aid — all results must be reviewed and stamped by a licensed fire protection engineer and accepted by the AHJ.";
-const esc = (s: string): string => String(s).replace(/[<>&'"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[c]!);
-const f = (n: number): string => n.toFixed(1);
-
-const A4 = { w: mm(210), h: mm(297) };
-const M = mm(12);
-const fontPx = mm(2.6);
+import { C, T, rect, line, frame, statCards, sectionTitle, table, INNER, CONTENT_TOP, CONTENT_BOTTOM, ROWS_PER_PAGE, PAGE, type Column, type SheetMeta } from "./report-theme";
 
 export interface Sheet {
   title: string;
   svg: string;
 }
 
-function txt(x: number, y: number, s: string, size = fontPx, fill = "#10243e", weight = "400", anchor = "start"): string {
-  return `<text x="${f(x)}" y="${f(y)}" font-size="${f(size)}" font-weight="${weight}" text-anchor="${anchor}" fill="${fill}">${esc(s)}</text>`;
+interface Spec {
+  title: string;
+  inner: string;
 }
 
-function frame(model: ProjectModel, title: string, page: string): string {
-  const y = A4.h - M;
-  return (
-    `<rect width="${f(A4.w)}" height="${f(A4.h)}" fill="#fff"/>` +
-    `<rect x="${f(M)}" y="${f(M)}" width="${f(A4.w - 2 * M)}" height="${f(A4.h - 2 * M)}" fill="none" stroke="#9bb0c3" stroke-width="0.8"/>` +
-    txt(M + mm(2), M + mm(6), title, mm(4.2), "#0b3d91", "700") +
-    txt(A4.w - M - mm(2), M + mm(6), page, mm(3), "#607d8b", "400", "end") +
-    txt(M + mm(2), M + mm(11), `${model.meta.name}  ·  ${model.meta.id}  ·  ${(model.meta.standard ?? model.meta.standardId ?? "").toString()}  ·  ${model.meta.units}`, mm(2.6), "#37474f") +
-    `<line x1="${f(M)}" y1="${f(M + mm(13))}" x2="${f(A4.w - M)}" y2="${f(M + mm(13))}" stroke="#cfd8dc" stroke-width="0.6"/>` +
-    txt(M + mm(2), y - mm(3.5), ATTRIBUTION, mm(2.3), "#546e7a", "600") +
-    txt(M + mm(2), y - mm(1), DISCLAIMER, mm(2.0), "#78909c")
+// ── unit-aware numeric formatting (value only; unit goes in the column header) ──
+function units(model: ProjectModel) {
+  const metric = model.meta.units === "metric";
+  const k = { p: metric ? 0.0689476 : 1, q: metric ? 3.785412 : 1, l: metric ? 0.3048 : 1, v: metric ? 0.3048 : 1 };
+  const U = { p: metric ? "bar" : "psi", q: metric ? "L/min" : "gpm", l: metric ? "m" : "ft", v: metric ? "m/s" : "ft/s" };
+  const fmt = (val: number | undefined, factor: number, d: number) => (val === undefined || !Number.isFinite(val) ? "—" : (val * factor).toFixed(d));
+  return {
+    U,
+    p: (v?: number, d = metric ? 2 : 1) => fmt(v, k.p, d),
+    q: (v?: number, d = metric ? 0 : 1) => fmt(v, k.q, d),
+    l: (v?: number, d = 1) => fmt(v, k.l, d),
+    v: (v?: number, d = 1) => fmt(v, k.v, d),
+    pU: (v?: number, d?: number) => `${fmt(v, k.p, d ?? (metric ? 2 : 1))} ${U.p}`,
+    qU: (v?: number, d?: number) => `${fmt(v, k.q, d ?? (metric ? 0 : 1))} ${U.q}`,
+  };
+}
+
+const num = (o: unknown, key: string): number | undefined => {
+  const v = (o as Record<string, unknown> | undefined)?.[key];
+  return typeof v === "number" ? v : undefined;
+};
+
+/** A boxed key/value section. */
+function infoBox(x: number, y: number, w: number, title: string, rows: [string, string][], rowH = mm(6)): { svg: string; endY: number } {
+  const head = mm(8.5);
+  const h = head + rows.length * rowH + mm(2);
+  const el: string[] = [rect(x, y, w, h, { fill: "#fbfdff", stroke: C.line, sw: 0.7, rx: mm(1.4) })];
+  el.push(rect(x, y, w, head, { fill: C.band, rx: mm(1.4) }));
+  el.push(rect(x, y + head - mm(1.4), w, mm(1.4), { fill: C.band }));
+  el.push(T(x + mm(3), y + mm(5.6), title, { size: mm(2.9), fill: C.primary, weight: "700" }));
+  let ry = y + head + mm(4);
+  rows.forEach(([k, v]) => {
+    el.push(T(x + mm(3), ry, k, { size: mm(2.4), fill: C.muted }));
+    el.push(T(x + w - mm(3), ry, v, { size: mm(2.5), fill: C.ink, weight: "600", anchor: "end" }));
+    ry += rowH;
+  });
+  return { svg: el.join(""), endY: y + h };
+}
+
+// ── cover ──
+function coverSpec(model: ProjectModel, sol: ProjectSolution): Spec {
+  const u = units(model);
+  const s = sol.summary;
+  const { x, w } = INNER;
+  let y = CONTENT_TOP + mm(6);
+  const el: string[] = [];
+  el.push(T(x, y, "HYDRAULIC CALCULATION REPORT", { size: mm(3.2), fill: C.accent, weight: "700" }));
+  y += mm(11);
+  el.push(T(x, y, model.meta.name, { size: mm(7.5), fill: C.ink, weight: "800" }));
+  y += mm(6);
+  el.push(T(x, y, `${model.meta.standard ?? model.meta.standardId ?? ""} · ${model.meta.hazardClass ?? model.meta.systemType ?? ""}`, { size: mm(3), fill: C.muted }));
+  y += mm(10);
+  const pass = s.passesSupply && s.meetsMinPressure;
+  el.push(
+    statCards(x, y, w, [
+      { label: "Required pressure", value: u.p(s.sourcePressurePsi), sub: `at source (${u.U.p})` },
+      { label: "Total demand", value: u.q(s.totalDemandGpm), sub: `incl. hose (${u.U.q})` },
+      { label: "Supply margin", value: u.p(s.marginPsi), sub: u.U.p, tone: s.passesSupply ? C.good : C.bad },
+      { label: "Result", value: pass ? "PASS" : "REVIEW", sub: pass ? "supply adequate" : "check supply", tone: pass ? C.good : C.warn },
+    ]),
   );
+  y += mm(28);
+  const db = model.designBasis as Record<string, unknown> | undefined;
+  const remote = s.mostRemoteSprinkler;
+  const a = infoBox(x, y, (w - mm(6)) / 2, "Design basis", [
+    ["Method", String(db?.["method"] ?? "density/area")],
+    ["Density", db?.["densityGpmFt2"] ? `${db["densityGpmFt2"]} gpm/ft²` : "—"],
+    ["Design area", db?.["designAreaFt2"] ? `${db["designAreaFt2"]} ft²` : "—"],
+    ["K-factor", db?.["sprinklerKFactor"] ? String(db["sprinklerKFactor"]) : "—"],
+    ["Operating sprinklers", db?.["operatingSprinklers"] ? String(db["operatingSprinklers"]) : "—"],
+    ["Min sprinkler pressure", u.pU(s.minSprinklerPressurePsi)],
+  ]);
+  const b = infoBox(x + (w + mm(6)) / 2, y, (w - mm(6)) / 2, "Result", [
+    ["Most-remote head", remote ? `${remote.id}` : "—"],
+    ["  pressure / flow", remote ? `${u.pU(remote.pressurePsi)} · ${u.qU(remote.flowGpm)}` : "—"],
+    ["System flow", u.qU(s.systemFlowGpm)],
+    ["Available @ demand", u.pU(s.availablePsi)],
+    ["Supply adequate", s.passesSupply ? "YES" : "NO"],
+    ["Solver converged", s.converged ? "yes" : "no"],
+  ]);
+  el.push(a.svg, b.svg);
+  return { title: "Cover", inner: el.join("") };
 }
 
-function wrap(svg: string[], title: string): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${f(A4.w)}" height="${f(A4.h)}" viewBox="0 0 ${f(A4.w)} ${f(A4.h)}" font-family="Helvetica, Arial, sans-serif">${svg.join("")}</svg>`;
+// ── summary ──
+function summarySpec(model: ProjectModel, sol: ProjectSolution): Spec {
+  const u = units(model);
+  const s = sol.summary;
+  const { x, w } = INNER;
+  let y = CONTENT_TOP + mm(4);
+  const el: string[] = [];
+  el.push(sectionTitle(x, y, w, "Hydraulic Summary — NFPA 13 §27.4.5.2"));
+  y += mm(8);
+  const pass = s.passesSupply && s.meetsMinPressure;
+  el.push(
+    statCards(x, y, w, [
+      { label: "Required pressure", value: u.p(s.sourcePressurePsi), sub: u.U.p },
+      { label: "Total demand", value: u.q(s.totalDemandGpm), sub: u.U.q },
+      { label: "Supply margin", value: u.p(s.marginPsi), sub: u.U.p, tone: s.passesSupply ? C.good : C.bad },
+      { label: "Result", value: pass ? "PASS" : "REVIEW", tone: pass ? C.good : C.warn },
+    ]),
+  );
+  y += mm(27);
+  const db = model.designBasis as Record<string, unknown> | undefined;
+  const remote = s.mostRemoteSprinkler;
+  const half = (w - mm(6)) / 2;
+  const left = infoBox(x, y, half, "Demand", [
+    ["System flow", u.qU(s.systemFlowGpm)],
+    ["Hose allowance", u.qU(s.hoseAllowanceGpm)],
+    ["Total demand", u.qU(s.totalDemandGpm)],
+    ["Most-remote sprinkler", remote ? `${remote.id}` : "—"],
+    ["  pressure / flow", remote ? `${u.pU(remote.pressurePsi)} · ${u.qU(remote.flowGpm)}` : "—"],
+  ]);
+  const right = infoBox(x + (w + mm(6)) / 2, y, half, "Supply & balance", [
+    ["Required source pressure", u.pU(s.sourcePressurePsi)],
+    ["Available @ demand", u.pU(s.availablePsi)],
+    ["Supply margin", u.pU(s.marginPsi)],
+    ["Supply adequate", s.passesSupply ? "YES" : "NO"],
+    ["Max junction imbalance", `${s.maxJunctionImbalanceGpm.toFixed(3)} gpm`],
+  ]);
+  el.push(left.svg, right.svg);
+  y = Math.max(left.endY, right.endY) + mm(8);
+  const box = infoBox(x, y, w, "Basis", [
+    ["Standard", String(model.meta.standard ?? model.meta.standardId ?? "—")],
+    ["Hazard class", String(model.meta.hazardClass ?? "—")],
+    ["Density × area", `${db?.["densityGpmFt2"] ?? "—"} gpm/ft² × ${db?.["designAreaFt2"] ?? "—"} ft²`],
+    ["K-factor", String(db?.["sprinklerKFactor"] ?? "—")],
+  ]);
+  el.push(box.svg);
+  return { title: "Summary Sheet", inner: el.join("") };
 }
 
-interface Col {
-  label: string;
-  w: number; // mm
-  align?: "start" | "end";
+// ── supply analysis ──
+function supplySpec(model: ProjectModel, sol: ProjectSolution): Spec {
+  const u = units(model);
+  const s = sol.summary;
+  const ft = (model.waterSupply as Record<string, unknown> | undefined)?.["flowTest"] as Record<string, unknown> | undefined;
+  const { x, w } = INNER;
+  let y = CONTENT_TOP + mm(4);
+  const el: string[] = [sectionTitle(x, y, w, "Water Supply Analysis — §27.4.5.4")];
+  y += mm(8);
+  const half = (w - mm(6)) / 2;
+  const left = infoBox(x, y, half, "Flow test (source)", [
+    ["Source node", s.sourceId],
+    ["Source elevation", u.l(s.sourceElevationFt) + ` ${u.U.l}`],
+    ["Static pressure", u.pU(num(ft, "staticPsi"))],
+    ["Residual pressure", u.pU(num(ft, "residualPsi"))],
+    ["Test flow", u.qU(num(ft, "testFlowGpm"))],
+  ]);
+  const right = infoBox(x + (w + mm(6)) / 2, y, half, "Demand vs supply", [
+    ["Total demand", u.qU(s.totalDemandGpm)],
+    ["Required source pressure", u.pU(s.sourcePressurePsi)],
+    ["Available @ demand", u.pU(s.availablePsi)],
+    ["Margin", u.pU(s.marginPsi)],
+    ["Adequate", s.passesSupply ? "YES" : "NO"],
+  ]);
+  el.push(left.svg, right.svg);
+  return { title: "Supply Analysis", inner: el.join("") };
 }
 
-/** Paginated table sheet. Returns one SVG per page. */
-function tableSheets(model: ProjectModel, title: string, cols: Col[], rows: string[][]): Sheet[] {
-  const top = M + mm(17);
-  const rowH = mm(5);
-  const headH = mm(6);
-  const bottom = A4.h - M - mm(8);
-  const perPage = Math.max(1, Math.floor((bottom - top - headH) / rowH));
-  const pages = Math.max(1, Math.ceil(rows.length / perPage));
-  const x0 = M + mm(2);
-  const sheets: Sheet[] = [];
-
-  for (let pg = 0; pg < pages; pg++) {
-    const el: string[] = [frame(model, title, `Page ${pg + 1} / ${pages}`)];
-    // header
-    let cx = x0;
-    let y = top;
-    for (const c of cols) {
-      el.push(txt(c.align === "end" ? cx + mm(c.w) : cx, y, c.label, mm(2.4), "#37474f", "700", c.align ?? "start"));
-      cx += mm(c.w);
-    }
-    el.push(`<line x1="${f(x0)}" y1="${f(y + mm(1.5))}" x2="${f(cx)}" y2="${f(y + mm(1.5))}" stroke="#90a4ae" stroke-width="0.5"/>`);
-    y += headH;
-    for (const r of rows.slice(pg * perPage, (pg + 1) * perPage)) {
-      cx = x0;
-      r.forEach((cell, i) => {
-        const c = cols[i]!;
-        el.push(txt(c.align === "end" ? cx + mm(c.w) : cx, y, cell, mm(2.3), "#263238", "400", c.align ?? "start"));
-        cx += mm(c.w);
-      });
-      el.push(`<line x1="${f(x0)}" y1="${f(y + mm(1.4))}" x2="${f(cx)}" y2="${f(y + mm(1.4))}" stroke="#eceff1" stroke-width="0.4"/>`);
-      y += rowH;
-    }
-    sheets.push({ title: `${title}${pages > 1 ? ` (${pg + 1}/${pages})` : ""}`, svg: wrap(el, title) });
+// ── graph (N^1.85) ──
+function graphSpec(model: ProjectModel, sol: ProjectSolution): Spec {
+  const u = units(model);
+  const s = sol.summary;
+  const { x, w } = INNER;
+  let y = CONTENT_TOP + mm(4);
+  const el: string[] = [sectionTitle(x, y, w, "Graph Sheet — N^1.85 §27.4.5.3")];
+  y += mm(10);
+  const gx = x + mm(16);
+  const gy = y;
+  const gw = w - mm(22);
+  const gh = mm(150);
+  const samples = s.supplyCurveSamples;
+  const qmax = Math.max(s.totalDemandGpm * 1.25, ...samples.map((p) => p.flowGpm), 1);
+  const pmax = Math.max(s.sourcePressurePsi * 1.2, ...samples.map((p) => p.pressurePsi), 1);
+  const X = (q: number) => gx + (Math.pow(q, 1.85) / Math.pow(qmax, 1.85)) * gw;
+  const Y = (p: number) => gy + gh - (p / pmax) * gh;
+  el.push(rect(gx, gy, gw, gh, { fill: "#fcfdff", stroke: C.line, sw: 0.8 }));
+  for (let i = 1; i <= 5; i++) {
+    const q = (qmax * i) / 5;
+    el.push(line(X(q), gy, X(q), gy + gh, "#eef2f7", 0.5));
+    el.push(T(X(q), gy + gh + mm(4), `${Math.round(q)}`, { size: mm(2.1), fill: C.muted, anchor: "middle" }));
+    const p = (pmax * i) / 5;
+    el.push(line(gx, Y(p), gx + gw, Y(p), "#eef2f7", 0.5));
+    el.push(T(gx - mm(2), Y(p) + mm(0.9), `${Math.round(p)}`, { size: mm(2.1), fill: C.muted, anchor: "end" }));
   }
-  return sheets;
+  el.push(T(gx + gw / 2, gy + gh + mm(9), `Flow (${u.U.q}) — N^1.85 scale`, { size: mm(2.5), fill: C.ink, weight: "600", anchor: "middle" }));
+  el.push(`<text x="${(gx - mm(11)).toFixed(2)}" y="${(gy + gh / 2).toFixed(2)}" font-size="${mm(2.5).toFixed(2)}" fill="${C.ink}" font-weight="600" text-anchor="middle" transform="rotate(-90 ${(gx - mm(11)).toFixed(2)} ${(gy + gh / 2).toFixed(2)})">Pressure (${u.U.p})</text>`);
+  const path = samples.map((p, i) => `${i ? "L" : "M"}${X(p.flowGpm).toFixed(1)},${Y(p.pressurePsi).toFixed(1)}`).join(" ");
+  el.push(`<path d="${path}" fill="none" stroke="${C.primary}" stroke-width="1.6"/>`);
+  const dx = X(s.totalDemandGpm);
+  const dy = Y(s.sourcePressurePsi);
+  el.push(`<circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="${mm(1.7).toFixed(1)}" fill="${C.bad}"/>`);
+  // legend box
+  const lx = gx + gw - mm(48);
+  const ly = gy + mm(4);
+  el.push(rect(lx, ly, mm(46), mm(13), { fill: "#ffffff", stroke: C.line, sw: 0.6, rx: mm(1) }));
+  el.push(line(lx + mm(2), ly + mm(4), lx + mm(8), ly + mm(4), C.primary, 1.6), T(lx + mm(10), ly + mm(4.8), "Supply curve", { size: mm(2.2), fill: C.ink }));
+  el.push(`<circle cx="${(lx + mm(5)).toFixed(1)}" cy="${(ly + mm(9)).toFixed(1)}" r="${mm(1.4).toFixed(1)}" fill="${C.bad}"/>`, T(lx + mm(10), ly + mm(9.8), `Demand ${u.q(s.totalDemandGpm)} @ ${u.p(s.sourcePressurePsi)}`, { size: mm(2.2), fill: C.ink }));
+  return { title: "Graph Sheet", inner: el.join("") };
 }
 
-/** Key/value sheet (single page). */
-function kvSheet(model: ProjectModel, title: string, sections: { heading: string; rows: [string, string][] }[]): Sheet {
-  const el: string[] = [frame(model, title, "Page 1 / 1")];
-  let y = M + mm(20);
-  const xK = M + mm(3), xV = M + mm(75);
-  for (const sec of sections) {
-    el.push(txt(M + mm(2), y, sec.heading, mm(3), "#0b3d91", "700"));
-    y += mm(6);
-    for (const [k, v] of sec.rows) {
-      el.push(txt(xK, y, k, mm(2.5), "#546e7a"));
-      el.push(txt(xV, y, v, mm(2.6), "#10243e", "600"));
+// ── generic paginated table specs ──
+function tableSpecs(title: string, cols: Column[], rows: string[][]): Spec[] {
+  const pages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
+  const out: Spec[] = [];
+  for (let p = 0; p < pages; p++) {
+    const { x, w } = INNER;
+    let y = CONTENT_TOP + mm(4);
+    const el: string[] = [sectionTitle(x, y, w, pages > 1 ? `${title}  (${p + 1}/${pages})` : title)];
+    y += mm(7);
+    el.push(table(x, y, w, cols, rows.slice(p * ROWS_PER_PAGE, (p + 1) * ROWS_PER_PAGE)).svg);
+    out.push({ title, inner: el.join("") });
+  }
+  return out;
+}
+
+function nodeSpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
+  const u = units(model);
+  const cols: Column[] = [
+    { label: "Node", w: 0.2 },
+    { label: "Type", w: 0.24 },
+    { label: "Elev", unit: u.U.l, w: 0.14, align: "r" },
+    { label: "Pt", unit: u.U.p, w: 0.14, align: "r" },
+    { label: "Pn", unit: u.U.p, w: 0.14, align: "r" },
+    { label: "Discharge", unit: u.U.q, w: 0.14, align: "r" },
+  ];
+  const rows = model.network.nodes.map((n) => {
+    const r = sol.results.nodes[n.id];
+    return [n.id, n.type, u.l(n.elevationFt ?? 0), u.p(r?.totalPressurePsi), u.p(r?.normalPressurePsi), u.q(r?.dischargeGpm)];
+  });
+  return tableSpecs("Node Analysis — §27.4.5.5", cols, rows);
+}
+
+function pipeSpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
+  const u = units(model);
+  const cols: Column[] = [
+    { label: "Pipe", w: 0.1 },
+    { label: "From → To", w: 0.2 },
+    { label: "Size", w: 0.09 },
+    { label: "C", w: 0.06, align: "r" },
+    { label: "Len", unit: u.U.l, w: 0.09, align: "r" },
+    { label: "EqL", unit: u.U.l, w: 0.08, align: "r" },
+    { label: "Flow", unit: u.U.q, w: 0.11, align: "r" },
+    { label: "Vel", unit: u.U.v, w: 0.09, align: "r" },
+    { label: "Pf", unit: u.U.p, w: 0.09, align: "r" },
+    { label: "Pe", unit: u.U.p, w: 0.09, align: "r" },
+  ];
+  const rows = model.network.pipes.map((p) => {
+    const r = sol.results.pipes[p.id];
+    const l = sol.gga.links[p.id];
+    return [p.id, `${p.from} → ${p.to}`, String(p.nominalSize ?? "—"), String(p.cFactor ?? l?.cFactorUsed ?? "—"), u.l(p.lengthFt ?? 0), u.l(l?.equivalentLengthFt ?? 0), u.q(r?.flowGpm), u.v(r?.velocityFps), u.p(r?.frictionLossPsi), u.p(r?.elevationLossPsi)];
+  });
+  return tableSpecs("Detailed Worksheet — Pipe Information §27.4.5.6", cols, rows);
+}
+
+function junctionSpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
+  const rows = Object.entries(sol.gga.nodeImbalanceGpm)
+    .map(([id, v]) => [id, v.toFixed(4)] as [string, string])
+    .sort((a, b) => Math.abs(Number(b[1])) - Math.abs(Number(a[1])));
+  return tableSpecs(`Hydraulic Junction Points — balance ≤ 0.5 psi (§27.2.2.4.1) · max ${sol.summary.maxJunctionImbalanceGpm.toFixed(4)} gpm`, [{ label: "Junction node", w: 0.6 }, { label: "Flow imbalance", unit: "gpm", w: 0.4, align: "r" }], rows);
+}
+
+// ── reference sheets ──
+function textSpec(title: string, blocks: { heading: string; lines: string[] }[]): Spec {
+  const { x, w } = INNER;
+  let y = CONTENT_TOP + mm(4);
+  const el: string[] = [sectionTitle(x, y, w, title)];
+  y += mm(9);
+  for (const b of blocks) {
+    el.push(T(x, y, b.heading, { size: mm(2.9), fill: C.primary, weight: "700" }));
+    y += mm(5.5);
+    for (const ln of b.lines) {
+      el.push(T(x + mm(3), y, ln, { size: mm(2.5), fill: C.ink }));
       y += mm(5);
     }
     y += mm(3);
   }
-  return { title, svg: wrap(el, title) };
+  return { title, inner: el.join("") };
 }
 
-export function summarySheet(model: ProjectModel, sol: ProjectSolution): Sheet {
-  const u = formatterFor(model.meta.units);
-  const db = model.meta.units;
-  const s = sol.summary;
-  const dbasis = model.designBasis as Record<string, unknown> | undefined;
-  const remote = s.mostRemoteSprinkler;
-  return kvSheet(model, "Hydraulic Summary Sheet — NFPA 13 §27.4.5.2", [
-    {
-      heading: "Design basis",
-      rows: [
-        ["System type", String(model.meta.systemType ?? "—")],
-        ["Hazard class", String(model.meta.hazardClass ?? "—")],
-        ["Design density", dbasis?.["densityGpmFt2"] ? `${dbasis["densityGpmFt2"]} gpm/ft²` : "—"],
-        ["Design area", dbasis?.["designAreaFt2"] ? `${dbasis["designAreaFt2"]} ft²` : "—"],
-        ["Sprinkler K-factor", dbasis?.["sprinklerKFactor"] ? String(dbasis["sprinklerKFactor"]) : "—"],
-        ["Min sprinkler pressure", u.pressure(s.minSprinklerPressurePsi)],
-      ],
-    },
-    {
-      heading: "Demand",
-      rows: [
-        ["System flow", u.flow(s.systemFlowGpm)],
-        ["Hose allowance", u.flow(s.hoseAllowanceGpm)],
-        ["Total demand", u.flow(s.totalDemandGpm)],
-        ["Most-remote sprinkler", remote ? `${remote.id}: ${u.pressure(remote.pressurePsi)}, ${u.flow(remote.flowGpm)}` : "—"],
-      ],
-    },
-    {
-      heading: "Result",
-      rows: [
-        ["Required source pressure", u.pressure(s.sourcePressurePsi)],
-        ["Available @ demand", u.pressure(s.availablePsi)],
-        ["Supply margin", u.pressure(s.marginPsi)],
-        ["Supply adequate", s.passesSupply ? "YES" : "NO ⚠"],
-        ["Junction balance (max imbalance)", `${s.maxJunctionImbalanceGpm.toFixed(3)} gpm`],
-        ["Solver converged", `${s.converged ? "yes" : "no"} · ${db}`],
-      ],
-    },
-  ]);
-}
-
-export function supplyAnalysisSheet(model: ProjectModel, sol: ProjectSolution): Sheet {
-  const u = formatterFor(model.meta.units);
-  const s = sol.summary;
-  const ft = (model.waterSupply as Record<string, unknown> | undefined)?.["flowTest"] as Record<string, unknown> | undefined;
-  return kvSheet(model, "Water Supply Analysis — NFPA 13 §27.4.5.4", [
-    {
-      heading: "Flow test (source)",
-      rows: [
-        ["Source node", s.sourceId],
-        ["Source elevation", u.len(s.sourceElevationFt)],
-        ["Static pressure", u.pressure((ft?.["staticPsi"] as number) ?? NaN)],
-        ["Residual pressure", u.pressure((ft?.["residualPsi"] as number) ?? NaN)],
-        ["Test flow", u.flow((ft?.["testFlowGpm"] as number) ?? NaN)],
-      ],
-    },
-    {
-      heading: "Demand vs supply",
-      rows: [
-        ["Total demand", u.flow(s.totalDemandGpm)],
-        ["Required source pressure", u.pressure(s.sourcePressurePsi)],
-        ["Available @ demand", u.pressure(s.availablePsi)],
-        ["Margin", u.pressure(s.marginPsi)],
-        ["Supply adequate", s.passesSupply ? "YES" : "NO ⚠"],
-      ],
-    },
-  ]);
-}
-
-export function nodeAnalysisSheets(model: ProjectModel, sol: ProjectSolution): Sheet[] {
-  const u = formatterFor(model.meta.units);
-  const cols: Col[] = [
-    { label: "Node", w: 30 },
-    { label: "Elev", w: 22, align: "end" },
-    { label: "Type", w: 34 },
-    { label: "Pt", w: 26, align: "end" },
-    { label: "Pn", w: 26, align: "end" },
-    { label: "Discharge", w: 30, align: "end" },
-  ];
-  const rows = model.network.nodes.map((n) => {
-    const r = sol.results.nodes[n.id];
-    return [n.id, u.len(n.elevationFt ?? 0), n.type, r?.totalPressurePsi !== undefined ? u.pressure(r.totalPressurePsi) : "—", r?.normalPressurePsi !== undefined ? u.pressure(r.normalPressurePsi) : "—", r?.dischargeGpm !== undefined ? u.flow(r.dischargeGpm) : ""];
-  });
-  return tableSheets(model, "Node Analysis — §27.4.5.5", cols, rows);
-}
-
-export function pipeWorksheetSheets(model: ProjectModel, sol: ProjectSolution): Sheet[] {
-  const u = formatterFor(model.meta.units);
-  const cols: Col[] = [
-    { label: "Pipe", w: 18 },
-    { label: "From→To", w: 30 },
-    { label: "Size", w: 14 },
-    { label: "C", w: 10, align: "end" },
-    { label: "Len", w: 16, align: "end" },
-    { label: "EqL", w: 14, align: "end" },
-    { label: "Flow", w: 20, align: "end" },
-    { label: "Vel", w: 16, align: "end" },
-    { label: "Pf", w: 18, align: "end" },
-    { label: "Pe", w: 18, align: "end" },
-  ];
-  const linkOf = (id: string) => sol.gga.links[id];
-  const rows = model.network.pipes.map((p) => {
-    const r = sol.results.pipes[p.id];
-    const l = linkOf(p.id);
-    return [
-      p.id,
-      `${p.from}→${p.to}`,
-      String(p.nominalSize ?? "—"),
-      String(p.cFactor ?? l?.cFactorUsed ?? "—"),
-      (p.lengthFt ?? 0).toFixed(1),
-      (l?.equivalentLengthFt ?? 0).toFixed(1),
-      r?.flowGpm !== undefined ? u.flow(r.flowGpm) : "—",
-      r?.velocityFps !== undefined ? u.velocity(r.velocityFps) : "—",
-      r?.frictionLossPsi !== undefined ? u.pressure(r.frictionLossPsi) : "—",
-      r?.elevationLossPsi !== undefined ? u.pressure(r.elevationLossPsi) : "—",
-    ];
-  });
-  return tableSheets(model, "Detailed Worksheet — Pipe Information §27.4.5.6", cols, rows);
-}
-
-export function graphSheet(model: ProjectModel, sol: ProjectSolution): Sheet {
-  const u = formatterFor(model.meta.units);
-  const s = sol.summary;
-  const el: string[] = [frame(model, "Graph Sheet — N^1.85 §27.4.5.3", "Page 1 / 1")];
-  const gx = M + mm(18), gy = M + mm(22);
-  const gw = A4.w - 2 * M - mm(24), gh = mm(150);
-  const samples = s.supplyCurveSamples;
-  const qmax = Math.max(s.totalDemandGpm * 1.2, ...samples.map((p) => p.flowGpm), 1);
-  const pmax = Math.max(s.sourcePressurePsi * 1.2, ...samples.map((p) => p.pressurePsi), 1);
-  const X = (q: number) => gx + (Math.pow(q, 1.85) / Math.pow(qmax, 1.85)) * gw; // Q^1.85 axis
-  const Y = (p: number) => gy + gh - (p / pmax) * gh;
-
-  // axes + grid (label actual Q at gridlines)
-  el.push(`<rect x="${f(gx)}" y="${f(gy)}" width="${f(gw)}" height="${f(gh)}" fill="#fff" stroke="#90a4ae" stroke-width="0.6"/>`);
-  for (let i = 1; i <= 5; i++) {
-    const q = (qmax * i) / 5;
-    const x = X(q);
-    el.push(`<line x1="${f(x)}" y1="${f(gy)}" x2="${f(x)}" y2="${f(gy + gh)}" stroke="#eceff1" stroke-width="0.4"/>`);
-    el.push(txt(x, gy + gh + mm(4), `${Math.round(q)}`, mm(2.2), "#607d8b", "400", "middle"));
-    const p = (pmax * i) / 5;
-    const y = Y(p);
-    el.push(`<line x1="${f(gx)}" y1="${f(y)}" x2="${f(gx + gw)}" y2="${f(y)}" stroke="#eceff1" stroke-width="0.4"/>`);
-    el.push(txt(gx - mm(2), y + mm(1), `${Math.round(p)}`, mm(2.2), "#607d8b", "400", "end"));
-  }
-  el.push(txt(gx + gw / 2, gy + gh + mm(9), `Flow (${u.flow(1).split(" ")[1] ?? "gpm"}) — N^1.85 scale`, mm(2.6), "#37474f", "600", "middle"));
-  el.push(`<text x="${f(gx - mm(11))}" y="${f(gy + gh / 2)}" font-size="${f(mm(2.6))}" fill="#37474f" font-weight="600" text-anchor="middle" transform="rotate(-90 ${f(gx - mm(11))} ${f(gy + gh / 2)})">Pressure (${u.pressure(1).split(" ")[1] ?? "psi"})</text>`);
-
-  // supply curve
-  const path = samples.map((p, i) => `${i ? "L" : "M"}${f(X(p.flowGpm))},${f(Y(p.pressurePsi))}`).join(" ");
-  el.push(`<path d="${path}" fill="none" stroke="#0b3d91" stroke-width="1.2"/>`);
-  el.push(txt(X(samples[samples.length - 1]?.flowGpm ?? 0) - mm(2), Y(samples[samples.length - 1]?.pressurePsi ?? 0) - mm(2), "Supply", mm(2.4), "#0b3d91", "600", "end"));
-  // demand point
-  const dx = X(s.totalDemandGpm), dy = Y(s.sourcePressurePsi);
-  el.push(`<circle cx="${f(dx)}" cy="${f(dy)}" r="${f(mm(1.6))}" fill="#e53935"/>`);
-  el.push(txt(dx + mm(3), dy, `Demand ${u.flow(s.totalDemandGpm)} @ ${u.pressure(s.sourcePressurePsi)}`, mm(2.4), "#c62828", "600"));
-
-  return { title: "Graph Sheet", svg: wrap(el, "Graph Sheet") };
-}
-
-/** Free-text sheet (formulas / procedure). */
-function textSheet(model: ProjectModel, title: string, blocks: { heading: string; lines: string[] }[]): Sheet {
-  const el: string[] = [frame(model, title, "Page 1 / 1")];
-  let y = M + mm(20);
-  for (const b of blocks) {
-    el.push(txt(M + mm(2), y, b.heading, mm(3), "#0b3d91", "700"));
-    y += mm(6);
-    for (const line of b.lines) {
-      el.push(txt(M + mm(4), y, line, mm(2.5), "#263238"));
-      y += mm(5.2);
-    }
-    y += mm(3);
-  }
-  return { title, svg: wrap(el, title) };
-}
-
-export function formulasSheet(model: ProjectModel): Sheet {
-  return textSheet(model, "Formulas & Calculation Procedure — NFPA 13 §27.2", [
-    { heading: "Friction loss — Hazen-Williams (§27.2.2.1.1)", lines: ["p = 4.52 · Q^1.85 / (C^1.85 · d^4.87)    [psi per ft]", "P_friction = p × (pipe length + fitting equivalent length)"] },
-    { heading: "Discharge — K-factor (§27.2.2.5)", lines: ["Q = K · √P     (P = pressure at the node)"] },
-    { heading: "Velocity & normal pressure (§27.2.2.2–3)", lines: ["V = 0.4085 · Q / d²    [ft/s]", "P_v = 0.001123 · Q² / d⁴    [psi]", "P_n = P_t − P_v"] },
+function formulasSpec(): Spec {
+  return textSpec("Formulas & Calculation Procedure — NFPA 13 §27.2", [
+    { heading: "Friction loss — Hazen-Williams (§27.2.2.1.1)", lines: ["p = 4.52 · Q^1.85 / (C^1.85 · d^4.87)   [psi per ft]", "P_friction = p × (pipe length + fitting equivalent length)"] },
+    { heading: "Discharge — K-factor (§27.2.2.5)", lines: ["Q = K · √P   (P = pressure at the node)"] },
+    { heading: "Velocity & normal pressure (§27.2.2.2–3)", lines: ["V = 0.4085 · Q / d²   [ft/s]", "P_v = 0.001123 · Q² / d⁴   [psi]", "P_n = P_t − P_v"] },
     { heading: "Elevation head (§27.2.2)", lines: ["ΔP = 0.433 psi/ft × Δelevation"] },
-    { heading: "Equivalent length (§27.2.3)", lines: ["modifier = (actual ID / Sch-40 ID)^4.87  (§27.2.3.1.3.1)", "Table 27.2.3.1.1 is at C = 120; multiply by Table 27.2.3.2.1 factor for other C."] },
-    { heading: "Procedure", lines: ["Density/area method · calculation begins at the hydraulically most-remote sprinkler.", "Each design-area sprinkler discharges ≥ density × coverage area.", "Pressures at hydraulic junction points balance within 0.5 psi (§27.2.2.4.1)."] },
+    { heading: "Equivalent length (§27.2.3)", lines: ["modifier = (actual ID / Sch-40 ID)^4.87   (§27.2.3.1.3.1)", "Table 27.2.3.1.1 is at C = 120; multiply by the Table 27.2.3.2.1 factor for other C."] },
+    { heading: "Procedure", lines: ["Density/area method · begin at the hydraulically most-remote sprinkler.", "Each design-area sprinkler discharges ≥ density × coverage area.", "Junction pressures balance within 0.5 psi (§27.2.2.4.1)."] },
   ]);
 }
 
-export function cValuesSheet(model: ProjectModel): Sheet {
+function cValuesSpec(model: ProjectModel): Spec {
   let cvals: Record<string, number> = {};
   try {
     cvals = getStandard((model.meta.standardId ?? "nfpa13") as StandardId).hazenWilliamsCValues?.() ?? {};
   } catch {
-    /* standard not implemented */
+    /* not implemented */
   }
   const rows = Object.entries(cvals).sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0])).map(([m, c]) => [m, String(c)]);
-  return tableSheets(model, "Hazen-Williams C Values — Table 27.2.4.8.1", [{ label: "Pipe / material", w: 100 }, { label: "C", w: 20, align: "end" }], rows)[0]!;
+  const { x, w } = INNER;
+  let y = CONTENT_TOP + mm(4);
+  const el: string[] = [sectionTitle(x, y, w, "Hazen-Williams C Values — Table 27.2.4.8.1")];
+  y += mm(7);
+  el.push(table(x, y, w, [{ label: "Pipe / material", w: 0.75 }, { label: "C", w: 0.25, align: "r" }], rows).svg);
+  return { title: "Hazen-Williams C Values", inner: el.join("") };
 }
 
-export function equivalentLengthSheet(model: ProjectModel): Sheet {
-  const el: string[] = [frame(model, "Equivalent Pipe Lengths & C-Multiplier — §27.2.3", "Page 1 / 1")];
-  let y = M + mm(20);
-  el.push(txt(M + mm(2), y, "C-value multiplier (Table 27.2.3.2.1)", mm(3), "#0b3d91", "700"));
-  y += mm(6);
-  for (const [c, mul] of Object.entries(C_VALUE_MULTIPLIER)) {
-    el.push(txt(M + mm(4), y, `C = ${c}`, mm(2.5)));
-    el.push(txt(M + mm(36), y, `× ${mul}`, mm(2.5), "#10243e", "600"));
-    y += mm(5);
-  }
-  y += mm(5);
-  el.push(txt(M + mm(2), y, "Equivalent Sch-40 length, ft (Table 27.2.3.1.1, C = 120)", mm(3), "#0b3d91", "700"));
-  y += mm(6);
+function equivSpec(): Spec {
+  const { x, w } = INNER;
+  let y = CONTENT_TOP + mm(4);
+  const el: string[] = [sectionTitle(x, y, w, "Equivalent Pipe Lengths & C-Multiplier — §27.2.3")];
+  y += mm(9);
+  el.push(T(x, y, "C-value multiplier (Table 27.2.3.2.1)", { size: mm(2.9), fill: C.primary, weight: "700" }));
+  y += mm(5.5);
+  el.push(table(x, y, (w - mm(8)) / 2, [{ label: "Value of C", w: 0.6 }, { label: "× factor", w: 0.4, align: "r" }], Object.entries(C_VALUE_MULTIPLIER).map(([c, m]) => [c, String(m)])).svg);
+  y += mm(8);
   const sizes = ["1", "1-1/2", "2", "2-1/2", "4", "6"];
-  el.push(txt(M + mm(4), y, "Fitting / valve", mm(2.3), "#37474f", "700"));
-  sizes.forEach((s, i) => el.push(txt(M + mm(60) + i * mm(20), y, `${s}"`, mm(2.3), "#37474f", "700", "end")));
+  const cols: Column[] = [{ label: "Fitting / valve", w: 0.34 }, ...sizes.map((s) => ({ label: `${s}"`, w: 0.11, align: "r" as const }))];
+  const rows = Object.entries(FITTING_EQUIV_LENGTH_FT).map(([fit, row]) => [fit, ...sizes.map((s) => (row[s] !== undefined ? String(row[s]) : "—"))]);
+  el.push(T(x, y, "Equivalent Sch-40 length, ft (Table 27.2.3.1.1, C = 120)", { size: mm(2.9), fill: C.primary, weight: "700" }));
   y += mm(5);
-  for (const [fit, row] of Object.entries(FITTING_EQUIV_LENGTH_FT)) {
-    el.push(txt(M + mm(4), y, fit, mm(2.3)));
-    sizes.forEach((s, i) => el.push(txt(M + mm(60) + i * mm(20), y, row[s] !== undefined ? String(row[s]) : "—", mm(2.3), "#263238", "400", "end")));
-    y += mm(4.6);
-  }
-  el.push(txt(M + mm(4), y + mm(2), "Reference table — audit against the printed NFPA 13 before production use.", mm(2), "#78909c"));
-  return { title: "Equivalent Lengths & C-Multiplier", svg: wrap(el, "Equivalent Lengths") };
+  el.push(table(x, y, w, cols, rows).svg);
+  el.push(T(x, CONTENT_BOTTOM - mm(2), "Reference table — audit against the printed NFPA 13 before production use.", { size: mm(2), fill: C.faint }));
+  return { title: "Equivalent Lengths", inner: el.join("") };
 }
 
-export function junctionBalancingSheets(model: ProjectModel, sol: ProjectSolution): Sheet[] {
-  const rows = Object.entries(sol.gga.nodeImbalanceGpm)
-    .map(([id, v]) => [id, v.toFixed(4)] as [string, string])
-    .sort((a, b) => Math.abs(Number(b[1])) - Math.abs(Number(a[1])));
-  return tableSheets(
-    model,
-    `Hydraulic Junction Points — balance ≤ 0.5 psi (§27.2.2.4.1) · max imbalance ${sol.summary.maxJunctionImbalanceGpm.toFixed(4)} gpm`,
-    [{ label: "Junction node", w: 70 }, { label: "Flow imbalance (gpm)", w: 50, align: "end" }],
-    rows,
-  );
-}
-
-export function pumpSheets(model: ProjectModel, sol: ProjectSolution): Sheet[] {
+function pumpSpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
   const ws = model.waterSupply as Record<string, unknown> | undefined;
   const fp = ws?.["firePump"] as Record<string, unknown> | undefined;
   const pump = model.network.pump;
   if (!fp && !pump) return [];
-  const u = formatterFor(model.meta.units);
+  const u = units(model);
   const ds = pump?.datasheet ?? {};
-  const ratedFlow = ds.ratedFlowGpm ?? (fp?.["ratedFlowGpm"] as number | undefined);
-  const ratedPsi = ds.ratedPsi ?? (fp?.["ratedPsi"] as number | undefined);
-  const churn = ds.churnPsi ?? (fp?.["churnPsi"] as number | undefined);
-  const overFlow = ds.overloadFlowGpm ?? (fp?.["overloadFlowGpm"] as number | undefined);
-  const overPsi = ds.overloadPsi ?? (fp?.["overloadPsi"] as number | undefined);
+  const rf = ds.ratedFlowGpm ?? (fp?.["ratedFlowGpm"] as number | undefined);
+  const rp = ds.ratedPsi ?? (fp?.["ratedPsi"] as number | undefined);
+  const ch = ds.churnPsi ?? (fp?.["churnPsi"] as number | undefined);
+  const of = ds.overloadFlowGpm ?? (fp?.["overloadFlowGpm"] as number | undefined);
+  const op = ds.overloadPsi ?? (fp?.["overloadPsi"] as number | undefined);
   const s = sol.summary;
-  const sheets: Sheet[] = [];
+  const { x, w } = INNER;
+  const out: Spec[] = [];
 
-  sheets.push(
-    kvSheet(model, "Fire Pump — Datasheet", [
-      {
-        heading: "Nameplate / listing",
-        rows: [
-          ["Make", String(ds.make ?? "—")],
-          ["Model", String(ds.model ?? "—")],
-          ["Type", String(ds.type ?? "—")],
-          ["Listed", String(ds.listed ?? fp?.["listed"] ?? "—")],
-          ["Rated flow", ratedFlow !== undefined ? u.flow(ratedFlow) : "—"],
-          ["Rated pressure", ratedPsi !== undefined ? u.pressure(ratedPsi) : "—"],
-          ["Churn (shutoff)", churn !== undefined ? u.pressure(churn) : "—"],
-          ["150% overload", overFlow !== undefined ? `${u.flow(overFlow)} @ ${u.pressure(overPsi ?? NaN)}` : "—"],
-          ["RPM", ds.rpm !== undefined ? String(ds.rpm) : "—"],
-          ["Impeller", ds.impellerIn !== undefined ? `${ds.impellerIn} in` : "—"],
-          ["Motor", ds.motorHp !== undefined ? `${ds.motorHp} hp` : "—"],
-        ],
-      },
-    ]),
+  let y = CONTENT_TOP + mm(4);
+  let el: string[] = [sectionTitle(x, y, w, "Fire Pump — Datasheet")];
+  y += mm(8);
+  el.push(
+    infoBox(x, y, w, "Nameplate / listing", [
+      ["Make", String(ds.make ?? "—")],
+      ["Model", String(ds.model ?? "—")],
+      ["Type", String(ds.type ?? "—")],
+      ["Listed", String(ds.listed ?? fp?.["listed"] ?? "—")],
+      ["Rated point", rf !== undefined ? `${u.qU(rf)} @ ${u.pU(rp)}` : "—"],
+      ["Churn (shutoff)", u.pU(ch)],
+      ["150% overload", of !== undefined ? `${u.qU(of)} @ ${u.pU(op)}` : "—"],
+      ["RPM / impeller / motor", `${ds.rpm ?? "—"} · ${ds.impellerIn ?? "—"} in · ${ds.motorHp ?? "—"} hp`],
+    ]).svg,
   );
-  sheets.push(
-    kvSheet(model, "Fire Pump — Hydraulic Calculation", [
-      { heading: "Performance points (NFPA 20)", rows: [["Churn @ 0 gpm", churn !== undefined ? u.pressure(churn) : "—"], ["Rated point", ratedFlow !== undefined ? `${u.flow(ratedFlow)} @ ${u.pressure(ratedPsi ?? NaN)}` : "—"], ["150% point", overFlow !== undefined ? `${u.flow(overFlow)} @ ${u.pressure(overPsi ?? NaN)}` : "—"]] },
-      { heading: "System operating point", rows: [["System demand", u.flow(s.totalDemandGpm)], ["Required source pressure", u.pressure(s.sourcePressurePsi)], ["Available @ demand (with pump)", u.pressure(s.availablePsi)], ["Margin", u.pressure(s.marginPsi)], ["Adequate", s.passesSupply ? "YES" : "NO ⚠"]] },
-    ]),
-  );
+  out.push({ title: "Fire Pump — Datasheet", inner: el.join("") });
+
+  y = CONTENT_TOP + mm(4);
+  el = [sectionTitle(x, y, w, "Fire Pump — Hydraulic Calculation")];
+  y += mm(8);
+  const half = (w - mm(6)) / 2;
+  const a = infoBox(x, y, half, "Performance points (NFPA 20)", [
+    ["Churn @ 0 gpm", u.pU(ch)],
+    ["Rated point", rf !== undefined ? `${u.qU(rf)} @ ${u.pU(rp)}` : "—"],
+    ["150% point", of !== undefined ? `${u.qU(of)} @ ${u.pU(op)}` : "—"],
+  ]);
+  const b = infoBox(x + (w + mm(6)) / 2, y, half, "System operating point", [
+    ["System demand", u.qU(s.totalDemandGpm)],
+    ["Required source pressure", u.pU(s.sourcePressurePsi)],
+    ["Available (with pump)", u.pU(s.availablePsi)],
+    ["Margin", u.pU(s.marginPsi)],
+    ["Adequate", s.passesSupply ? "YES" : "NO"],
+  ]);
+  el.push(a.svg, b.svg);
+  out.push({ title: "Fire Pump — Hydraulic Calc", inner: el.join("") });
+
   const st = pump?.shopTest ?? [];
+  y = CONTENT_TOP + mm(4);
+  el = [sectionTitle(x, y, w, "Fire Pump — Shop Test Data")];
+  y += mm(8);
   if (st.length) {
-    sheets.push(tableSheets(model, "Fire Pump — Shop Test Data", [{ label: "Flow", w: 30, align: "end" }, { label: "Pressure", w: 30, align: "end" }, { label: "RPM", w: 30, align: "end" }], st.map((p) => [u.flow(p.flowGpm), u.pressure(p.psi), p.rpm !== undefined ? String(p.rpm) : "—"]))[0]!);
+    el.push(table(x, y, w, [{ label: "Flow", unit: u.U.q, w: 0.34, align: "r" }, { label: "Pressure", unit: u.U.p, w: 0.33, align: "r" }, { label: "RPM", w: 0.33, align: "r" }], st.map((p) => [u.q(p.flowGpm), u.p(p.psi), p.rpm !== undefined ? String(p.rpm) : "—"])).svg);
   } else {
-    sheets.push(kvSheet(model, "Fire Pump — Shop Test Data", [{ heading: "Field / acceptance test", rows: [["Shop-test curve", "not provided — attach witnessed test results"]] }]));
+    el.push(infoBox(x, y, w, "Field / acceptance test", [["Shop-test curve", "not provided — attach witnessed test results"]]).svg);
   }
-  return sheets;
+  out.push({ title: "Fire Pump — Shop Test", inner: el.join("") });
+  return out;
 }
 
-/** The full ordered report set for a solved project (NFPA 13 §27.4 + references). */
+/** Frame an array of content specs with a consistent header/footer + page x/total. */
+function frameAll(model: ProjectModel, specs: Spec[]): Sheet[] {
+  const total = specs.length;
+  return specs.map((sp, i) => ({ title: sp.title, svg: frame(model, { title: sp.title, page: i + 1, total } as SheetMeta, sp.inner) }));
+}
+
+/** The full ordered §27.4 report. */
 export function reportSheets(model: ProjectModel, sol: ProjectSolution): Sheet[] {
-  return [
-    summarySheet(model, sol),
-    graphSheet(model, sol),
-    supplyAnalysisSheet(model, sol),
-    ...nodeAnalysisSheets(model, sol),
-    ...pipeWorksheetSheets(model, sol),
-    ...junctionBalancingSheets(model, sol),
-    formulasSheet(model),
-    cValuesSheet(model),
-    equivalentLengthSheet(model),
-    ...pumpSheets(model, sol),
+  const specs: Spec[] = [
+    coverSpec(model, sol),
+    summarySpec(model, sol),
+    graphSpec(model, sol),
+    supplySpec(model, sol),
+    ...nodeSpecs(model, sol),
+    ...pipeSpecs(model, sol),
+    ...junctionSpecs(model, sol),
+    formulasSpec(),
+    cValuesSpec(model),
+    equivSpec(),
+    ...pumpSpecs(model, sol),
   ];
+  return frameAll(model, specs);
+}
+
+// named exports used elsewhere / by tests
+export function summarySheet(model: ProjectModel, sol: ProjectSolution): Sheet {
+  return frameAll(model, [summarySpec(model, sol)])[0]!;
+}
+export function pipeWorksheetSheets(model: ProjectModel, sol: ProjectSolution): Sheet[] {
+  return frameAll(model, pipeSpecs(model, sol));
+}
+export function nodeAnalysisSheets(model: ProjectModel, sol: ProjectSolution): Sheet[] {
+  return frameAll(model, nodeSpecs(model, sol));
+}
+export function graphSheet(model: ProjectModel, sol: ProjectSolution): Sheet {
+  return frameAll(model, [graphSpec(model, sol)])[0]!;
 }
