@@ -7,7 +7,8 @@
   "author": "Sifat Sarower",
   "license": "PolyForm-Noncommercial-1.0.0",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "test": "vitest run",
