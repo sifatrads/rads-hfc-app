@@ -8,6 +8,7 @@ import { decodeJSON, isRhfc } from "@rads/container";
 import { sampleProject } from "./sample";
 import { ImportDialog } from "./ImportDialog";
 import { ReportsPanel } from "./ReportsPanel";
+import { CloudBar } from "./CloudBar";
 
 interface Pending {
   doc: DxfDoc;
@@ -73,7 +74,8 @@ export function App(): JSX.Element {
         </label>
         <button style={reportBtn} disabled={!model} onClick={() => setReports(true)}>Reports</button>
         <span style={{ marginLeft: 12, fontSize: 12, color: "#cfd8dc" }}>{status}</span>
-        <span style={{ marginLeft: "auto", fontSize: 11, color: "#7f93b3" }}>© Sifat Sarower — calculation aid; verify with a licensed PE &amp; the AHJ</span>
+        <span style={{ flex: 1 }} />
+        <CloudBar model={model} />
       </header>
       <main style={{ flex: 1, position: "relative" }}>
         {scene ? <Viewer scene={scene} /> : <div style={{ padding: 20 }}>Loading…</div>}

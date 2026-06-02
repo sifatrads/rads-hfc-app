@@ -6,6 +6,7 @@ coverage/
 .DS_Store
 .env
 .env.*
+!.env.example
 # Copyrighted reference standards (NFPA / EN / FM / ISO) — local-only, NEVER publish
 NFPA/
 standards-reference/
@@ -16,3 +17,7 @@ test_data/
 apps/*/ios/
 apps/*/android/
 .vite/
+# Firebase CLI local cache / logs (deploy config is firebase.json + .firebaserc)
+.firebase/
+firebase-debug.log
+*.log

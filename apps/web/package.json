@@ -19,6 +19,7 @@
     "@rads/viewer-3d": "*",
     "@react-three/drei": "^9.114.0",
     "@react-three/fiber": "^8.17.10",
+    "firebase": "^12.14.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "three": "^0.169.0"
