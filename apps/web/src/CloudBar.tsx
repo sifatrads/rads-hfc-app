@@ -9,7 +9,7 @@ import type { ProjectModel } from "@rads/model";
 import { solveProject } from "@rads/solve";
 import { firebaseConfigured } from "./firebase";
 import { onUser, signIn, signOutUser, getDriveAccessToken, type User } from "./cloud/auth";
-import { saveProjectMeta } from "./cloud/firestore";
+import { saveProject } from "./cloud/firestore";
 import { backupToDrive, listDriveBackups, restoreFromDrive, type DriveBackup } from "./cloud/drive";
 import { enableNotifications, messagingSupported } from "./cloud/messaging";
 
@@ -31,7 +31,7 @@ export function CloudBar({ model, onLoadProject }: { model: ProjectModel | null;
     setMsg("Saving…");
     try {
       if (!getDriveAccessToken()) await signIn(); // refresh Drive token if needed
-      const driveFileId = await backupToDrive(model); // full encrypted .rhfc → user's Drive
+      const driveFileId = await backupToDrive(model); // full project (plain JSON) → user's Drive
       let result: { requiredPressurePsi?: number; systemFlowGpm?: number } = {};
       try {
         const s = solveProject(model).summary;
@@ -39,8 +39,8 @@ export function CloudBar({ model, onLoadProject }: { model: ProjectModel | null;
       } catch {
         /* geometry-only */
       }
-      await saveProjectMeta(user.uid, { id: model.meta.id, name: model.meta.name, standardId: model.meta.standardId, systemType: model.meta.systemType, units: model.meta.units, rev: model.meta.rev, driveFileId, ...result });
-      setMsg("Saved to Drive + metadata ✓");
+      await saveProject(user.uid, model, { driveFileId, ...result }); // full sync to Firestore
+      setMsg("Synced to Firestore + Drive ✓");
     } catch (e) {
       setMsg(`Save failed: ${(e as Error).message}`);
     } finally {
