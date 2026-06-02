@@ -39,4 +39,21 @@ export interface StandardModule {
 
   /** Listed nominal K-factors for this standard's unit system. */
   standardKFactors(): number[];
+
+  // ── equivalent length / friction reference (optional; NFPA 13 §27.2.3) ──
+
+  /** Hazen-Williams C value table (material id → C). */
+  hazenWilliamsCValues?(): Record<string, number>;
+
+  /** C-value multiplier for the equivalent-length table (Table 27.2.3.2.1). */
+  cValueMultiplier?(cFactor: number): number;
+
+  /** Schedule-40 internal diameter for a nominal size (in / mm). */
+  schedule40IdIn?(nominalSize: string): number | undefined;
+
+  /** Diameter modifier for non-Sch-40 ID (§27.2.3.1.3.1): (actual/sch40)^4.87. */
+  equivalentLengthModifier?(actualIdIn: number, nominalSize: string): number;
+
+  /** Equivalent pipe length (ft/m) for a fitting/valve at a nominal size (Table 27.2.3.1.1). */
+  fittingEquivalentLength?(fitting: string, nominalSize: string, opts?: { cFactor?: number; actualIdIn?: number }): number | undefined;
 }

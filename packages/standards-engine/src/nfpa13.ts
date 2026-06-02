@@ -1,4 +1,5 @@
 import type { StandardModule, HazardClass, DesignDensityPoint } from "./types";
+import { cValueMultiplier, equivalentLengthModifier, fittingEquivalentLengthFt, SCH40_ID_IN } from "./tables-nfpa13";
 
 /**
  * NFPA 13 (imperial). Representative data — every table is flagged for an
@@ -68,4 +69,9 @@ export const nfpa13: StandardModule = {
   hoseAllowance: (id) => HOSE[id],
   minResidualPressure: () => 7,
   standardKFactors: () => [4.2, 5.6, 8.0, 11.2, 14.0, 16.8, 22.4, 25.2],
+  hazenWilliamsCValues: () => ({ ...C_FACTORS }),
+  cValueMultiplier,
+  schedule40IdIn: (nominalSize) => SCH40_ID_IN[nominalSize],
+  equivalentLengthModifier,
+  fittingEquivalentLength: (fitting, nominalSize, opts) => fittingEquivalentLengthFt(fitting, nominalSize, opts ?? {}),
 };

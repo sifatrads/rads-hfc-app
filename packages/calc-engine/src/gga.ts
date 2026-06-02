@@ -15,6 +15,7 @@
  * Σ|ΔQ| / Σ|Q| < tolerance. The exact branch-line solver is the validation oracle.
  */
 import { solveLinear } from "./linalg";
+import { velocityFps as velocityFpsOf, velocityPressurePsi } from "./hydraulics";
 
 export const HW_EXPONENT = 1.85;
 
@@ -39,6 +40,11 @@ export interface GgaLink {
   /** Exponent n (1.85 pipe, 2 emitter). */
   exponent: number;
   internalDiameterIn?: number;
+  // ── optional reporting passthrough (echoed into the link result) ──
+  nominalSize?: string;
+  cFactorUsed?: number;
+  lengthFt?: number;
+  equivalentLengthFt?: number;
 }
 
 export interface GgaNetwork {
@@ -49,14 +55,33 @@ export interface GgaNetwork {
 export interface GgaNodeResult {
   id: string;
   headPsi: number;
+  /** Gauge (total) pressure = head − 0.433·elevation. */
   pressurePsi: number;
+  elevationFt: number;
+  /** Representative velocity pressure from the highest-flow connected pipe. */
+  velocityPressurePsi?: number;
+  /** Normal pressure P_n = P_t − P_v (NFPA 13 §27.2.2.3). */
+  normalPressurePsi?: number;
+  /** Discharge drawn at this node through emitters (gpm). */
+  dischargeGpm?: number;
 }
 
 export interface GgaLinkResult {
   id: string;
   flowGpm: number;
+  /** Friction loss only (the GGA works in total head, so head loss is pure friction). */
   headlossPsi: number;
+  frictionLossPsi: number;
+  /** Elevation head across the link, 0.433·(elev_to − elev_from), psi. */
+  elevationLossPsi: number;
+  /** friction + elevation, psi. */
+  totalLossPsi: number;
   velocityFps?: number;
+  velocityPressurePsi?: number;
+  nominalSize?: string;
+  cFactorUsed?: number;
+  lengthFt?: number;
+  equivalentLengthFt?: number;
 }
 
 export interface GgaResult {
@@ -64,6 +89,10 @@ export interface GgaResult {
   iterations: number;
   nodes: Record<string, GgaNodeResult>;
   links: Record<string, GgaLinkResult>;
+  /** Per-junction flow continuity residual (gpm); ≈ 0 at convergence. */
+  nodeImbalanceGpm: Record<string, number>;
+  /** Largest |continuity residual| over all junctions (gpm). */
+  maxImbalanceGpm: number;
 }
 
 export interface GgaOptions {
@@ -199,19 +228,73 @@ export function solveGga(network: GgaNetwork, opts: GgaOptions = {}): GgaResult 
       id: node.id,
       headPsi: head,
       pressurePsi: head - 0.433 * (node.elevationFt ?? 0),
+      elevationFt: node.elevationFt ?? 0,
     };
   }
 
   const links: Record<string, GgaLinkResult> = {};
+  // continuity residual per junction, and per-node aggregation for Pv/Pn + discharge
+  const imbalance = new Map<string, number>();
+  for (const n of junctions) imbalance.set(n.id, -(n.demandGpm ?? 0));
+  const bestPv = new Map<string, { flow: number; pv: number }>();
+  const discharge = new Map<string, number>();
+
   network.links.forEach((link, p) => {
     const q = Q[p]!;
-    const hL = link.resistance * q * Math.pow(Math.abs(q), link.exponent - 1);
-    const result: GgaLinkResult = { id: link.id, flowGpm: q, headlossPsi: hL };
+    const aq = Math.abs(q);
+    const hL = link.resistance * q * Math.pow(aq, link.exponent - 1);
+    const elevTo = nodeById.get(link.to)?.elevationFt ?? 0;
+    const elevFrom = nodeById.get(link.from)?.elevationFt ?? 0;
+    const elevationLossPsi = 0.433 * (elevTo - elevFrom);
+    const result: GgaLinkResult = {
+      id: link.id,
+      flowGpm: q,
+      headlossPsi: hL,
+      frictionLossPsi: hL,
+      elevationLossPsi,
+      totalLossPsi: hL + elevationLossPsi,
+    };
     if (link.internalDiameterIn) {
-      result.velocityFps = (0.4085 * Math.abs(q)) / (link.internalDiameterIn * link.internalDiameterIn);
+      result.velocityFps = velocityFpsOf(aq, link.internalDiameterIn);
+      result.velocityPressurePsi = velocityPressurePsi(aq, link.internalDiameterIn);
     }
+    if (link.nominalSize !== undefined) result.nominalSize = link.nominalSize;
+    if (link.cFactorUsed !== undefined) result.cFactorUsed = link.cFactorUsed;
+    if (link.lengthFt !== undefined) result.lengthFt = link.lengthFt;
+    if (link.equivalentLengthFt !== undefined) result.equivalentLengthFt = link.equivalentLengthFt;
     links[link.id] = result;
+
+    // continuity: flow leaves `from` (−q) and enters `to` (+q)
+    if (imbalance.has(link.from)) imbalance.set(link.from, imbalance.get(link.from)! - q);
+    if (imbalance.has(link.to)) imbalance.set(link.to, imbalance.get(link.to)! + q);
+    // emitters draw discharge at their `from` node
+    if (link.exponent === 2) discharge.set(link.from, (discharge.get(link.from) ?? 0) + q);
+    // representative velocity pressure = highest-flow connected pipe
+    if (result.velocityPressurePsi !== undefined) {
+      for (const id of [link.from, link.to]) {
+        const cur = bestPv.get(id);
+        if (!cur || aq > cur.flow) bestPv.set(id, { flow: aq, pv: result.velocityPressurePsi });
+      }
+    }
   });
 
-  return { converged, iterations, nodes, links };
+  for (const node of network.nodes) {
+    const r = nodes[node.id]!;
+    const pv = bestPv.get(node.id)?.pv;
+    if (pv !== undefined) {
+      r.velocityPressurePsi = pv;
+      r.normalPressurePsi = r.pressurePsi - pv;
+    }
+    const d = discharge.get(node.id);
+    if (d !== undefined) r.dischargeGpm = d;
+  }
+
+  const nodeImbalanceGpm: Record<string, number> = {};
+  let maxImbalanceGpm = 0;
+  for (const [id, v] of imbalance) {
+    nodeImbalanceGpm[id] = v;
+    maxImbalanceGpm = Math.max(maxImbalanceGpm, Math.abs(v));
+  }
+
+  return { converged, iterations, nodes, links, nodeImbalanceGpm, maxImbalanceGpm };
 }
