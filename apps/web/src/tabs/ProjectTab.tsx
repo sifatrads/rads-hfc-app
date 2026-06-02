@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode, type 
 import type { ProjectModel, NetworkNode, Pipe, Valve, Pump, PumpCurvePoint, Direction } from "@rads/model";
 import {
   NOMINAL_SIZES, PIPE_ROLES, NODE_TYPES, VALVE_TYPES, PUMP_TYPES, PUMP_DRIVERS, VALVE_EQUIV_FT,
-  DIRECTIONS, DIRECTION_LABEL, renumberNetwork, normalizePipe, withModel,
+  DIRECTIONS, DIRECTION_LABEL, renumberNetwork, normalizePipe, withModel, splitPipeInModel,
 } from "../network-edit";
 import { C, FONT, card, sectionTitle, field, fieldLabel, input, select, btnPrimary, btnGhost, btnDanger, th, td } from "../ui";
 
@@ -111,19 +111,7 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
     commitStructural(nodes, [...pipes, { id: `P-${pipes.length + 1}`, from: lastTo, to, role: "branch-line", nominalSize: "1", lengthFt: 10, fittings: [] }]);
   };
   const delPipe = (i: number) => commitStructural(nodes, pipes.filter((_, j) => j !== i));
-  // Divide a pipe: insert a junction at the midpoint, split length (and any
-  // elevation change) in half. Renumber assigns the new node + pipe ids.
-  const splitPipe = (i: number) => {
-    const p = pipes[i]!;
-    const byId = new Map(nodes.map((n) => [n.id, n]));
-    const e1 = byId.get(p.from)?.elevationFt ?? 0, e2 = byId.get(p.to)?.elevationFt ?? 0;
-    const mid: NetworkNode = { id: "tmp-mid", type: "junction", elevationFt: (e1 + e2) / 2, fittings: [] } as NetworkNode;
-    const halfL = (p.lengthFt ?? 0) / 2;
-    const halfE = p.elevationChangeFt !== undefined ? p.elevationChangeFt / 2 : undefined;
-    const p1: Pipe = { ...p, to: "tmp-mid", lengthFt: halfL, ...(halfE !== undefined ? { elevationChangeFt: halfE } : {}) };
-    const p2: Pipe = { ...p, from: "tmp-mid", to: p.to, lengthFt: halfL, fittings: [], ...(halfE !== undefined ? { elevationChangeFt: halfE } : {}) };
-    commitStructural([...nodes, mid], [...pipes.slice(0, i), p1, p2, ...pipes.slice(i + 1)]);
-  };
+  const splitPipe = (i: number) => onChange(splitPipeInModel(model, pipes[i]!.id, 0.5));
 
   const renumber = () => commitStructural(nodes, pipes);
 

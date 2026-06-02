@@ -13,7 +13,7 @@ import { parseDxf, analyzeDxf, type DxfDoc, type DxfAnalysis } from "@rads/dxf-i
 import { solveProject, type ProjectSolution } from "@rads/solve";
 import { decodeJSON, encodeJSON, isRhfc } from "@rads/container";
 import { sampleProject } from "./sample";
-import { newProject } from "./network-edit";
+import { newProject, splitPipeInModel, deleteNodeInModel } from "./network-edit";
 import { ImportDialog } from "./ImportDialog";
 import { CloudBar } from "./CloudBar";
 import { ProjectTab } from "./tabs/ProjectTab";
@@ -139,7 +139,13 @@ export function App(): JSX.Element {
           ) : tab === "project" ? (
             <ProjectTab model={model} onChange={(m) => { setModel(m); setNote("Edited"); }} />
           ) : tab === "view" ? (
-            scene ? <Viewer scene={scene} /> : <div style={{ padding: 24, color: C.muted }}>No geometry.</div>
+            scene ? (
+              <Viewer
+                scene={scene}
+                onSplitPipe={(pipeId, fraction) => { setModel((m) => (m ? splitPipeInModel(m, pipeId, fraction) : m)); setNote("Split pipe in 3D"); }}
+                onDeleteNode={(nodeId) => { setModel((m) => (m ? deleteNodeInModel(m, nodeId) : m)); setNote("Deleted node in 3D"); }}
+              />
+            ) : <div style={{ padding: 24, color: C.muted }}>No geometry.</div>
           ) : tab === "summary" ? (
             <SummaryTab model={model} solution={sol} error={solveError} />
           ) : tab === "analysis" ? (

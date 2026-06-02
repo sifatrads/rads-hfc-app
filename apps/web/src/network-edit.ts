@@ -113,3 +113,43 @@ export function newProject(now: string): ProjectModel {
 export function withModel(model: ProjectModel, patch: Partial<ProjectModel>): ProjectModel {
   return parseProject({ ...model, ...patch });
 }
+
+/** Replace the network's nodes+pipes, renumbering to 1..N / P-1.., and re-parse. */
+function commitNetwork(model: ProjectModel, nodes: NetworkNode[], pipes: Pipe[]): ProjectModel {
+  const r = renumberNetwork(nodes, pipes.map(normalizePipe));
+  return withModel(model, { network: { ...model.network, nodes: r.nodes, pipes: r.pipes } });
+}
+
+/**
+ * Divide a pipe at `fraction` (0..1) of its length: insert a junction there and
+ * split length + elevation change proportionally. Used by both the Project-tab
+ * Split button and click-to-split in the 3D view.
+ */
+export function splitPipeInModel(model: ProjectModel, pipeId: string, fraction = 0.5): ProjectModel {
+  const pipes = model.network.pipes;
+  const i = pipes.findIndex((p) => p.id === pipeId);
+  if (i < 0) return model;
+  const p = pipes[i]!;
+  const fr = Math.min(0.9, Math.max(0.1, fraction));
+  const byId = new Map(model.network.nodes.map((n) => [n.id, n]));
+  const e1 = byId.get(p.from)?.elevationFt ?? 0, e2 = byId.get(p.to)?.elevationFt ?? 0;
+  const mid = { id: "tmp-mid", type: "junction", elevationFt: e1 + (e2 - e1) * fr, fittings: [] } as NetworkNode;
+  const len = p.lengthFt ?? 0, ec = p.elevationChangeFt;
+  const p1: Pipe = { ...p, to: "tmp-mid", lengthFt: len * fr, ...(ec !== undefined ? { elevationChangeFt: ec * fr } : {}) };
+  const p2: Pipe = { ...p, from: "tmp-mid", to: p.to, lengthFt: len * (1 - fr), fittings: [], ...(ec !== undefined ? { elevationChangeFt: ec * (1 - fr) } : {}) };
+  return commitNetwork(model, [...model.network.nodes, mid], [...pipes.slice(0, i), p1, p2, ...pipes.slice(i + 1)]);
+}
+
+/** Delete a node and every pipe touching it. */
+export function deleteNodeInModel(model: ProjectModel, nodeId: string): ProjectModel {
+  return commitNetwork(
+    model,
+    model.network.nodes.filter((n) => n.id !== nodeId),
+    model.network.pipes.filter((p) => p.from !== nodeId && p.to !== nodeId),
+  );
+}
+
+/** Delete a single pipe (nodes untouched). */
+export function deletePipeInModel(model: ProjectModel, pipeId: string): ProjectModel {
+  return commitNetwork(model, model.network.nodes, model.network.pipes.filter((p) => p.id !== pipeId));
+}

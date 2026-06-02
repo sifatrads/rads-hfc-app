@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { solveProject } from "@rads/solve";
 import { encodeJSON, decodeJSON } from "@rads/container";
 import { parseProject } from "@rads/model";
-import { newProject, renumberNetwork, normalizePipe, internalDiameterFor, withModel } from "./network-edit";
+import { newProject, renumberNetwork, normalizePipe, internalDiameterFor, withModel, splitPipeInModel, deleteNodeInModel, deletePipeInModel } from "./network-edit";
 import type { NetworkNode, Pipe } from "@rads/model";
 
 describe("in-app data entry → solve", () => {
@@ -68,5 +68,43 @@ describe("in-app data entry → solve", () => {
     expect(back.network.reservoir?.capacityGal).toBe(20000);
     expect(back.network.suction?.sizeIn).toBe(6);
     expect(back.network.valves[0]!.type).toBe("check-valve");
+  });
+
+  // Build a 3-node line (1→2→3) to exercise the click-to-edit ops.
+  const line3 = () => {
+    let m = newProject("2026-06-03T00:00:00.000Z");
+    const nodes: NetworkNode[] = [
+      m.network.nodes[0]!,
+      { id: "2", type: "junction", elevationFt: 10, fittings: [] } as unknown as NetworkNode,
+      { id: "3", type: "sprinkler", elevationFt: 10, kFactor: 5.6, fittings: [] } as unknown as NetworkNode,
+    ];
+    const pipes: Pipe[] = [
+      { id: "P-1", from: "1", to: "2", role: "riser", nominalSize: "2", lengthFt: 20, elevationChangeFt: 10, direction: "U", fittings: [] },
+      { id: "P-2", from: "2", to: "3", role: "branch-line", nominalSize: "1", lengthFt: 10, direction: "E", fittings: [] },
+    ];
+    return withModel(m, { network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } });
+  };
+
+  it("splitPipeInModel inserts a node and halves length/elevation", () => {
+    const out = splitPipeInModel(line3(), "P-1", 0.5);
+    expect(out.network.nodes.length).toBe(4); // 3 + inserted
+    expect(out.network.pipes.length).toBe(3); // P-1 (riser) became two
+    const halves = out.network.pipes.filter((p) => p.role === "riser"); // the two halves of the 20-ft riser
+    expect(halves.length).toBe(2);
+    expect(halves.every((p) => Math.abs((p.lengthFt ?? 0) - 10) < 1e-6)).toBe(true);
+    expect(halves.every((p) => Math.abs((p.elevationChangeFt ?? 0) - 5) < 1e-6)).toBe(true);
+  });
+
+  it("deleteNodeInModel removes the node and its pipes, renumbering 1..N", () => {
+    const out = deleteNodeInModel(line3(), "2"); // middle node → both pipes go
+    expect(out.network.nodes.length).toBe(2);
+    expect(out.network.pipes.length).toBe(0);
+    expect(out.network.nodes.map((n) => n.id)).toEqual(["1", "2"]);
+  });
+
+  it("deletePipeInModel removes one pipe, keeps nodes", () => {
+    const out = deletePipeInModel(line3(), "P-2");
+    expect(out.network.pipes.map((p) => p.id)).toEqual(["P-1"]);
+    expect(out.network.nodes.length).toBe(3);
   });
 });

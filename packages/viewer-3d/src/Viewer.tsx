@@ -5,7 +5,7 @@
  * engine. Reuses @rads/scene (colorize) + @rads/labeling. No project/calc logic
  * lives here — it only renders an AnnotatedScene.
  */
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { MOUSE } from "three";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
@@ -18,6 +18,16 @@ import { LabelOverlay } from "./LabelOverlay";
 const METRICS: ColorMetric[] = ["size", "role", "material", "velocity", "flow", "pressure", "pressureDrop"];
 const VIEWS = ["iso", "plan", "front", "side"] as const;
 const TOGGLEABLE: LabelCategory[] = ["nodeNo", "pipeNo", "pipeSize", "valve", "elevation", "kFactor", "flow", "velocity", "pressureTotal", "source", "pump"];
+
+/** Widen the line/point pick tolerance so thin pipe lines are easy to click. */
+function RaycastTuning(): null {
+  const raycaster = useThree((s) => s.raycaster);
+  useEffect(() => {
+    raycaster.params.Line = { threshold: 0.6 };
+    raycaster.params.Points = { threshold: 1 };
+  }, [raycaster]);
+  return null;
+}
 
 /** Snaps the camera to a preset view + recenters the orbit target. Re-runs when
  * `view` changes or `fitNonce` increments (the Fit button). */
@@ -40,15 +50,30 @@ function CameraRig({ view, fitNonce }: { view: string; fitNonce: number }): null
 export interface ViewerProps {
   scene: AnnotatedScene;
   initialMetric?: ColorMetric;
+  /** When provided, an Edit toggle appears: click a pipe to split it here. */
+  onSplitPipe?: (pipeId: string, fraction: number) => void;
+  /** When provided, an Edit toggle appears: click a node to delete it. */
+  onDeleteNode?: (nodeId: string) => void;
 }
 
-export function Viewer({ scene, initialMetric = "size" }: ViewerProps): JSX.Element {
+type EditSel =
+  | { kind: "pipe"; id: string; fraction: number; x: number; y: number }
+  | { kind: "node"; id: string; x: number; y: number };
+
+export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNode }: ViewerProps): JSX.Element {
   const t = useMemo(() => computeTransform(scene), [scene]);
   const [metric, setMetric] = useState<ColorMetric>(initialMetric);
   const [view, setView] = useState<string>("iso");
   const [fitNonce, setFitNonce] = useState(0);
   const [enabled, setEnabled] = useState<Set<LabelCategory>>(new Set<LabelCategory>(["nodeNo", "pipeSize", "valve"]));
+  const [edit, setEdit] = useState(false);
+  const [picked, setPicked] = useState<EditSel | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canEdit = !!(onSplitPipe || onDeleteNode);
   const fit = () => setFitNonce((n) => n + 1);
+  const rel = (cx: number, cy: number) => { const r = containerRef.current?.getBoundingClientRect(); return { x: cx - (r?.left ?? 0), y: cy - (r?.top ?? 0) }; };
+  const pickPipe = (id: string, fraction: number, cx: number, cy: number) => { const p = rel(cx, cy); setPicked({ kind: "pipe", id, fraction, x: p.x, y: p.y }); };
+  const pickNode = (id: string, cx: number, cy: number) => { const p = rel(cx, cy); setPicked({ kind: "node", id, x: p.x, y: p.y }); };
   const { pipeColors, legend } = useMemo(() => colorize(scene, metric), [scene, metric]);
 
   const toggle = (c: LabelCategory) =>
@@ -60,15 +85,20 @@ export function Viewer({ scene, initialMetric = "size" }: ViewerProps): JSX.Elem
     });
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%", background: "#eef2f5" }}>
-      <Canvas camera={{ position: VIEW_POSITIONS.iso, fov: 45, near: 0.1, far: 6000 }} dpr={[1, 2]}>
+    <div ref={containerRef} style={{ position: "relative", width: "100%", height: "100%", background: "#eef2f5" }}>
+      <Canvas
+        camera={{ position: VIEW_POSITIONS.iso, fov: 45, near: 0.1, far: 6000 }}
+        dpr={[1, 2]}
+        onPointerMissed={() => setPicked(null)}
+      >
+        <RaycastTuning />
         <color attach="background" args={["#eef2f5"]} />
         <ambientLight intensity={0.85} />
         <directionalLight position={[30, 50, 20]} intensity={0.7} />
         <directionalLight position={[-20, 10, -30]} intensity={0.25} />
         <gridHelper args={[120, 24, "#cfd8dc", "#e3e9ed"]} position={[0, -0.01, 0]} />
-        <Pipes scene={scene} t={t} colors={pipeColors} />
-        <Nodes scene={scene} t={t} />
+        <Pipes scene={scene} t={t} colors={pipeColors} onPick={edit && onSplitPipe ? pickPipe : undefined} />
+        <Nodes scene={scene} t={t} onPick={edit && onDeleteNode ? pickNode : undefined} />
         <Devices scene={scene} t={t} />
         <LabelOverlay scene={scene} t={t} enabled={enabled} />
         <CameraRig view={view} fitNonce={fitNonce} />
@@ -88,6 +118,12 @@ export function Viewer({ scene, initialMetric = "size" }: ViewerProps): JSX.Elem
       {/* toolbar */}
       <div style={panel}>
         <div style={panelTitle}>{scene.name}</div>
+
+        {canEdit && (
+          <button onClick={() => { setEdit((e) => !e); setPicked(null); }} style={{ ...editToggle, ...(edit ? editToggleOn : {}) }}>
+            {edit ? "✓ Editing — click a pipe to split, a node to delete" : "✏️ Edit model"}
+          </button>
+        )}
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={groupLabel}>View</div>
@@ -130,6 +166,24 @@ export function Viewer({ scene, initialMetric = "size" }: ViewerProps): JSX.Elem
           </div>
         ))}
       </div>
+
+      {/* edit action menu (anchored at the click) */}
+      {picked && (
+        <div style={{ ...menu, left: Math.min(picked.x, (containerRef.current?.clientWidth ?? 9999) - 170), top: picked.y + 8 }}>
+          {picked.kind === "pipe" ? (
+            <>
+              <div style={menuTitle}>Pipe {picked.id}</div>
+              <button style={menuBtn} onClick={() => { onSplitPipe?.(picked.id, picked.fraction); setPicked(null); }}>⊟ Split here ({Math.round(picked.fraction * 100)}%)</button>
+            </>
+          ) : (
+            <>
+              <div style={menuTitle}>Node {picked.id}</div>
+              <button style={{ ...menuBtn, color: "#b91c1c" }} onClick={() => { onDeleteNode?.(picked.id); setPicked(null); }}>🗑 Delete node + its pipes</button>
+            </>
+          )}
+          <button style={menuCancel} onClick={() => setPicked(null)}>Cancel</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -148,3 +202,9 @@ const chip: CSSProperties = { fontSize: 10.5, padding: "3px 8px", border: "1px s
 const chipActive: CSSProperties = { background: "#0b3d91", color: "#fff", borderColor: "#0b3d91", fontWeight: 600 };
 const legendPanel: CSSProperties = { position: "absolute", bottom: 12, left: 12, background: "rgba(255,255,255,0.97)", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 13px", fontFamily: FONT, boxShadow: "0 6px 22px rgba(15,30,60,0.16)" };
 const legendTitle: CSSProperties = { fontWeight: 700, color: "#0b3d91", fontSize: 12, marginBottom: 5 };
+const editToggle: CSSProperties = { width: "100%", margin: "0 0 8px", padding: "6px 10px", fontSize: 12, fontWeight: 700, color: "#0b3d91", background: "#eef3fb", border: "1px solid #cfdcee", borderRadius: 7, cursor: "pointer", textAlign: "left" };
+const editToggleOn: CSSProperties = { background: "#16a34a", color: "#fff", borderColor: "#16a34a" };
+const menu: CSSProperties = { position: "absolute", zIndex: 30, minWidth: 160, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 9, boxShadow: "0 8px 26px rgba(15,30,60,0.22)", padding: 6, fontFamily: FONT };
+const menuTitle: CSSProperties = { fontSize: 11, fontWeight: 700, color: "#64748b", padding: "3px 8px 6px" };
+const menuBtn: CSSProperties = { display: "block", width: "100%", textAlign: "left", fontSize: 12.5, fontWeight: 600, color: "#0b3d91", background: "transparent", border: "none", borderRadius: 6, padding: "7px 8px", cursor: "pointer" };
+const menuCancel: CSSProperties = { display: "block", width: "100%", textAlign: "left", fontSize: 11.5, color: "#94a3b8", background: "transparent", border: "none", borderRadius: 6, padding: "5px 8px", cursor: "pointer" };

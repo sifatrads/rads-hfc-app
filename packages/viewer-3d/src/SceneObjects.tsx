@@ -6,6 +6,7 @@
  * metric never rebuilds geometry.
  */
 import { useLayoutEffect, useMemo, useRef } from "react";
+import type { ThreeEvent } from "@react-three/fiber";
 import {
   InstancedMesh,
   SphereGeometry,
@@ -21,7 +22,7 @@ import { symbolIdFor } from "@rads/nfpa170";
 import { toThree, type SceneTransform } from "./transform";
 import { symbolTexture } from "./symbolTexture";
 
-export function Pipes({ scene, t, colors }: { scene: AnnotatedScene; t: SceneTransform; colors: Map<string, string> }): JSX.Element {
+export function Pipes({ scene, t, colors, onPick }: { scene: AnnotatedScene; t: SceneTransform; colors: Map<string, string>; onPick?: (pipeId: string, fraction: number, clientX: number, clientY: number) => void }): JSX.Element {
   // One geometry sized to the pipe count; positions + per-vertex colors filled
   // in the effect. New geometry only when the pipe count changes.
   const geo = useMemo(() => {
@@ -51,10 +52,25 @@ export function Pipes({ scene, t, colors }: { scene: AnnotatedScene; t: SceneTra
     geo.computeBoundingSphere();
   }, [scene, t, colors, geo]);
 
-  return <lineSegments args={[geo, mat]} />;
+  const handleClick = onPick
+    ? (e: ThreeEvent<MouseEvent>) => {
+        if (e.index == null) return;
+        e.stopPropagation();
+        const p = scene.pipes[Math.floor(e.index / 2)];
+        if (!p) return;
+        const [ax, ay, az] = toThree(p.a, t);
+        const [bx, by, bz] = toThree(p.b, t);
+        const abx = bx - ax, aby = by - ay, abz = bz - az;
+        const len2 = abx * abx + aby * aby + abz * abz || 1;
+        const fr = Math.min(1, Math.max(0, ((e.point.x - ax) * abx + (e.point.y - ay) * aby + (e.point.z - az) * abz) / len2));
+        onPick(p.id, fr, e.clientX, e.clientY);
+      }
+    : undefined;
+
+  return <lineSegments args={[geo, mat]} onClick={handleClick} />;
 }
 
-export function Nodes({ scene, t }: { scene: AnnotatedScene; t: SceneTransform }): JSX.Element {
+export function Nodes({ scene, t, onPick }: { scene: AnnotatedScene; t: SceneTransform; onPick?: (nodeId: string, clientX: number, clientY: number) => void }): JSX.Element {
   const ref = useRef<InstancedMesh>(null);
   const geo = useMemo(() => new SphereGeometry(1, 12, 12), []);
   const mat = useMemo(() => new MeshStandardMaterial({ metalness: 0.1, roughness: 0.7 }), []);
@@ -78,7 +94,16 @@ export function Nodes({ scene, t }: { scene: AnnotatedScene; t: SceneTransform }
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [scene, t, geo, mat]);
 
-  return <instancedMesh ref={ref} args={[geo, mat, Math.max(1, scene.nodes.length)]} />;
+  const handleClick = onPick
+    ? (e: ThreeEvent<MouseEvent>) => {
+        if (e.instanceId == null) return;
+        e.stopPropagation();
+        const n = scene.nodes[e.instanceId];
+        if (n) onPick(n.id, e.clientX, e.clientY);
+      }
+    : undefined;
+
+  return <instancedMesh ref={ref} args={[geo, mat, Math.max(1, scene.nodes.length)]} onClick={handleClick} />;
 }
 
 /** Valves/devices as NFPA-170 billboard sprites (camera-facing, always legible). */
