@@ -1,0 +1,22 @@
+{
+  "name": "rads-hfc-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "RADS-HFC-APP — offline-first fire sprinkler hydraulic calculation app (NFPA 13 / EN 12845 / FM / ISO).",
+  "author": "Sifat Sarower",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b --pretty"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

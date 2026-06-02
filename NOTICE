@@ -1,0 +1,23 @@
+RADS-HFC-APP
+Fire Sprinkler Hydraulic Calculation Software
+Copyright (c) Sifat Sarower. All rights reserved.
+
+Required Notice: Copyright (c) Sifat Sarower — RADS-HFC-APP
+
+Dual-licensed:
+  - Non-commercial use: PolyForm Noncommercial License 1.0.0 — see LICENSE
+  - Commercial use:      US$10 per project — see COMMERCIAL-LICENSE.md
+
+If you use or distribute this software you must:
+  1. Keep this NOTICE and the LICENSE and COMMERCIAL-LICENSE.md files.
+  2. Retain all copyright and license notices.
+  3. Show attribution in the app UI and on exported reports/drawings, e.g.
+       "Calculations by RADS-HFC-APP — © Sifat Sarower"
+  4. For commercial use, obtain a commercial license (COMMERCIAL-LICENSE.md).
+
+LIFE-SAFETY DISCLAIMER
+This software is a calculation aid. All results MUST be independently reviewed,
+verified, and approved/stamped by a licensed fire protection engineer and accepted
+by the Authority Having Jurisdiction (AHJ) before use in design or construction.
+Provided "as is" without warranty; the author accepts no liability for life-safety
+outcomes.
