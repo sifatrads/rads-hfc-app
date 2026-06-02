@@ -1,63 +1,57 @@
 /**
- * Instanced 3D geometry for the scene: pipes (cylinders sized by bore, colored
- * by the active metric), nodes (spheres; sprinklers red), and device markers.
- * Uses native <instancedMesh> with per-instance matrix + color (no re-mesh on
- * recolor) per the perf plan.
+ * Scene geometry: pipes as single-stroke colored LINES (per the user's
+ * "line type is ok — no 3D pipe/fitting solids"), nodes as small instanced
+ * spheres (sprinklers red), and valve/device markers as NFPA-170 billboards.
+ * Pipes use one <lineSegments> with a per-vertex color buffer so recolor by
+ * metric never rebuilds geometry.
  */
 import { useLayoutEffect, useMemo, useRef } from "react";
 import {
   InstancedMesh,
-  CylinderGeometry,
   SphereGeometry,
   MeshStandardMaterial,
+  BufferGeometry,
+  Float32BufferAttribute,
+  LineBasicMaterial,
   Object3D,
-  Vector3,
-  Quaternion,
   Color,
 } from "three";
 import type { AnnotatedScene } from "@rads/scene";
 import { symbolIdFor } from "@rads/nfpa170";
-import { toThree, pipeRadius, type SceneTransform } from "./transform";
+import { toThree, type SceneTransform } from "./transform";
 import { symbolTexture } from "./symbolTexture";
 
-const UP = new Vector3(0, 1, 0);
-
 export function Pipes({ scene, t, colors }: { scene: AnnotatedScene; t: SceneTransform; colors: Map<string, string> }): JSX.Element {
-  const ref = useRef<InstancedMesh>(null);
-  const geo = useMemo(() => new CylinderGeometry(1, 1, 1, 10), []);
-  const mat = useMemo(() => new MeshStandardMaterial({ metalness: 0.15, roughness: 0.65 }), []);
+  // One geometry sized to the pipe count; positions + per-vertex colors filled
+  // in the effect. New geometry only when the pipe count changes.
+  const geo = useMemo(() => {
+    const g = new BufferGeometry();
+    const n = Math.max(1, scene.pipes.length);
+    g.setAttribute("position", new Float32BufferAttribute(new Float32Array(n * 6), 3));
+    g.setAttribute("color", new Float32BufferAttribute(new Float32Array(n * 6), 3));
+    return g;
+  }, [scene]);
+  const mat = useMemo(() => new LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95 }), []);
 
   useLayoutEffect(() => {
-    const mesh = ref.current;
-    if (!mesh) return;
-    const o = new Object3D();
-    const q = new Quaternion();
-    const a = new Vector3();
-    const b = new Vector3();
-    const dir = new Vector3();
+    const pos = geo.getAttribute("position") as Float32BufferAttribute;
+    const colAttr = geo.getAttribute("color") as Float32BufferAttribute;
     const col = new Color();
     scene.pipes.forEach((p, i) => {
       const [ax, ay, az] = toThree(p.a, t);
       const [bx, by, bz] = toThree(p.b, t);
-      a.set(ax, ay, az);
-      b.set(bx, by, bz);
-      dir.subVectors(b, a);
-      const len = dir.length() || 1e-3;
-      dir.normalize();
-      q.setFromUnitVectors(UP, dir);
-      o.position.set((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2);
-      o.quaternion.copy(q);
-      const r = pipeRadius(p.sizeMm);
-      o.scale.set(r, len, r);
-      o.updateMatrix();
-      mesh.setMatrixAt(i, o.matrix);
-      mesh.setColorAt(i, col.set(colors.get(p.id) ?? "#90a4ae"));
+      pos.setXYZ(i * 2, ax, ay, az);
+      pos.setXYZ(i * 2 + 1, bx, by, bz);
+      col.set(colors.get(p.id) ?? "#90a4ae");
+      colAttr.setXYZ(i * 2, col.r, col.g, col.b);
+      colAttr.setXYZ(i * 2 + 1, col.r, col.g, col.b);
     });
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [scene, t, colors, geo, mat]);
+    pos.needsUpdate = true;
+    colAttr.needsUpdate = true;
+    geo.computeBoundingSphere();
+  }, [scene, t, colors, geo]);
 
-  return <instancedMesh ref={ref} args={[geo, mat, Math.max(1, scene.pipes.length)]} />;
+  return <lineSegments args={[geo, mat]} />;
 }
 
 export function Nodes({ scene, t }: { scene: AnnotatedScene; t: SceneTransform }): JSX.Element {
@@ -74,7 +68,7 @@ export function Nodes({ scene, t }: { scene: AnnotatedScene; t: SceneTransform }
       const [x, y, z] = toThree(n.pos, t);
       const head = n.kind === "sprinkler" || n.kind === "hose-station";
       o.position.set(x, y, z);
-      const r = head ? 0.32 : 0.22;
+      const r = head ? 0.16 : 0.1;
       o.scale.set(r, r, r);
       o.updateMatrix();
       mesh.setMatrixAt(i, o.matrix);
