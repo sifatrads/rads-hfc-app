@@ -37,6 +37,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
     const c = defaultCFactorForMaterial(p.material);
     return dryFill && pipeMaterial(p.material).family === "steel" ? Math.min(c, 100) : c;
   };
+  const [bulkRole, setBulkRole] = useState("");
 
   // ---- committers ------------------------------------------------------
   const setMeta = (k: string, v: unknown) => onChange(withModel(model, { meta: { ...model.meta, [k]: v } }));
@@ -122,6 +123,9 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
   };
   const delPipe = (i: number) => commitStructural(nodes, pipes.filter((_, j) => j !== i));
   const splitPipe = (i: number) => onChange(splitPipeInModel(model, pipes[i]!.id, 0.5));
+  // Bulk edit: apply a patch to every pipe matching the role filter ("" = all).
+  const bulkMatch = (p: Pipe) => !bulkRole || (p.role ?? "") === bulkRole;
+  const bulkApply = (patch: Partial<Pipe>) => commit(nodes, pipes.map((p) => (bulkMatch(p) ? { ...p, ...patch } : p)));
 
   const renumber = () => commitStructural(nodes, pipes);
 
@@ -287,6 +291,20 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
           <span style={{ flex: 1 }} />
           <button style={btnPrimary} onClick={addPipe} disabled={nodes.length < 2}>+ Add pipe</button>
         </div>
+        {pipes.length > 1 && (
+          <div style={bulkBar}>
+            <span style={{ fontWeight: 700, color: C.muted }}>Bulk edit · where role</span>
+            <select style={{ ...cellInput, width: 110 }} value={bulkRole} onChange={(e) => setBulkRole(e.target.value)}>
+              <option value="">(all)</option>
+              {PIPE_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <span style={{ color: C.muted }}>set →</span>
+            <select style={{ ...cellInput, width: 124 }} value="" onChange={(e) => { if (e.target.value) bulkApply({ material: e.target.value, cFactor: undefined }); }}><option value="">material…</option>{MATERIAL_OPTIONS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select>
+            <select style={{ ...cellInput, width: 64 }} value="" onChange={(e) => { if (e.target.value) bulkApply({ nominalSize: e.target.value }); }}><option value="">size…</option>{NOMINAL_SIZES.map((s) => <option key={s} value={s}>{s}"</option>)}</select>
+            <select style={{ ...cellInput, width: 110 }} value="" onChange={(e) => { if (e.target.value) bulkApply({ role: e.target.value }); }}><option value="">role…</option>{PIPE_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>
+            <span style={{ color: C.muted }}>({pipes.filter(bulkMatch).length} match)</span>
+          </div>
+        )}
         <div style={tableScroll}>
           <table style={table}>
             <thead><tr>{["#", "From", "To", "Role", "Size", "Material", "C", "ID (in)", "Length (ft)", "Add'l (ft)", "Fittings", "Direction", "ΔElev (ft)", "Fixed ΔP", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
@@ -484,6 +502,7 @@ const table: CSSProperties = { width: "100%", borderCollapse: "collapse", fontFa
 const cellInput: CSSProperties = { fontSize: 12.5, padding: "3px 5px", border: `1px solid ${C.line}`, borderRadius: 5, background: "#fff", color: C.ink, fontFamily: FONT, width: "100%", boxSizing: "border-box" };
 const hint: CSSProperties = { fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.5 };
 const validBanner: CSSProperties = { ...card, padding: "12px 16px", borderLeft: `4px solid ${C.warn}`, background: "#fffbeb" };
+const bulkBar: CSSProperties = { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 11.5, color: C.ink, background: C.band, border: `1px solid ${C.line}`, borderRadius: 7, padding: "6px 10px", marginBottom: 8 };
 const splitBtn: CSSProperties = { fontSize: 11, fontWeight: 600, color: C.accent, background: "#eef3fb", border: `1px solid ${C.line}`, borderRadius: 5, padding: "3px 7px", cursor: "pointer", whiteSpace: "nowrap" };
 const uploadRow: CSSProperties = { display: "flex", alignItems: "center", gap: 12 };
 const uploadBtn: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: C.primary, background: "#eef3fb", border: `1px solid ${C.line}`, borderRadius: 7, padding: "6px 12px", cursor: "pointer" };

@@ -78,7 +78,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 
 **Already covered:** ✅ Open .dxf (layer→role map) · ✅ Open/Save .rhfc · ✅ Open/Export .json · ✅ Print/Save PDF · ✅ Add/Break/Delete/Edit pipe · ✅ Split at distance · ✅ Pipe↔pump · ✅ Cloud sync / My-projects / auto-save / Drive
 
-- [ ] Replace values / global bulk edit (e.g. resize all 2" → 2.5" across a range) — **high value on big jobs**
+- [x] Bulk edit (filter pipes by role → set material/size/role across them) ✅ DONE
 - [ ] Find node / Find pipe / Find value-in-field — navigation in large models
 - [ ] Toggle fixed / variable pressure source node — static supply vs flow-test source
 - [ ] Merge file (combine two networks) — multi-system assembly
