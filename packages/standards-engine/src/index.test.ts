@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getStandard, availableStandards } from "./index";
+import { getStandard, availableStandards, designBasisForHazard } from "./index";
 
 describe("standards-engine: NFPA 13", () => {
   const s = getStandard("nfpa13");
@@ -37,7 +37,35 @@ describe("standards-engine: NFPA 13", () => {
   it("registry lists implemented standards and rejects unimplemented ones", () => {
     expect(availableStandards()).toContain("nfpa13");
     expect(availableStandards()).toContain("en12845");
-    expect(() => getStandard("fmds")).toThrow(/not implemented/i);
+    expect(availableStandards()).toContain("fmds");
+    expect(() => getStandard("iso")).toThrow(/not implemented/i);
+  });
+});
+
+describe("standards-engine: FM Global Data Sheets", () => {
+  const s = getStandard("fmds");
+
+  it("is imperial with FM hazard categories HC-1/2/3", () => {
+    expect(s.units).toBe("imperial");
+    expect(s.hazardClasses().map((h) => h.id)).toEqual(["hc-1", "hc-2", "hc-3"]);
+  });
+
+  it("exposes DS 3-26 density over 2500 ft² and hose demand", () => {
+    expect(s.designDensity("hc-1")).toEqual({ hazardClassId: "hc-1", density: 0.1, area: 2500 });
+    expect(s.designDensity("hc-3")).toEqual({ hazardClassId: "hc-3", density: 0.3, area: 2500 });
+    expect(s.hoseAllowance("hc-1")).toBe(250);
+    expect(s.hoseAllowance("hc-3")).toBe(500);
+  });
+
+  it("uses C = 120 for steel, 150 for copper/plastic", () => {
+    expect(s.cFactor("black-steel")).toBe(120);
+    expect(s.cFactor("copper")).toBe(150);
+    expect(s.cFactor("cpvc")).toBe(150);
+  });
+
+  it("design basis stays imperial (no metric conversion)", () => {
+    const db = designBasisForHazard("fmds", "hc-2");
+    expect(db).toEqual({ densityGpmFt2: 0.2, designAreaFt2: 2500, minPressurePsi: 7, hoseAllowanceGpm: 250 });
   });
 });
 
