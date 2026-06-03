@@ -78,7 +78,10 @@ function Chart({ series, markers, vline, vlabel }: { series: Series[]; markers: 
   const all = [...series.flatMap((s) => s.pts), ...markers];
   const maxQ = Math.max(...all.map((p) => p.x), vline ?? 0, 100) * 1.08;
   const maxP = Math.max(...all.map((p) => p.y), 10) * 1.12;
-  const X = (q: number) => ml + (q / maxQ) * (W - ml - mr);
+  // NFPA hydraulic-graph paper: flow on a Q^1.85 (semi-exponential) X-axis so
+  // Hazen-Williams supply/system curves plot as straight lines; pressure linear.
+  const qScale = (q: number) => Math.pow(Math.max(0, q), 1.85);
+  const X = (q: number) => ml + (qScale(q) / (qScale(maxQ) || 1)) * (W - ml - mr);
   const Y = (p: number) => H - mb - (p / maxP) * (H - mt - mb);
   const xTicks = ticks(maxQ, 6), yTicks = ticks(maxP, 6);
 
@@ -90,7 +93,7 @@ function Chart({ series, markers, vline, vlabel }: { series: Series[]; markers: 
       <line x1={ml} y1={H - mb} x2={W - mr} y2={H - mb} stroke={C.ink} strokeWidth={1.5} />
       {xTicks.map((q) => <text key={`tx${q}`} x={X(q)} y={H - mb + 17} fontSize={12} fill={C.muted} textAnchor="middle">{Math.round(q)}</text>)}
       {yTicks.map((p) => <text key={`ty${p}`} x={ml - 8} y={Y(p) + 4} fontSize={12} fill={C.muted} textAnchor="end">{Math.round(p)}</text>)}
-      <text x={(ml + W - mr) / 2} y={H - 12} fontSize={13} fill={C.ink} textAnchor="middle" fontWeight={600}>Flow (gpm)</text>
+      <text x={(ml + W - mr) / 2} y={H - 12} fontSize={13} fill={C.ink} textAnchor="middle" fontWeight={600}>Flow (gpm) — Q¹·⁸⁵ scale</text>
       <text x={16} y={(mt + H - mb) / 2} fontSize={13} fill={C.ink} textAnchor="middle" fontWeight={600} transform={`rotate(-90 16 ${(mt + H - mb) / 2})`}>Pressure (psi)</text>
 
       {vline !== undefined && <line x1={X(vline)} y1={mt} x2={X(vline)} y2={H - mb} stroke={C.muted} strokeWidth={1} strokeDasharray="5 4" />}
