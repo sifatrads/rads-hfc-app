@@ -10,8 +10,8 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [ ] Alphanumeric node IDs (≤4 char, e.g. S1, RN3A) — ID flexibility for plan-matching; replaces forced 1..N
 - [x] Hose / Hydrant fixed-flow node flag (gpm on junction/hose-station) ✅ DONE
 - [ ] Remote Area Box + active-flowing-head assignment — auto-mark heads inside a design-area box; core NFPA workflow
-- [ ] Hanging-end / disconnected-segment validation sweep ("Check Model") — blocks calc on broken topology; high value
-- [ ] Zero-diameter / zero-connectivity error check — pairs with above; cheap safety net
+- [x] Check-Model validation sweep (hanging ends, cyclic, unreachable, no-source) ✅ DONE
+- [x] Zero-diameter / zero-connectivity error check ✅ DONE
 - [ ] CAD auto-heal on node delete (Merge Pipes vs Leave Open) — merge adjacent segments + sum length
 - [ ] Mid-point insertion auto-divide + auto-Tee on snapped branch — depends on auto-fitting engine
 - [ ] Coordinate extraction → auto-elevation from CAD — minor; only with full CAD snap placement
@@ -92,7 +92,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 
 **Already covered:** ✅ Imperial/Metric · ✅ NFPA13 tables · ✅ Min sprinkler pressure · ✅ Per-pipe C-factor
 
-- [ ] Minimum operating pressure + low-pressure node flagging — instant pass/fail; **high value, small**
+- [x] Min operating pressure + low-pressure node flagging ✅ DONE
 - [ ] Friction-equation selector (H-W / Darcy-Weisbach / Mixed) — gates D-W everywhere
 - [ ] Fluid properties (type/temp/antifreeze/viscosity/density) — for D-W & antifreeze
 - [ ] Demand-sizing modes (satisfy-min / below-available / %-below-available) — flexible targets

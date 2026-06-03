@@ -13,8 +13,9 @@ import {
 } from "../network-edit";
 import { defaultCFactorForMaterial, pipeMaterial } from "@rads/standards-engine";
 import { C, FONT, card, sectionTitle, field, fieldLabel, input, select, btnPrimary, btnGhost, btnDanger, th, td } from "../ui";
+import type { Issue } from "../network-validate";
 
-export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange: (m: ProjectModel) => void }): JSX.Element {
+export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; onChange: (m: ProjectModel) => void; issues?: Issue[] }): JSX.Element {
   const ds = (model.designBasis ?? {}) as Record<string, unknown>;
   const ws = (model.waterSupply ?? {}) as Record<string, unknown>;
   const ft = (ws["flowTest"] ?? {}) as Record<string, unknown>;
@@ -126,6 +127,13 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
 
   return (
     <div style={page}>
+      {issues && issues.length > 0 && (
+        <div style={validBanner}>
+          <div style={{ fontWeight: 700, color: C.ink, marginBottom: 4 }}>⚠ Model check — {issues.filter((i) => i.severity === "error").length} error(s), {issues.filter((i) => i.severity === "warning").length} warning(s)</div>
+          {issues.slice(0, 8).map((it, i) => <div key={i} style={{ fontSize: 12, color: it.severity === "error" ? C.bad : C.warn }}>• {it.message}</div>)}
+          {issues.length > 8 && <div style={{ fontSize: 11.5, color: C.muted }}>…and {issues.length - 8} more</div>}
+        </div>
+      )}
       <div style={grid2}>
         {/* Project info */}
         <Section title="Project information">
@@ -462,6 +470,7 @@ const tableScroll: CSSProperties = { overflow: "auto", maxHeight: 420, border: `
 const table: CSSProperties = { width: "100%", borderCollapse: "collapse", fontFamily: FONT };
 const cellInput: CSSProperties = { fontSize: 12.5, padding: "3px 5px", border: `1px solid ${C.line}`, borderRadius: 5, background: "#fff", color: C.ink, fontFamily: FONT, width: "100%", boxSizing: "border-box" };
 const hint: CSSProperties = { fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.5 };
+const validBanner: CSSProperties = { ...card, padding: "12px 16px", borderLeft: `4px solid ${C.warn}`, background: "#fffbeb" };
 const splitBtn: CSSProperties = { fontSize: 11, fontWeight: 600, color: C.accent, background: "#eef3fb", border: `1px solid ${C.line}`, borderRadius: 5, padding: "3px 7px", cursor: "pointer", whiteSpace: "nowrap" };
 const uploadRow: CSSProperties = { display: "flex", alignItems: "center", gap: 12 };
 const uploadBtn: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: C.primary, background: "#eef3fb", border: `1px solid ${C.line}`, borderRadius: 7, padding: "6px 12px", cursor: "pointer" };

@@ -53,6 +53,8 @@ export interface SolveSummary {
   mostRemoteSprinkler?: { id: string; pressurePsi: number; flowGpm: number };
   minSprinklerPressurePsi: number;
   meetsMinPressure: boolean;
+  /** Design-area sprinklers whose pressure falls below the minimum (id + psi). */
+  lowPressureNodes: { id: string; pressurePsi: number }[];
   maxJunctionImbalanceGpm: number;
   supplyCurveSamples: CurvePoint[];
   converged: boolean;
@@ -295,6 +297,10 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     ...(remote ? { mostRemoteSprinkler: remote } : {}),
     minSprinklerPressurePsi,
     meetsMinPressure: remote ? remote.pressurePsi >= minSprinklerPressurePsi - 0.5 : true,
+    lowPressureNodes: openSprinklers
+      .map((n) => ({ id: n.id, pressurePsi: gga.nodes[n.id]?.pressurePsi ?? 0 }))
+      .filter((x) => x.pressurePsi < minSprinklerPressurePsi - 0.5)
+      .sort((a, b) => a.pressurePsi - b.pressurePsi),
     maxJunctionImbalanceGpm: gga.maxImbalanceGpm,
     supplyCurveSamples: sampleCurve(supply, maxFlowGpm, 24),
     converged: gga.converged,
