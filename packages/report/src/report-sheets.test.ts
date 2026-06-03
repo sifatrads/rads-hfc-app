@@ -41,6 +41,8 @@ describe("NFPA §27.4 report sheets", () => {
     const summary = sheets.find((s) => s.title === "Summary Sheet")!.svg;
     expect(summary).toContain("Summary Sheet");
     expect(summary).toContain("Total demand");
+    expect(sheets.some((s) => s.title.includes("Most-Unfavourable"))).toBe(true);
+    expect(sheets.some((s) => s.title === "Riser Nameplate")).toBe(true);
   });
 
   it("renders computed flows/pressures into the worksheet", () => {

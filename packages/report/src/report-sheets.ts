@@ -310,6 +310,27 @@ function headsSummarySpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
   return tableSpecs("Sprinkler Heads Summary", cols, rows);
 }
 
+// ── four most-unfavourable sprinklers (EN 12845 §; also a useful NFPA check) ──
+function fourWeakestSpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
+  const u = units(model);
+  const ranked = model.network.nodes
+    .filter((n) => n.type === "sprinkler" && (n.kFactor ?? 0) > 0)
+    .map((n) => ({ n, p: sol.results.nodes[n.id]?.totalPressurePsi, q: sol.results.nodes[n.id]?.dischargeGpm }))
+    .filter((x) => x.p !== undefined && (x.q ?? 0) > 0.01)
+    .sort((a, b) => (a.p ?? 0) - (b.p ?? 0))
+    .slice(0, 4);
+  if (ranked.length === 0) return [];
+  const cols: Column[] = [
+    { label: "Rank", w: 0.12 },
+    { label: "Head", w: 0.2 },
+    { label: "Pressure", unit: u.U.p, w: 0.22, align: "r" },
+    { label: "Flow", unit: u.U.q, w: 0.22, align: "r" },
+    { label: "Coverage", unit: "ft²", w: 0.24, align: "r" },
+  ];
+  const rows = ranked.map((x, i) => [`${i + 1}`, x.n.id, u.p(x.p), u.q(x.q), x.n.coverageAreaFt2 ? String(x.n.coverageAreaFt2) : "—"]);
+  return tableSpecs("Four Most-Unfavourable Sprinklers", cols, rows);
+}
+
 // ── report of utilities / bill of materials ──
 function bomSpecs(model: ProjectModel): Spec[] {
   const u = units(model);
@@ -556,6 +577,7 @@ export function reportSheets(model: ProjectModel, sol: ProjectSolution): Sheet[]
     supplySpec(model, sol),
     ...nodeSpecs(model, sol),
     ...headsSummarySpecs(model, sol),
+    ...fourWeakestSpecs(model, sol),
     ...pipeSpecs(model, sol),
     ...junctionSpecs(model, sol),
     formulasSpec(),

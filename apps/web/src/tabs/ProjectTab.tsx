@@ -38,6 +38,21 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
     return dryFill && pipeMaterial(p.material).family === "steel" ? Math.min(c, 100) : c;
   };
   const [bulkRole, setBulkRole] = useState("");
+  // Metric data entry: when units=metric, table cells show/accept metric and
+  // convert to the model's imperial storage (the solver is imperial-internal).
+  const metric = model.meta.units === "metric";
+  const rnd = (v: number, p = 2) => Math.round(v * 10 ** p) / 10 ** p;
+  const dispLen = (v?: number) => (v === undefined ? undefined : metric ? rnd(v * 0.3048) : v); // ft→m
+  const storLen = (v?: number) => (v === undefined ? undefined : metric ? v / 0.3048 : v);
+  const dispK = (v?: number) => (v === undefined ? undefined : metric ? rnd(v * 14.415, 1) : v); // imperial→metric K
+  const storK = (v?: number) => (v === undefined ? undefined : metric ? v / 14.415 : v);
+  const dispArea = (v?: number) => (v === undefined ? undefined : metric ? rnd(v / 10.7639, 1) : v); // ft²→m²
+  const storArea = (v?: number) => (v === undefined ? undefined : metric ? v * 10.7639 : v);
+  const dispFlow = (v?: number) => (v === undefined ? undefined : metric ? Math.round(v * 3.78541) : v); // gpm→L/min
+  const storFlow = (v?: number) => (v === undefined ? undefined : metric ? v / 3.78541 : v);
+  const dispId = (v?: number) => (v === undefined ? undefined : metric ? rnd(v * 25.4, 1) : v); // in→mm
+  const storId = (v?: number) => (v === undefined ? undefined : metric ? v / 25.4 : v);
+  const U = { len: metric ? "m" : "ft", area: metric ? "m²" : "ft²", k: metric ? "metric" : "imp", flow: metric ? "L/min" : "gpm", id: metric ? "mm" : "in" };
   // Hazard classes + density preset from the active code (EN 12845 is metric).
   const standardId = str(model.meta.standardId, "nfpa13");
   const hzClasses = hazardClassesFor(standardId);
@@ -293,7 +308,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
         </div>
         <div style={tableScroll}>
           <table style={table}>
-            <thead><tr>{["#", "Type", "Elevation (ft)", "K-factor", "Coverage (ft²)", "Fixed flow (gpm)", "Note", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+            <thead><tr>{["#", "Type", `Elevation (${U.len})`, `K (${U.k})`, `Coverage (${U.area})`, `Fixed flow (${U.flow})`, "Note", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
               {nodes.map((n, i) => {
                 if (!nodeMatch(n)) return null;
@@ -302,10 +317,10 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
                   <tr key={i} style={i % 2 ? { background: C.zebra } : undefined}>
                     <td style={{ ...td, fontWeight: 700, color: C.primary }}>{n.id}</td>
                     <td style={td}><Cell><select style={cellInput} value={n.type} onChange={(e) => setNode(i, { type: e.target.value })}>{NODE_TYPES.map((o) => <option key={o} value={o}>{o}</option>)}</select></Cell></td>
-                    <td style={td}><NumCell value={n.elevationFt} onChange={(v) => setNode(i, { elevationFt: v ?? 0 })} /></td>
-                    <td style={td}>{spk ? <NumCell value={n.kFactor} onChange={(v) => setNode(i, { kFactor: v })} /> : <Dim>—</Dim>}</td>
-                    <td style={td}>{spk ? <NumCell value={n.coverageAreaFt2} onChange={(v) => setNode(i, { coverageAreaFt2: v })} /> : <Dim>—</Dim>}</td>
-                    <td style={td} title="Fixed hose/hydrant demand for junction & hose-station nodes (sprinklers flow Q=K√P)">{spk ? <Dim>—</Dim> : <NumCell value={n.flowGpm} onChange={(v) => setNode(i, { flowGpm: v })} />}</td>
+                    <td style={td}><NumCell value={dispLen(n.elevationFt)} onChange={(v) => setNode(i, { elevationFt: storLen(v) ?? 0 })} /></td>
+                    <td style={td}>{spk ? <NumCell value={dispK(n.kFactor)} onChange={(v) => setNode(i, { kFactor: storK(v) })} /> : <Dim>—</Dim>}</td>
+                    <td style={td}>{spk ? <NumCell value={dispArea(n.coverageAreaFt2)} onChange={(v) => setNode(i, { coverageAreaFt2: storArea(v) })} /> : <Dim>—</Dim>}</td>
+                    <td style={td} title="Fixed hose/hydrant demand for junction & hose-station nodes (sprinklers flow Q=K√P)">{spk ? <Dim>—</Dim> : <NumCell value={dispFlow(n.flowGpm)} onChange={(v) => setNode(i, { flowGpm: storFlow(v) })} />}</td>
                     <td style={td}><input style={cellInput} value={n.note ?? ""} onChange={(e) => setNode(i, { note: e.target.value })} /></td>
                     <td style={td}><button style={btnDanger} onClick={() => delNode(i)} title="Delete node">✕</button></td>
                   </tr>
@@ -339,7 +354,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
         )}
         <div style={tableScroll}>
           <table style={table}>
-            <thead><tr>{["#", "From", "To", "Role", "Size", "Material", "C", "ID (in)", "Length (ft)", "Add'l (ft)", "Fittings", "Direction", "ΔElev (ft)", "Fixed ΔP", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+            <thead><tr>{["#", "From", "To", "Role", "Size", "Material", "C", `ID (${U.id})`, `Length (${U.len})`, `Add'l (${U.len})`, "Fittings", "Direction", `ΔElev (${U.len})`, "Fixed ΔP", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
               {pipes.map((p, i) => pipeMatch(p) ? (
                 <tr key={i} style={i % 2 ? { background: C.zebra } : undefined}>
@@ -350,9 +365,9 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
                   <td style={td}><select style={{ ...cellInput, width: 64 }} value={p.nominalSize ?? "1"} onChange={(e) => setPipe(i, { nominalSize: e.target.value, ...(p.fittingCode ? { fittings: parseFittingCodes(p.fittingCode, e.target.value) } : {}) })}>{NOMINAL_SIZES.map((o) => <option key={o} value={o}>{o}"</option>)}</select></td>
                   <td style={td}><select style={{ ...cellInput, width: 130 }} value={p.material ?? "steel-sch40"} onChange={(e) => setPipe(i, { material: e.target.value })}>{MATERIAL_OPTIONS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></td>
                   <td style={td}><NumCell value={effC(p)} onChange={(v) => setPipe(i, { cFactor: v })} /></td>
-                  <td style={td}><NumCell value={p.internalDiameterIn} onChange={(v) => setPipe(i, v === undefined ? { idOverride: false, internalDiameterIn: undefined } : { idOverride: true, internalDiameterIn: v })} /></td>
-                  <td style={td}><NumCell value={p.lengthFt} onChange={(v) => setPipe(i, { lengthFt: v ?? 0 })} /></td>
-                  <td style={td}><NumCell value={p.additionalLengthFt} onChange={(v) => setPipe(i, { additionalLengthFt: v })} /></td>
+                  <td style={td}><NumCell value={dispId(p.internalDiameterIn)} onChange={(v) => setPipe(i, v === undefined ? { idOverride: false, internalDiameterIn: undefined } : { idOverride: true, internalDiameterIn: storId(v) })} /></td>
+                  <td style={td}><NumCell value={dispLen(p.lengthFt)} onChange={(v) => setPipe(i, { lengthFt: storLen(v) ?? 0 })} /></td>
+                  <td style={td}><NumCell value={dispLen(p.additionalLengthFt)} onChange={(v) => setPipe(i, { additionalLengthFt: storLen(v) })} /></td>
                   <td style={td}><input style={{ ...cellInput, width: 70 }} value={p.fittingCode ?? ""} placeholder="2E 1T" title="Fitting codes: E elbow, T tee, GV/BV/CV valves" onChange={(e) => setPipe(i, { fittingCode: e.target.value, fittings: parseFittingCodes(e.target.value, p.nominalSize ?? "1") })} /></td>
                   <td style={td}>
                     <select style={{ ...cellInput, width: 92 }} value={p.direction ?? ""} onChange={(e) => setPipe(i, { direction: (e.target.value || undefined) as Direction | undefined })}>
@@ -360,7 +375,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
                       {DIRECTIONS.map((d) => <option key={d} value={d}>{DIRECTION_LABEL[d]}</option>)}
                     </select>
                   </td>
-                  <td style={td}><NumCell value={p.elevationChangeFt} onChange={(v) => setPipe(i, { elevationChangeFt: v })} /></td>
+                  <td style={td}><NumCell value={dispLen(p.elevationChangeFt)} onChange={(v) => setPipe(i, { elevationChangeFt: storLen(v) })} /></td>
                   <td style={td}><NumCell value={p.fixedDropPsi} onChange={(v) => setPipe(i, { fixedDropPsi: v })} /></td>
                   <td style={td}>
                     <div style={{ display: "flex", gap: 4 }}>

@@ -59,7 +59,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] NFPA 15 deluge / water-spray (all nozzles flow at design density) ✅ DONE
 - [x] Darcy-Weisbach method (flow-dependent f, Swamee-Jain, per-material roughness) ✅ DONE
 - [ ] NFPA 750 water mist (D-W trigger, viscosity/density) — niche
-- [x] EN 12845 v1 (hazard classes LH/OH1-4/HHP, metric densities, C=100, metric display, density preset) ✅ DONE (Table 23 equiv-lengths + explicit 4-weakest report = follow-up)
+- [x] EN 12845 (hazard classes, metric densities, C=100, Table 23 equiv-lengths, four-most-unfavourable report, metric data entry) ✅ DONE
 - [ ] BS 9251 / EN 16925 residential — UK/EU; large
 - [ ] Glazing / exposure-protection sprinkler sizing — niche
 - [ ] Other intl (CEA 4001, UNI 10779, AS 2118, MS 1910, CP 52) + per-standard libraries — long-tail

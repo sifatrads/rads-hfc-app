@@ -133,8 +133,15 @@ function pipeId(p: Pipe): number {
   if (p.nominalSize) return internalDiameterForMaterial(p.material, p.nominalSize);
   return 1.049;
 }
-function pipeEquivLen(p: Pipe): number {
-  return (p.fittings ?? []).reduce((s, f) => s + (f.equivalentLengthFt ?? 0), 0);
+function pipeEquivLen(p: Pipe, std?: ReturnType<typeof getStandard>): number {
+  const useStd = std && std.units === "metric" && std.fittingEquivalentLength;
+  return (p.fittings ?? []).reduce((s, f) => {
+    if (useStd) {
+      const v = std!.fittingEquivalentLength!(f.type, p.nominalSize ?? "1", { cFactor: p.cFactor });
+      if (v !== undefined) return s + v * (f.qty ?? 1);
+    }
+    return s + (f.equivalentLengthFt ?? 0);
+  }, 0);
 }
 
 /** Hydraulic path length (ft) from the source to every node (tree walk). */
@@ -252,7 +259,7 @@ function buildGga(model: ProjectModel, source: { id: string; elevationFt: number
   const upstreamByNode = new Map<string, Pipe>();
   if (autoFit) for (const p of model.network.pipes) upstreamByNode.set(p.to, p);
   for (const p of model.network.pipes) {
-    let eq = pipeEquivLen(p) + (extraEquiv.get(p.id) ?? 0);
+    let eq = pipeEquivLen(p, std) + (extraEquiv.get(p.id) ?? 0);
     if (autoFit) {
       const up = upstreamByNode.get(p.from);
       if (up && p.direction && up.direction && p.direction !== up.direction) {

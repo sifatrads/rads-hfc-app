@@ -1,4 +1,5 @@
 import type { StandardModule, HazardClass, DesignDensityPoint } from "./types";
+import { fittingEquivalentLengthFt } from "./tables-nfpa13";
 
 /**
  * EN 12845 (metric). Density in mm/min, area in m², pressure in bar, flow in L/min.
@@ -61,4 +62,8 @@ export const en12845: StandardModule = {
   minResidualPressure: () => 0.5,
   // Metric K-factors (L·min⁻¹·bar⁻⁰·⁵): K80 ≈ NFPA K5.6.
   standardKFactors: () => [57, 80, 115, 160, 240, 360],
+  // EN 12845 Table 23 equivalent lengths. Approximated from the base fitting
+  // table at the EN flat C = 100 (same C-correction mechanism as NFPA Table
+  // 27.2.3.2.1); ⚠ AUDIT against the printed Table 23 before production use.
+  fittingEquivalentLength: (fitting, nominalSize, opts) => fittingEquivalentLengthFt(fitting, nominalSize, { cFactor: opts?.cFactor ?? EN_C_FACTOR, ...(opts?.actualIdIn !== undefined ? { actualIdIn: opts.actualIdIn } : {}) }),
 };
