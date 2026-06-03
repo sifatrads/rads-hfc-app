@@ -16,7 +16,7 @@ import {
   type GgaNode,
   type GgaResult,
 } from "@rads/calc-engine";
-import { cityCurve, pumpOnSuction, constantPressureCurve, sampleCurve, type SupplyCurve, type FlowTest, type CurvePoint } from "@rads/calc-engine";
+import { cityCurve, pumpOnSuction, constantPressureCurve, sampleCurve, velocityFps, type SupplyCurve, type FlowTest, type CurvePoint } from "@rads/calc-engine";
 import { getStandard, internalDiameterForMaterial, defaultCFactorForMaterial, pipeMaterial, fittingEquivalentLengthFt, type StandardId } from "@rads/standards-engine";
 
 export interface NodeResult {
@@ -63,6 +63,8 @@ export interface SolveSummary {
   lowPressureNodes: { id: string; pressurePsi: number }[];
   maxJunctionImbalanceGpm: number;
   supplyCurveSamples: CurvePoint[];
+  /** NFPA 20 pump suction-velocity check at 150% rated flow (limit 15 ft/s). */
+  suctionCheck?: { velocityFps: number; atFlowGpm: number; ok: boolean };
   converged: boolean;
 }
 
@@ -346,6 +348,17 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   const availablePsi = supply(totalDemandGpm);
   const marginPsi = availablePsi - sourceP;
 
+  // NFPA 20: suction velocity at 150% rated flow must not exceed 15 ft/s.
+  const suction = model.network.suction;
+  const pumpDs = model.network.pump?.datasheet;
+  let suctionCheck: SolveSummary["suctionCheck"];
+  if (suction && typeof suction.sizeIn === "number" && pumpDs && typeof pumpDs.ratedFlowGpm === "number") {
+    const overload = pumpDs.overloadFlowGpm ?? pumpDs.ratedFlowGpm * 1.5;
+    const id = internalDiameterForMaterial(suction.material, String(suction.sizeIn));
+    const vel = velocityFps(overload, id);
+    suctionCheck = { velocityFps: vel, atFlowGpm: overload, ok: vel <= 15 };
+  }
+
   const summary: SolveSummary = {
     sourceId: source.id,
     sourceElevationFt: source.elevationFt,
@@ -368,6 +381,7 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
       .sort((a, b) => a.pressurePsi - b.pressurePsi),
     maxJunctionImbalanceGpm: gga.maxImbalanceGpm,
     supplyCurveSamples: sampleCurve(supply, maxFlowGpm, 24),
+    ...(suctionCheck ? { suctionCheck } : {}),
     converged: gga.converged,
   };
 

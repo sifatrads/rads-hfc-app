@@ -520,6 +520,7 @@ function pumpSpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
     ["Required source pressure", u.pU(s.sourcePressurePsi)],
     ["Available (with pump)", u.pU(s.availablePsi)],
     ["Margin", u.pU(s.marginPsi)],
+    ["Suction vel @ 150% (≤15 ft/s)", s.suctionCheck ? `${s.suctionCheck.velocityFps.toFixed(1)} ${u.U.v} ${s.suctionCheck.ok ? "OK" : "HIGH"}` : "—"],
     ["Adequate", s.passesSupply ? "YES" : "NO"],
   ]);
   el.push(a.svg, b.svg);

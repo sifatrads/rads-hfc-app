@@ -253,6 +253,21 @@ describe("in-app data entry → solve", () => {
     expect(solveProject(build(true)).summary.sourcePressurePsi).toBeGreaterThan(solveProject(build(false)).summary.sourcePressurePsi);
   });
 
+  it("NFPA 20 flags a fast pump suction velocity at 150% flow", () => {
+    const m = newProject("2026-06-03T00:00:00.000Z");
+    const nodes: NetworkNode[] = [m.network.nodes[0]!, { id: "2", type: "sprinkler", elevationFt: 0, kFactor: 5.6, fittings: [] } as unknown as NetworkNode];
+    const pipes: Pipe[] = [{ id: "P-1", from: "1", to: "2", role: "branch-line", nominalSize: "1", lengthFt: 10, fittings: [] }];
+    const model = withModel(m, {
+      designBasis: { ...m.designBasis, operatingSprinklers: 1 },
+      network: { ...m.network, nodes, pipes: pipes.map(normalizePipe), suction: { sizeIn: 6, lengthFt: 20, material: "ductile-iron", fittings: [] }, pump: { datasheet: { ratedFlowGpm: 1000, ratedPsi: 100, churnPsi: 120 } } },
+    });
+    const c = solveProject(model).summary.suctionCheck!;
+    expect(c).toBeDefined();
+    expect(c.atFlowGpm).toBeCloseTo(1500, 0); // 150% of 1000
+    expect(c.velocityFps).toBeGreaterThan(15);
+    expect(c.ok).toBe(false);
+  });
+
   it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {
     const out = setNodeGeometryInModel(line3(), "3", { x: 42, y: 7, z: 10 });
     const n3 = out.network.nodes.find((n) => n.id === "3")!;

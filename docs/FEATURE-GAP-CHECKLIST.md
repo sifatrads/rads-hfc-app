@@ -55,7 +55,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [ ] NFPA 13D automation (weakest head / 2 most-remote in a room + safety margin) — residential
 - [ ] NFPA 13R automation — low-rise residential
 - [ ] Compliance-path selector (route project to a code framework) — top-level UX that unlocks the rest
-- [ ] NFPA 20 checks (suction/discharge velocity limits, cavitation guard) — pump-room safety
+- [x] NFPA 20 suction-velocity check (≤15 ft/s at 150% flow) ✅ DONE
 - [ ] NFPA 15 water-spray / deluge (uniform density, spray-nozzle discharge) — specialty
 - [ ] Darcy-Weisbach method (full) — prerequisite for mist + Europe
 - [ ] NFPA 750 water mist (D-W trigger, viscosity/density) — niche
