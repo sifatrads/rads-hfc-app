@@ -11,7 +11,7 @@ import {
   NOMINAL_SIZES, PIPE_ROLES, NODE_TYPES, VALVE_TYPES, PUMP_TYPES, PUMP_DRIVERS, VALVE_EQUIV_FT, MATERIAL_OPTIONS,
   DIRECTIONS, DIRECTION_LABEL, renumberNetwork, normalizePipe, withModel, splitPipeInModel, cleanupModel,
 } from "../network-edit";
-import { defaultCFactorForMaterial, pipeMaterial, parseFittingCodes } from "@rads/standards-engine";
+import { defaultCFactorForMaterial, pipeMaterial, parseFittingCodes, hazardClassesFor, designBasisForHazard, standardIsMetric } from "@rads/standards-engine";
 import { C, FONT, card, sectionTitle, field, fieldLabel, input, select, btnPrimary, btnGhost, btnDanger, th, td } from "../ui";
 import type { Issue } from "../network-validate";
 
@@ -38,6 +38,18 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
     return dryFill && pipeMaterial(p.material).family === "steel" ? Math.min(c, 100) : c;
   };
   const [bulkRole, setBulkRole] = useState("");
+  // Hazard classes + density preset from the active code (EN 12845 is metric).
+  const standardId = str(model.meta.standardId, "nfpa13");
+  const hzClasses = hazardClassesFor(standardId);
+  const hazardOpts = hzClasses.length ? hzClasses.map((h) => h.id) : ["lh", "oh1", "oh2", "eh1", "eh2"];
+  const applyDensity = () => {
+    const db = designBasisForHazard(standardId, str(model.meta.hazardClass, hazardOpts[0]));
+    if (!db) return;
+    onChange(withModel(model, {
+      designBasis: { ...ds, densityGpmFt2: db.densityGpmFt2, designAreaFt2: db.designAreaFt2, minSprinklerPressurePsi: db.minPressurePsi, hoseAllowanceGpm: db.hoseAllowanceGpm, operatingSprinklers: undefined },
+      ...(standardIsMetric(standardId) ? { meta: { ...model.meta, units: "metric" } } : {}),
+    }));
+  };
   const [find, setFind] = useState("");
   const fq = find.toLowerCase().trim();
   const nodeMatch = (n: NetworkNode) => !fq || `${n.id} ${n.type} ${n.note ?? ""}`.toLowerCase().includes(fq);
@@ -157,7 +169,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             <Sel label="Code" value={str(model.meta.standardId, "nfpa13")} options={["nfpa13", "nfpa13d", "nfpa13r", "nfpa14", "en12845"]} onChange={(v) => setMeta("standardId", v)} />
             <Sel label="System" value={str(model.meta.systemType, "sprinkler")} options={["sprinkler", "standpipe"]} onChange={(v) => setMeta("systemType", v)} />
             <Sel label="Fill type" value={str(model.meta.fillType, "wet")} options={["wet", "dry", "preaction", "deluge"]} onChange={(v) => setMeta("fillType", v)} />
-            <Sel label="Hazard" value={str(model.meta.hazardClass, "oh2")} options={["lh", "oh1", "oh2", "eh1", "eh2"]} onChange={(v) => setMeta("hazardClass", v)} />
+            <Sel label="Hazard" value={str(model.meta.hazardClass, hazardOpts[0])} options={hazardOpts} onChange={(v) => setMeta("hazardClass", v)} />
             <Sel label="Units" value={str(model.meta.units, "imperial")} options={["imperial", "metric"]} onChange={(v) => setMeta("units", v)} />
           </Row>
           {model.meta.systemType === "standpipe" && (
@@ -184,6 +196,11 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
 
         {/* Design basis */}
         <Section title="Design basis">
+          {designBasisForHazard(standardId, str(model.meta.hazardClass, hazardOpts[0])) && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -4 }}>
+              <button style={btnGhost} onClick={applyDensity} title="Fill density/area/pressure from the selected code + hazard class">↧ Apply {standardId.toUpperCase()} {str(model.meta.hazardClass, "").toUpperCase()} density</button>
+            </div>
+          )}
           <Row>
             <Num label="Density (gpm/ft²)" value={num(ds["densityGpmFt2"])} step={0.01} onChange={(v) => setBasis("densityGpmFt2", v)} />
             <Num label="Design area (ft²)" value={num(ds["designAreaFt2"])} step={50} onChange={(v) => setBasis("designAreaFt2", v)} />

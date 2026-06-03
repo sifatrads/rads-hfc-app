@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { solveProject } from "@rads/solve";
-import { parseFittingCodes } from "@rads/standards-engine";
+import { parseFittingCodes, designBasisForHazard } from "@rads/standards-engine";
 import { encodeJSON, decodeJSON } from "@rads/container";
 import { parseProject } from "@rads/model";
 import { newProject, renumberNetwork, normalizePipe, internalDiameterFor, withModel, splitPipeInModel, deleteNodeInModel, deletePipeInModel, addBranchInModel, addPipeBetweenInModel, setNodeGeometryInModel, mergeModels, cleanupModel } from "./network-edit";
@@ -378,6 +378,15 @@ describe("in-app data entry → solve", () => {
     expect(dw.sourcePressurePsi).toBeGreaterThan(7);
     // HW and D-W agree within ~40% for water in steel at fire-sprinkler velocities
     expect(Math.abs(dw.sourcePressurePsi - hw.sourcePressurePsi) / hw.sourcePressurePsi).toBeLessThan(0.4);
+  });
+
+  it("EN 12845 hazard density converts to imperial design basis", () => {
+    const db = designBasisForHazard("en12845", "oh1")!; // 5.0 mm/min over 72 m²
+    expect(db.densityGpmFt2).toBeCloseTo(5.0 * 0.024543, 4);
+    expect(db.designAreaFt2).toBe(Math.round(72 * 10.7639)); // 775 ft²
+    expect(db.minPressurePsi).toBeCloseTo(0.5 * 14.5038, 1); // 0.5 bar → ~7.25 psi
+    // a standpipe / non-density standard returns undefined
+    expect(designBasisForHazard("nfpa14", "I")).toBeUndefined();
   });
 
   it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {
