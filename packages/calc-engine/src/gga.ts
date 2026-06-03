@@ -43,6 +43,9 @@ export interface GgaLink {
    * preventer / meter. hL += fixedDropPsi·sign(Q); linearized by a secant
    * gradient fixedDropPsi/|Q| so the GGA stays conditioned. */
   fixedDropPsi?: number;
+  /** Darcy-Weisbach parameters; when set, friction uses a flow-dependent factor
+   * computed each iteration (resistance/exponent are ignored for the loss). */
+  dw?: { roughnessFt: number; viscosityFt2s: number; internalDiameterIn: number; lengthFt: number };
   internalDiameterIn?: number;
   // ── optional reporting passthrough (echoed into the link result) ──
   nominalSize?: string;
@@ -108,10 +111,30 @@ export interface GgaOptions {
 /** Floor on |Q| when forming the gradient, to keep the matrix conditioned near zero flow. */
 const Q_FLOOR = 1e-4;
 
-/** Head loss hL(Q) and its linearization gradient dhL/dQ for a link (friction +
- * optional constant device drop). Friction-only links are unchanged. */
+/** Darcy friction factor f (Swamee-Jain explicit; laminar below Re 2300). */
+function dwFriction(re: number, relRoughness: number): number {
+  if (re < 2300) return 64 / Math.max(re, 1);
+  const t = relRoughness / 3.7 + 5.74 / Math.pow(re, 0.9);
+  return 0.25 / Math.pow(Math.log10(t), 2);
+}
+
+/** Head loss hL(Q) and its linearization gradient dhL/dQ for a link (Hazen-
+ * Williams / Darcy-Weisbach friction + optional constant device drop). Friction-
+ * only Hazen-Williams links are unchanged. */
 function linkState(link: GgaLink, q: number): { hL: number; grad: number } {
   const aq = Math.max(Math.abs(q), Q_FLOOR);
+  if (link.dw) {
+    const { roughnessFt, viscosityFt2s, internalDiameterIn: d, lengthFt: L } = link.dw;
+    const dFt = d / 12;
+    const v = (0.4085 * aq) / (d * d); // ft/s
+    const re = Math.max(1, (v * dFt) / viscosityFt2s);
+    const f = dwFriction(re, roughnessFt / dFt);
+    const r = (f * L * 0.01349) / Math.pow(d, 5); // psi per gpm² (hL = r·Q²)
+    let hL = r * q * aq;
+    let grad = 2 * r * aq;
+    if (link.fixedDropPsi) { hL += link.fixedDropPsi * Math.sign(q); grad += link.fixedDropPsi / aq; }
+    return { hL, grad };
+  }
   const n = link.exponent;
   const hLfric = link.resistance * q * Math.pow(Math.abs(q), n - 1);
   let hL = hLfric;
@@ -148,6 +171,29 @@ export function hwPipeLink(id: string, from: string, to: string, params: HwPipeP
     resistance: hwResistance(params.cFactor, params.internalDiameterIn, totalLength),
     exponent: HW_EXPONENT,
     internalDiameterIn: params.internalDiameterIn,
+  };
+}
+
+export interface DwPipeParams {
+  internalDiameterIn: number;
+  lengthFt: number;
+  equivalentLengthFt?: number;
+  /** Absolute wall roughness ε (ft). */
+  roughnessFt: number;
+  /** Kinematic viscosity (ft²/s); water at 60 °F ≈ 1.21e-5. */
+  viscosityFt2s: number;
+}
+
+/** Build a Darcy-Weisbach pipe link (flow-dependent friction factor). */
+export function dwPipeLink(id: string, from: string, to: string, params: DwPipeParams): GgaLink {
+  return {
+    id,
+    from,
+    to,
+    resistance: 0,
+    exponent: 2,
+    internalDiameterIn: params.internalDiameterIn,
+    dw: { roughnessFt: params.roughnessFt, viscosityFt2s: params.viscosityFt2s, internalDiameterIn: params.internalDiameterIn, lengthFt: params.lengthFt + (params.equivalentLengthFt ?? 0) },
   };
 }
 
@@ -199,7 +245,7 @@ export function solveGga(network: GgaNetwork, opts: GgaOptions = {}): GgaResult 
       const n = link.exponent;
       const { hL, grad } = linkState(link, q);
       const pc = 1 / grad;
-      const correction = link.fixedDropPsi ? q - hL / grad : (1 - 1 / n) * q; // F-term
+      const correction = link.fixedDropPsi || link.dw ? q - hL / grad : (1 - 1 / n) * q; // F-term
 
       const ai = idx.get(link.from);
       const bi = idx.get(link.to);

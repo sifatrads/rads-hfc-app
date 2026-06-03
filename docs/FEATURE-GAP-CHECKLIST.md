@@ -30,7 +30,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Fixed pressure-drop per segment (psi) — BFP/meter/filter constant loss ✅ DONE
 - [x] Added/negative length (off-drawing run, ≥0 floor) ✅ DONE
 - [ ] Fittings allocation mode (Pipe-Type-Specific vs physics) — affects equiv-length distribution
-- [ ] Darcy-Weisbach roughness (e) + C→e calculator — only with D-W method (see Standards)
+- [x] Per-material absolute roughness ε for D-W ✅ DONE
 - [ ] Pipe end-preps (Grooved/Threaded/Flanged/Welded) — BOM/submittal only, no hydraulic effect
 - [ ] Manufacturer / finish (galv/black/unlined) cataloging — BOM/pricing only
 
@@ -57,7 +57,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Compliance-path selector (Code picker: NFPA 13/13D/13R/14/EN) ✅ DONE
 - [x] NFPA 20 suction-velocity check (≤15 ft/s at 150% flow) ✅ DONE
 - [x] NFPA 15 deluge / water-spray (all nozzles flow at design density) ✅ DONE
-- [ ] Darcy-Weisbach method (full) — prerequisite for mist + Europe
+- [x] Darcy-Weisbach method (flow-dependent f, Swamee-Jain, per-material roughness) ✅ DONE
 - [ ] NFPA 750 water mist (D-W trigger, viscosity/density) — niche
 - [ ] EN 12845 (Table 23 equiv lengths, 4 weakest) — European commercial; large
 - [ ] BS 9251 / EN 16925 residential — UK/EU; large
@@ -93,7 +93,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 **Already covered:** ✅ Imperial/Metric · ✅ NFPA13 tables · ✅ Min sprinkler pressure · ✅ Per-pipe C-factor
 
 - [x] Min operating pressure + low-pressure node flagging ✅ DONE
-- [ ] Friction-equation selector (H-W / Darcy-Weisbach / Mixed) — gates D-W everywhere
+- [x] Friction-equation selector (Hazen-Williams / Darcy-Weisbach) ✅ DONE
 - [ ] Fluid properties (type/temp/antifreeze/viscosity/density) — for D-W & antifreeze
 - [ ] Demand-sizing modes (satisfy-min / below-available / %-below-available) — flexible targets
 - [ ] Default equivalent-lengths (PDT) editor by type/size — tune fitting tables

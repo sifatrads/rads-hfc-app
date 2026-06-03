@@ -365,6 +365,21 @@ describe("in-app data entry → solve", () => {
     expect(cleaned.network.pipes.length).toBe(1);
   });
 
+  it("Darcy-Weisbach converges and tracks Hazen-Williams for water in steel", () => {
+    const build = (method?: string) => {
+      const m = newProject("2026-06-03T00:00:00.000Z");
+      const nodes: NetworkNode[] = [m.network.nodes[0]!, { id: "2", type: "sprinkler", elevationFt: 0, kFactor: 5.6, fittings: [] } as unknown as NetworkNode];
+      const pipes: Pipe[] = [{ id: "P-1", from: "1", to: "2", role: "branch-line", nominalSize: "2", material: "steel-sch40", lengthFt: 200, fittings: [] }];
+      return withModel(m, { designBasis: { operatingSprinklers: 1, minSprinklerPressurePsi: 7, ...(method ? { frictionMethod: method } : {}) }, network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } });
+    };
+    const hw = solveProject(build()).summary;
+    const dw = solveProject(build("darcy-weisbach")).summary;
+    expect(dw.converged).toBe(true);
+    expect(dw.sourcePressurePsi).toBeGreaterThan(7);
+    // HW and D-W agree within ~40% for water in steel at fire-sprinkler velocities
+    expect(Math.abs(dw.sourcePressurePsi - hw.sourcePressurePsi) / hw.sourcePressurePsi).toBeLessThan(0.4);
+  });
+
   it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {
     const out = setNodeGeometryInModel(line3(), "3", { x: 42, y: 7, z: 10 });
     const n3 = out.network.nodes.find((n) => n.id === "3")!;

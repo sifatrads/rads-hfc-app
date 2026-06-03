@@ -197,6 +197,10 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             <Num label="Hose allowance (gpm)" value={num(ds["hoseAllowanceGpm"])} step={50} onChange={(v) => setBasis("hoseAllowanceGpm", v)} />
             <Num label="Supply duration (min)" value={num(ds["durationMin"])} step={10} onChange={(v) => setBasis("durationMin", v)} />
           </Row>
+          <Row>
+            <Sel label="Friction method" value={str(ds["frictionMethod"], "hazen-williams")} options={["hazen-williams", "darcy-weisbach"]} onChange={(v) => setBasis("frictionMethod", v)} />
+            {ds["frictionMethod"] === "darcy-weisbach" && <Num label="Fluid viscosity (cSt, water≈1.1)" value={num(ds["fluidViscosityCst"])} step={0.1} onChange={(v) => setBasis("fluidViscosityCst", v)} />}
+          </Row>
           <label style={checkRow}>
             <input type="checkbox" checked={!!ds["autoFittings"]} onChange={(e) => setBasis("autoFittings", e.target.checked)} />
             <span>Auto-add a 90° elbow where a pipe changes direction</span>

@@ -10,6 +10,7 @@ import type { ProjectModel, Pipe } from "@rads/model";
 import {
   solveGga,
   hwPipeLink,
+  dwPipeLink,
   emitterLink,
   type GgaNetwork,
   type GgaLink,
@@ -17,7 +18,7 @@ import {
   type GgaResult,
 } from "@rads/calc-engine";
 import { cityCurve, pumpOnSuction, constantPressureCurve, sampleCurve, velocityFps, type SupplyCurve, type FlowTest, type CurvePoint } from "@rads/calc-engine";
-import { getStandard, internalDiameterForMaterial, defaultCFactorForMaterial, pipeMaterial, fittingEquivalentLengthFt, type StandardId } from "@rads/standards-engine";
+import { getStandard, internalDiameterForMaterial, defaultCFactorForMaterial, pipeMaterial, roughnessForMaterial, fittingEquivalentLengthFt, type StandardId } from "@rads/standards-engine";
 
 export interface NodeResult {
   totalPressurePsi?: number;
@@ -242,6 +243,9 @@ function buildGga(model: ProjectModel, source: { id: string; elevationFt: number
   }
 
   const dry = model.meta.fillType === "dry" || model.meta.fillType === "preaction";
+  const dwMethod = (model.designBasis as Record<string, unknown> | undefined)?.["frictionMethod"] === "darcy-weisbach";
+  const viscCst = num(model.designBasis, "fluidViscosityCst");
+  const viscosityFt2s = viscCst !== undefined ? viscCst * 1.07639e-5 : 1.21e-5; // water 60°F default
   // Optional auto-fitting: add a 90° elbow equivalent where a pipe changes
   // routing direction from its upstream pipe (NFPA equivalent-length table).
   const autoFit = !!(model.designBasis as Record<string, unknown> | undefined)?.["autoFittings"];
@@ -258,7 +262,9 @@ function buildGga(model: ProjectModel, source: { id: string; elevationFt: number
     const cFactor = pipeCFactor(p, std, dry);
     const id = pipeId(p);
     const physLen = Math.max(0, (p.lengthFt ?? 0) + (p.additionalLengthFt ?? 0));
-    const link = hwPipeLink(p.id, p.from, p.to, { cFactor, internalDiameterIn: id, lengthFt: physLen, equivalentLengthFt: eq });
+    const link = dwMethod
+      ? dwPipeLink(p.id, p.from, p.to, { internalDiameterIn: id, lengthFt: physLen, equivalentLengthFt: eq, roughnessFt: roughnessForMaterial(p.material), viscosityFt2s })
+      : hwPipeLink(p.id, p.from, p.to, { cFactor, internalDiameterIn: id, lengthFt: physLen, equivalentLengthFt: eq });
     link.nominalSize = p.nominalSize;
     link.cFactorUsed = cFactor;
     link.lengthFt = physLen;

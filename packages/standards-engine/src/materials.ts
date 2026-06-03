@@ -94,3 +94,16 @@ export function internalDiameterForMaterial(materialId: string | undefined, nomi
 export function defaultCFactorForMaterial(materialId: string | undefined): number {
   return pipeMaterial(materialId).defaultCFactor;
 }
+
+/** Absolute wall roughness ε (ft) by material family, for Darcy-Weisbach. */
+const ROUGHNESS_FT: Record<MaterialFamily, number> = {
+  steel: 0.00015,
+  copper: 0.000005,
+  cpvc: 0.000005,
+  pvc: 0.000005,
+  "ductile-iron": 0.0008,
+  stainless: 0.000007,
+};
+export function roughnessForMaterial(materialId: string | undefined): number {
+  return ROUGHNESS_FT[pipeMaterial(materialId).family] ?? 0.00015;
+}
