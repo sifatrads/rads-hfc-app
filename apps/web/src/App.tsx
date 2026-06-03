@@ -13,6 +13,7 @@ import { solveProject, type ProjectSolution } from "@rads/solve";
 import { decodeJSON, encodeJSON, isRhfc } from "@rads/container";
 import { sampleProject } from "./sample";
 import { newProject, splitPipeInModel, deleteNodeInModel, addBranchInModel, addPipeBetweenInModel, setNodeGeometryInModel } from "./network-edit";
+import { useModelHistory } from "./useModelHistory";
 import { ProjectTab } from "./tabs/ProjectTab";
 import { SummaryTab } from "./tabs/SummaryTab";
 import { AnalysisTab } from "./tabs/AnalysisTab";
@@ -44,13 +45,13 @@ interface Pending { doc: DxfDoc; analysis: DxfAnalysis; fileName: string; }
 const cloudConfigured = !!import.meta.env.VITE_FIREBASE_API_KEY;
 
 export function App(): JSX.Element {
-  const [model, setModel] = useState<ProjectModel | null>(null);
+  const { model, set: setModel, reset: resetModel, undo, redo, canUndo, canRedo } = useModelHistory();
   const [tab, setTab] = useState<TabId>("project");
   const [note, setNote] = useState("Built-in sample");
   const [pending, setPending] = useState<Pending | null>(null);
   const [cloudOpen, setCloudOpen] = useState(false);
 
-  useEffect(() => { setModel(sampleProject()); }, []);
+  useEffect(() => { resetModel(sampleProject()); }, [resetModel]);
   // Auto-mount the cloud bar (loads firebase) only for users who were signed in
   // last time — everyone else pays nothing until they click "Cloud".
   useEffect(() => { if (cloudConfigured && localStorage.getItem("rads-cloud") === "1") setCloudOpen(true); }, []);
@@ -77,7 +78,22 @@ export function App(): JSX.Element {
     return s;
   }, [note, sol, solveError]);
 
-  function load(m: ProjectModel, msg: string, goto: TabId = "view"): void { setModel(m); setNote(msg); setTab(goto); }
+  // Opening a document (file / New / cloud restore) starts a fresh undo history.
+  function load(m: ProjectModel, msg: string, goto: TabId = "view"): void { resetModel(m); setNote(msg); setTab(goto); }
+
+  // Ctrl/Cmd+Z = undo, Ctrl+Y / Ctrl+Shift+Z = redo — unless typing in a field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const el = e.target as HTMLElement | null;
+      if (el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) { e.preventDefault(); undo(); setNote("Undo"); }
+      else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); redo(); setNote("Redo"); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
 
   function download(name: string, data: BlobPart, type: string): void {
     const url = URL.createObjectURL(new Blob([data], { type }));
@@ -129,6 +145,8 @@ export function App(): JSX.Element {
           ⤓ Open
           <input type="file" accept=".dxf,.rhfc,.json" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void openFile(f); e.target.value = ""; }} />
         </label>
+        <button style={{ ...iconBtn, ...(canUndo ? {} : disabledBtn) }} disabled={!canUndo} title="Undo (Ctrl+Z)" onClick={() => { undo(); setNote("Undo"); }}>↶</button>
+        <button style={{ ...iconBtn, ...(canRedo ? {} : disabledBtn) }} disabled={!canRedo} title="Redo (Ctrl+Y)" onClick={() => { redo(); setNote("Redo"); }}>↷</button>
         <button style={{ ...fileBtn, ...(model ? {} : disabledBtn) }} disabled={!model} title="Save the project as an encrypted .rhfc file" onClick={() => void saveRhfc()}>💾 Save</button>
         <button style={{ ...fileBtn, ...(model ? {} : disabledBtn) }} disabled={!model} title="Export plain JSON" onClick={exportJson}>JSON</button>
         <span style={statusPill}>{status}</span>
@@ -201,6 +219,7 @@ const header: CSSProperties = { display: "flex", alignItems: "center", gap: 10, 
 const brand: CSSProperties = { display: "flex", alignItems: "baseline", gap: 8, marginRight: 6 };
 const fileBtn: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 13px", background: "rgba(255,255,255,0.14)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 7, cursor: "pointer", fontSize: 12.5, fontWeight: 600 };
 const disabledBtn: CSSProperties = { opacity: 0.4, cursor: "default" };
+const iconBtn: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 30, padding: "5px 0", background: "rgba(255,255,255,0.14)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 7, cursor: "pointer", fontSize: 15, fontWeight: 700, lineHeight: 1 };
 const statusPill: CSSProperties = { marginLeft: 4, fontSize: 11.5, color: "#dbe7fa", background: "rgba(255,255,255,0.1)", padding: "3px 10px", borderRadius: 999, maxWidth: 420, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 const sidebar: CSSProperties = { width: 150, background: "#fff", borderRight: `1px solid ${C.line}`, display: "flex", flexDirection: "column", padding: "10px 8px", gap: 3, flexShrink: 0 };
 const navBtn: CSSProperties = { display: "flex", alignItems: "center", gap: 9, padding: "9px 11px", border: "none", background: "transparent", color: C.ink, borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: FONT, textAlign: "left" };
