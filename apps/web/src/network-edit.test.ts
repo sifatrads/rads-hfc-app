@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { solveProject } from "@rads/solve";
 import { encodeJSON, decodeJSON } from "@rads/container";
 import { parseProject } from "@rads/model";
-import { newProject, renumberNetwork, normalizePipe, internalDiameterFor, withModel, splitPipeInModel, deleteNodeInModel, deletePipeInModel, addBranchInModel } from "./network-edit";
+import { newProject, renumberNetwork, normalizePipe, internalDiameterFor, withModel, splitPipeInModel, deleteNodeInModel, deletePipeInModel, addBranchInModel, addPipeBetweenInModel } from "./network-edit";
 import type { NetworkNode, Pipe } from "@rads/model";
 
 describe("in-app data entry → solve", () => {
@@ -120,5 +120,17 @@ describe("in-app data entry → solve", () => {
     expect(pipe.direction).toBe("U");
     expect(pipe.elevationChangeFt).toBe(8);
     expect(pipe.nominalSize).toBe("1");
+  });
+
+  it("addPipeBetweenInModel connects two nodes (and is a no-op for duplicates/self)", () => {
+    const m = line3(); // 1→2→3
+    const out = addPipeBetweenInModel(m, "1", "3", { lengthFt: 25, nominalSize: "2", role: "cross-main" });
+    expect(out.network.pipes.length).toBe(3); // P-1, P-2 + the new 1↔3 connection
+    const added = out.network.pipes.find((p) => (p.from === "1" && p.to === "3") || (p.from === "3" && p.to === "1"))!;
+    expect(added.lengthFt).toBe(25);
+    expect(added.internalDiameterIn).toBe(internalDiameterFor("2"));
+    // duplicate (already 1→2) and self-connect are no-ops
+    expect(addPipeBetweenInModel(m, "1", "2", { lengthFt: 5, nominalSize: "1" }).network.pipes.length).toBe(2);
+    expect(addPipeBetweenInModel(m, "2", "2", { lengthFt: 5, nominalSize: "1" }).network.pipes.length).toBe(2);
   });
 });

@@ -196,3 +196,23 @@ export function addBranchInModel(model: ProjectModel, fromNodeId: string, opts: 
   };
   return commitNetwork(model, [...model.network.nodes, newNode], [...model.network.pipes, newPipe]);
 }
+
+/**
+ * Connect two existing nodes with a new pipe (close a loop / grid). No-op if the
+ * ends are the same or already directly connected. Geometry comes from the two
+ * nodes' existing positions, so no direction is set — only length drives the calc.
+ */
+export function addPipeBetweenInModel(model: ProjectModel, fromId: string, toId: string, opts: { lengthFt: number; nominalSize: string; role?: string }): ProjectModel {
+  if (fromId === toId) return model;
+  if (model.network.pipes.some((p) => (p.from === fromId && p.to === toId) || (p.from === toId && p.to === fromId))) return model;
+  const newPipe: Pipe = {
+    id: "tmp-conn",
+    from: fromId,
+    to: toId,
+    role: opts.role ?? "cross-main",
+    nominalSize: opts.nominalSize,
+    lengthFt: Math.max(0.1, opts.lengthFt),
+    fittings: [],
+  };
+  return commitNetwork(model, model.network.nodes, [...model.network.pipes, newPipe]);
+}

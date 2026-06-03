@@ -56,6 +56,8 @@ export interface ViewerProps {
   onDeleteNode?: (nodeId: string) => void;
   /** When provided, clicking a node offers "Add branch" in a direction. */
   onAddBranch?: (fromNodeId: string, opts: { direction: string; lengthFt: number; nominalSize: string; nodeType: string }) => void;
+  /** When provided, "Connect to…" lets you click two nodes to add a pipe between them. */
+  onAddPipe?: (fromNodeId: string, toNodeId: string, lengthFt: number, opts: { nominalSize: string; role: string }) => void;
 }
 
 const DIRS: { d: string; label: string }[] = [
@@ -67,7 +69,7 @@ type EditSel =
   | { kind: "pipe"; id: string; fraction: number; x: number; y: number }
   | { kind: "node"; id: string; x: number; y: number };
 
-export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNode, onAddBranch }: ViewerProps): JSX.Element {
+export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNode, onAddBranch, onAddPipe }: ViewerProps): JSX.Element {
   const t = useMemo(() => computeTransform(scene), [scene]);
   const [metric, setMetric] = useState<ColorMetric>(initialMetric);
   const [view, setView] = useState<string>("iso");
@@ -78,12 +80,34 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
   const [brLen, setBrLen] = useState(10);
   const [brSize, setBrSize] = useState("1");
   const [brType, setBrType] = useState("sprinkler");
+  const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const canEdit = !!(onSplitPipe || onDeleteNode || onAddBranch);
+  const canEdit = !!(onSplitPipe || onDeleteNode || onAddBranch || onAddPipe);
+  const nodePos = useMemo(() => new Map(scene.nodes.map((n) => [n.id, n.pos])), [scene]);
   const fit = () => setFitNonce((n) => n + 1);
   const rel = (cx: number, cy: number) => { const r = containerRef.current?.getBoundingClientRect(); return { x: cx - (r?.left ?? 0), y: cy - (r?.top ?? 0) }; };
   const pickPipe = (id: string, fraction: number, cx: number, cy: number) => { const p = rel(cx, cy); setPicked({ kind: "pipe", id, fraction, x: p.x, y: p.y }); };
-  const pickNode = (id: string, cx: number, cy: number) => { const p = rel(cx, cy); setPicked({ kind: "node", id, x: p.x, y: p.y }); };
+  const pickNode = (id: string, cx: number, cy: number) => {
+    if (connectFrom) {
+      if (connectFrom !== id && onAddPipe) {
+        const a = nodePos.get(connectFrom), b = nodePos.get(id);
+        const len = a && b ? Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) : 10;
+        onAddPipe(connectFrom, id, Math.round(len * 10) / 10, { nominalSize: brSize, role: "cross-main" });
+      }
+      setConnectFrom(null);
+      return;
+    }
+    const p = rel(cx, cy);
+    setPicked({ kind: "node", id, x: p.x, y: p.y });
+  };
+
+  // Esc cancels an in-progress connect.
+  useEffect(() => {
+    if (!connectFrom) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setConnectFrom(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [connectFrom]);
   const { pipeColors, legend } = useMemo(() => colorize(scene, metric), [scene, metric]);
 
   const toggle = (c: LabelCategory) =>
@@ -99,7 +123,7 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
       <Canvas
         camera={{ position: VIEW_POSITIONS.iso, fov: 45, near: 0.1, far: 6000 }}
         dpr={[1, 2]}
-        onPointerMissed={() => setPicked(null)}
+        onPointerMissed={() => { setPicked(null); setConnectFrom(null); }}
       >
         <RaycastTuning />
         <color attach="background" args={["#eef2f5"]} />
@@ -107,8 +131,8 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
         <directionalLight position={[30, 50, 20]} intensity={0.7} />
         <directionalLight position={[-20, 10, -30]} intensity={0.25} />
         <gridHelper args={[120, 24, "#cfd8dc", "#e3e9ed"]} position={[0, -0.01, 0]} />
-        <Pipes scene={scene} t={t} colors={pipeColors} onPick={edit && onSplitPipe ? pickPipe : undefined} />
-        <Nodes scene={scene} t={t} onPick={edit && (onDeleteNode || onAddBranch) ? pickNode : undefined} />
+        <Pipes scene={scene} t={t} colors={pipeColors} onPick={edit && onSplitPipe && !connectFrom ? pickPipe : undefined} />
+        <Nodes scene={scene} t={t} onPick={edit && (onDeleteNode || onAddBranch || onAddPipe) ? pickNode : undefined} />
         <Devices scene={scene} t={t} />
         <LabelOverlay scene={scene} t={t} enabled={enabled} />
         <CameraRig view={view} fitNonce={fitNonce} />
@@ -177,6 +201,14 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
         ))}
       </div>
 
+      {/* connect-mode banner */}
+      {connectFrom && (
+        <div style={connectBanner}>
+          🔗 Connecting from node <b>{connectFrom}</b> — click a target node &nbsp;
+          <button style={connectCancel} onClick={() => setConnectFrom(null)}>Esc / Cancel</button>
+        </div>
+      )}
+
       {/* edit action menu (anchored at the click) */}
       {picked && (
         <div style={{ ...menu, left: Math.min(picked.x, (containerRef.current?.clientWidth ?? 9999) - 170), top: picked.y + 8 }}>
@@ -206,6 +238,7 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
                   <div style={{ fontSize: 9.5, color: "#94a3b8", margin: "2px 0 4px" }}>Add branch → pick a direction</div>
                 </div>
               )}
+              {onAddPipe && <button style={menuBtn} onClick={() => { setConnectFrom(picked.id); setPicked(null); }}>🔗 Connect to another node…</button>}
               {onDeleteNode && <button style={{ ...menuBtn, color: "#b91c1c" }} onClick={() => { onDeleteNode(picked.id); setPicked(null); }}>🗑 Delete node + its pipes</button>}
             </>
           )}
@@ -240,3 +273,5 @@ const branchForm: CSSProperties = { padding: "2px 6px 4px", borderBottom: "1px s
 const miniInput: CSSProperties = { flex: 1, minWidth: 0, fontSize: 11.5, padding: "3px 4px", border: "1px solid #d7dee6", borderRadius: 5, color: "#16243a", fontFamily: FONT };
 const dirGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, marginTop: 5 };
 const dirBtn: CSSProperties = { fontSize: 12, fontWeight: 700, color: "#0b3d91", background: "#eef3fb", border: "1px solid #cfdcee", borderRadius: 6, padding: "5px 0", cursor: "pointer" };
+const connectBanner: CSSProperties = { position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)", zIndex: 30, display: "flex", alignItems: "center", background: "#0b3d91", color: "#fff", fontFamily: FONT, fontSize: 12.5, padding: "7px 14px", borderRadius: 999, boxShadow: "0 6px 22px rgba(15,30,60,0.28)" };
+const connectCancel: CSSProperties = { fontSize: 11.5, fontWeight: 600, color: "#0b3d91", background: "#fff", border: "none", borderRadius: 999, padding: "3px 10px", cursor: "pointer" };
