@@ -238,7 +238,7 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
         </div>
         <div style={tableScroll}>
           <table style={table}>
-            <thead><tr>{["#", "Type", "Elevation (ft)", "K-factor", "Coverage (ft²)", "Note", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+            <thead><tr>{["#", "Type", "Elevation (ft)", "K-factor", "Coverage (ft²)", "Fixed flow (gpm)", "Note", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
               {nodes.map((n, i) => {
                 const spk = n.type === "sprinkler";
@@ -249,6 +249,7 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
                     <td style={td}><NumCell value={n.elevationFt} onChange={(v) => setNode(i, { elevationFt: v ?? 0 })} /></td>
                     <td style={td}>{spk ? <NumCell value={n.kFactor} onChange={(v) => setNode(i, { kFactor: v })} /> : <Dim>—</Dim>}</td>
                     <td style={td}>{spk ? <NumCell value={n.coverageAreaFt2} onChange={(v) => setNode(i, { coverageAreaFt2: v })} /> : <Dim>—</Dim>}</td>
+                    <td style={td} title="Fixed hose/hydrant demand for junction & hose-station nodes (sprinklers flow Q=K√P)">{spk ? <Dim>—</Dim> : <NumCell value={n.flowGpm} onChange={(v) => setNode(i, { flowGpm: v })} />}</td>
                     <td style={td}><input style={cellInput} value={n.note ?? ""} onChange={(e) => setNode(i, { note: e.target.value })} /></td>
                     <td style={td}><button style={btnDanger} onClick={() => delNode(i)} title="Delete node">✕</button></td>
                   </tr>

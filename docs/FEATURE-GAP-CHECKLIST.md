@@ -8,7 +8,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 **Already covered:** ✅ Add/insert node (auto-numbered table) · ✅ Static elevation · ✅ K-factor · ✅ K=0 junctions · ✅ Delete node · ✅ Split/divide pipe (3D click + table) · ✅ Split distance from start · ✅ Auto-ID on split · ✅ Property preservation across split · ✅ Add branch (direction+length) · ✅ Connect two nodes · ✅ Renumber 1..N
 
 - [ ] Alphanumeric node IDs (≤4 char, e.g. S1, RN3A) — ID flexibility for plan-matching; replaces forced 1..N
-- [ ] Hose Stream / Hydrant fixed-flow flag UI — node fixed GPM bypassing K√P; hydrant/standpipe demand
+- [x] Hose / Hydrant fixed-flow node flag (gpm on junction/hose-station) ✅ DONE
 - [ ] Remote Area Box + active-flowing-head assignment — auto-mark heads inside a design-area box; core NFPA workflow
 - [ ] Hanging-end / disconnected-segment validation sweep ("Check Model") — blocks calc on broken topology; high value
 - [ ] Zero-diameter / zero-connectivity error check — pairs with above; cheap safety net

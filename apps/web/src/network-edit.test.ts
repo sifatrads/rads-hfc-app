@@ -193,6 +193,23 @@ describe("in-app data entry → solve", () => {
     expect(solveProject(build("dry")).summary.sourcePressurePsi).toBeGreaterThan(solveProject(build("wet")).summary.sourcePressurePsi);
   });
 
+  it("a fixed-flow (hose/hydrant) node adds demand drawn through the source", () => {
+    const build = (hose?: number) => {
+      const m = newProject("2026-06-03T00:00:00.000Z");
+      const nodes: NetworkNode[] = [
+        m.network.nodes[0]!,
+        { id: "2", type: "hose-station", elevationFt: 0, ...(hose ? { flowGpm: hose } : {}), fittings: [] } as unknown as NetworkNode,
+        { id: "3", type: "sprinkler", elevationFt: 0, kFactor: 5.6, fittings: [] } as unknown as NetworkNode,
+      ];
+      const pipes: Pipe[] = [
+        { id: "P-1", from: "1", to: "2", role: "feed-main", nominalSize: "2", lengthFt: 50, fittings: [] },
+        { id: "P-2", from: "2", to: "3", role: "branch-line", nominalSize: "1", lengthFt: 20, fittings: [] },
+      ];
+      return withModel(m, { designBasis: { ...m.designBasis, operatingSprinklers: 1 }, network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } });
+    };
+    expect(solveProject(build(250)).summary.sourcePressurePsi).toBeGreaterThan(solveProject(build()).summary.sourcePressurePsi);
+  });
+
   it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {
     const out = setNodeGeometryInModel(line3(), "3", { x: 42, y: 7, z: 10 });
     const n3 = out.network.nodes.find((n) => n.id === "3")!;
