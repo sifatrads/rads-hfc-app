@@ -132,3 +132,29 @@ export function fittingEquivalentLengthFt(fitting: string, nominalSize: string, 
   const dm = opts.actualIdIn !== undefined ? equivalentLengthModifier(opts.actualIdIn, nominalSize) : 1;
   return base * cm * dm;
 }
+
+/** Alphanumeric fitting codes → fitting type (Canute-style: 2E = 2×elbow). */
+export const FITTING_CODE_MAP: Record<string, string> = {
+  E: "elbow-90", LE: "elbow-90-long", FE: "elbow-45", T: "tee", X: "tee",
+  GV: "gate-valve", BV: "butterfly-valve", CV: "check-valve", FS: "flow-switch",
+};
+
+export interface ParsedFitting { type: string; qty: number; equivalentLengthFt: number }
+
+/**
+ * Parse a fitting-code string (e.g. "2E 1T", "E,GV") into fitting entries with
+ * total Sch-40 equivalent length at a nominal size. Unknown tokens are skipped.
+ */
+export function parseFittingCodes(code: string, nominalSize: string): ParsedFitting[] {
+  const out: ParsedFitting[] = [];
+  for (const tok of (code ?? "").toUpperCase().split(/[\s,]+/).filter(Boolean)) {
+    const m = /^(\d*)([A-Z]+)$/.exec(tok);
+    if (!m) continue;
+    const qty = m[1] ? parseInt(m[1], 10) : 1;
+    const type = FITTING_CODE_MAP[m[2]!];
+    if (!type || qty <= 0) continue;
+    const each = fittingEquivalentLengthFt(type, nominalSize) ?? 0;
+    out.push({ type, qty, equivalentLengthFt: Math.round(each * qty * 100) / 100 });
+  }
+  return out;
+}

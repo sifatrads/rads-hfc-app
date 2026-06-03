@@ -11,7 +11,7 @@ import {
   NOMINAL_SIZES, PIPE_ROLES, NODE_TYPES, VALVE_TYPES, PUMP_TYPES, PUMP_DRIVERS, VALVE_EQUIV_FT, MATERIAL_OPTIONS,
   DIRECTIONS, DIRECTION_LABEL, renumberNetwork, normalizePipe, withModel, splitPipeInModel,
 } from "../network-edit";
-import { defaultCFactorForMaterial, pipeMaterial } from "@rads/standards-engine";
+import { defaultCFactorForMaterial, pipeMaterial, parseFittingCodes } from "@rads/standards-engine";
 import { C, FONT, card, sectionTitle, field, fieldLabel, input, select, btnPrimary, btnGhost, btnDanger, th, td } from "../ui";
 import type { Issue } from "../network-validate";
 
@@ -177,6 +177,11 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             <Num label="Min head pressure (psi)" value={num(ds["minSprinklerPressurePsi"])} step={1} onChange={(v) => setBasis("minSprinklerPressurePsi", v)} />
             <Num label="Hose allowance (gpm)" value={num(ds["hoseAllowanceGpm"])} step={50} onChange={(v) => setBasis("hoseAllowanceGpm", v)} />
           </Row>
+          <label style={checkRow}>
+            <input type="checkbox" checked={!!ds["autoFittings"]} onChange={(e) => setBasis("autoFittings", e.target.checked)} />
+            <span>Auto-add a 90° elbow where a pipe changes direction</span>
+          </label>
+          <div style={hint}>Leave operating heads blank to auto‑peak the design area. Fitting codes per pipe: E elbow · LE long elbow · FE 45° · T tee · GV/BV/CV valves (e.g. “2E 1T”).</div>
         </Section>
 
         {/* Water supply */}
@@ -277,7 +282,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
         </div>
         <div style={tableScroll}>
           <table style={table}>
-            <thead><tr>{["#", "From", "To", "Role", "Size", "Material", "C", "ID (in)", "Length (ft)", "Add'l (ft)", "Direction", "ΔElev (ft)", "Fixed ΔP", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+            <thead><tr>{["#", "From", "To", "Role", "Size", "Material", "C", "ID (in)", "Length (ft)", "Add'l (ft)", "Fittings", "Direction", "ΔElev (ft)", "Fixed ΔP", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
               {pipes.map((p, i) => (
                 <tr key={i} style={i % 2 ? { background: C.zebra } : undefined}>
@@ -285,12 +290,13 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
                   <td style={td}><NodeSel ids={nodeIds} value={p.from} onChange={(v) => setPipe(i, { from: v })} /></td>
                   <td style={td}><NodeSel ids={nodeIds} value={p.to} onChange={(v) => setPipe(i, { to: v })} /></td>
                   <td style={td}><select style={cellInput} value={p.role ?? "branch-line"} onChange={(e) => setPipe(i, { role: e.target.value })}>{PIPE_ROLES.map((o) => <option key={o} value={o}>{o}</option>)}</select></td>
-                  <td style={td}><select style={{ ...cellInput, width: 64 }} value={p.nominalSize ?? "1"} onChange={(e) => setPipe(i, { nominalSize: e.target.value })}>{NOMINAL_SIZES.map((o) => <option key={o} value={o}>{o}"</option>)}</select></td>
+                  <td style={td}><select style={{ ...cellInput, width: 64 }} value={p.nominalSize ?? "1"} onChange={(e) => setPipe(i, { nominalSize: e.target.value, ...(p.fittingCode ? { fittings: parseFittingCodes(p.fittingCode, e.target.value) } : {}) })}>{NOMINAL_SIZES.map((o) => <option key={o} value={o}>{o}"</option>)}</select></td>
                   <td style={td}><select style={{ ...cellInput, width: 130 }} value={p.material ?? "steel-sch40"} onChange={(e) => setPipe(i, { material: e.target.value })}>{MATERIAL_OPTIONS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></td>
                   <td style={td}><NumCell value={effC(p)} onChange={(v) => setPipe(i, { cFactor: v })} /></td>
                   <td style={td}><NumCell value={p.internalDiameterIn} onChange={(v) => setPipe(i, v === undefined ? { idOverride: false, internalDiameterIn: undefined } : { idOverride: true, internalDiameterIn: v })} /></td>
                   <td style={td}><NumCell value={p.lengthFt} onChange={(v) => setPipe(i, { lengthFt: v ?? 0 })} /></td>
                   <td style={td}><NumCell value={p.additionalLengthFt} onChange={(v) => setPipe(i, { additionalLengthFt: v })} /></td>
+                  <td style={td}><input style={{ ...cellInput, width: 70 }} value={p.fittingCode ?? ""} placeholder="2E 1T" title="Fitting codes: E elbow, T tee, GV/BV/CV valves" onChange={(e) => setPipe(i, { fittingCode: e.target.value, fittings: parseFittingCodes(e.target.value, p.nominalSize ?? "1") })} /></td>
                   <td style={td}>
                     <select style={{ ...cellInput, width: 92 }} value={p.direction ?? ""} onChange={(e) => setPipe(i, { direction: (e.target.value || undefined) as Direction | undefined })}>
                       <option value="">(auto)</option>
@@ -307,7 +313,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
                   </td>
                 </tr>
               ))}
-              {pipes.length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={14}>No pipes yet — add nodes, then connect them. The first node (#1) is the supply source.</td></tr>}
+              {pipes.length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={15}>No pipes yet — add nodes, then connect them. The first node (#1) is the supply source.</td></tr>}
             </tbody>
           </table>
         </div>

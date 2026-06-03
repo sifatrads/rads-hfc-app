@@ -25,8 +25,8 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Multi-material pipe DB (Sch10, Copper K/L/M, CPVC, PVC, Ductile, SS) — per-material ID + C lookup ✅ DONE
 - [ ] Material database, up to 50 user-defined entries — build atop material DB
 - [x] Nominal-vs-Actual ID toggle + manual ID override ✅ DONE
-- [ ] Auto-fitting allocation from drawn direction changes — turn → elbow equiv automatically
-- [ ] Manual fittings via alphanumeric codes (2E, 1T) — fast fitting entry
+- [x] Auto-fitting allocation (elbow at direction changes, toggle) ✅ DONE
+- [x] Manual fittings via alphanumeric codes (2E, 1T, GV/BV/CV) ✅ DONE
 - [x] Fixed pressure-drop per segment (psi) — BFP/meter/filter constant loss ✅ DONE
 - [x] Added/negative length (off-drawing run, ≥0 floor) ✅ DONE
 - [ ] Fittings allocation mode (Pipe-Type-Specific vs physics) — affects equiv-length distribution

@@ -17,7 +17,7 @@ import {
   type GgaResult,
 } from "@rads/calc-engine";
 import { cityCurve, pumpOnSuction, constantPressureCurve, sampleCurve, type SupplyCurve, type FlowTest, type CurvePoint } from "@rads/calc-engine";
-import { getStandard, internalDiameterForMaterial, defaultCFactorForMaterial, pipeMaterial, type StandardId } from "@rads/standards-engine";
+import { getStandard, internalDiameterForMaterial, defaultCFactorForMaterial, pipeMaterial, fittingEquivalentLengthFt, type StandardId } from "@rads/standards-engine";
 
 export interface NodeResult {
   totalPressurePsi?: number;
@@ -203,8 +203,19 @@ function buildGga(model: ProjectModel, source: { id: string; elevationFt: number
   }
 
   const dry = model.meta.fillType === "dry" || model.meta.fillType === "preaction";
+  // Optional auto-fitting: add a 90° elbow equivalent where a pipe changes
+  // routing direction from its upstream pipe (NFPA equivalent-length table).
+  const autoFit = !!(model.designBasis as Record<string, unknown> | undefined)?.["autoFittings"];
+  const upstreamByNode = new Map<string, Pipe>();
+  if (autoFit) for (const p of model.network.pipes) upstreamByNode.set(p.to, p);
   for (const p of model.network.pipes) {
-    const eq = pipeEquivLen(p) + (extraEquiv.get(p.id) ?? 0);
+    let eq = pipeEquivLen(p) + (extraEquiv.get(p.id) ?? 0);
+    if (autoFit) {
+      const up = upstreamByNode.get(p.from);
+      if (up && p.direction && up.direction && p.direction !== up.direction) {
+        eq += fittingEquivalentLengthFt("elbow-90", p.nominalSize ?? "1") ?? 0;
+      }
+    }
     const cFactor = pipeCFactor(p, std, dry);
     const id = pipeId(p);
     const physLen = Math.max(0, (p.lengthFt ?? 0) + (p.additionalLengthFt ?? 0));

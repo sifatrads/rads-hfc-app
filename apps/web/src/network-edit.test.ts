@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { solveProject } from "@rads/solve";
+import { parseFittingCodes } from "@rads/standards-engine";
 import { encodeJSON, decodeJSON } from "@rads/container";
 import { parseProject } from "@rads/model";
 import { newProject, renumberNetwork, normalizePipe, internalDiameterFor, withModel, splitPipeInModel, deleteNodeInModel, deletePipeInModel, addBranchInModel, addPipeBetweenInModel, setNodeGeometryInModel } from "./network-edit";
@@ -226,6 +227,30 @@ describe("in-app data entry → solve", () => {
     expect(sol.summary.operatingHeads).toBe(15);
     expect(sol.summary.requiredHeadFlowGpm).toBeCloseTo(10, 3); // 0.1 gpm/ft² × 100 ft²
     expect(sol.summary.designAreaFt2).toBe(1500);
+  });
+
+  it("parses fitting codes into equivalent lengths", () => {
+    const f = parseFittingCodes("2E 1T", "2"); // 2": elbow-90 = 5 ft, tee = 8 ft
+    expect(f.find((x) => x.type === "elbow-90")!.qty).toBe(2);
+    expect(f.find((x) => x.type === "elbow-90")!.equivalentLengthFt).toBeCloseTo(10, 1);
+    expect(f.find((x) => x.type === "tee")!.equivalentLengthFt).toBeCloseTo(8, 1);
+  });
+
+  it("auto-fittings adds an elbow at a direction change", () => {
+    const build = (auto: boolean) => {
+      const m = newProject("2026-06-03T00:00:00.000Z");
+      const nodes: NetworkNode[] = [
+        m.network.nodes[0]!,
+        { id: "2", type: "junction", elevationFt: 0, fittings: [] } as unknown as NetworkNode,
+        { id: "3", type: "sprinkler", elevationFt: 0, kFactor: 5.6, fittings: [] } as unknown as NetworkNode,
+      ];
+      const pipes: Pipe[] = [
+        { id: "P-1", from: "1", to: "2", role: "feed-main", nominalSize: "1", lengthFt: 10, direction: "E", fittings: [] },
+        { id: "P-2", from: "2", to: "3", role: "branch-line", nominalSize: "1", lengthFt: 10, direction: "N", fittings: [] },
+      ];
+      return withModel(m, { designBasis: { ...m.designBasis, operatingSprinklers: 1, autoFittings: auto }, network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } });
+    };
+    expect(solveProject(build(true)).summary.sourcePressurePsi).toBeGreaterThan(solveProject(build(false)).summary.sourcePressurePsi);
   });
 
   it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {

@@ -70,6 +70,8 @@ export const PipeSchema = z
     /** Canute-compatible routing direction; alternate geometry input. */
     direction: DirectionSchema.optional(),
     fittings: z.array(FittingSchema).default([]),
+    /** Raw alphanumeric fitting code (e.g. "2E 1T") parsed into `fittings`. */
+    fittingCode: z.string().optional(),
     standpipe: z.number().optional(),
   })
   .passthrough();
