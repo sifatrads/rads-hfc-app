@@ -17,7 +17,7 @@ import {
   type GgaResult,
 } from "@rads/calc-engine";
 import { cityCurve, pumpOnSuction, constantPressureCurve, sampleCurve, type SupplyCurve, type FlowTest, type CurvePoint } from "@rads/calc-engine";
-import { getStandard, internalDiameterForMaterial, defaultCFactorForMaterial, type StandardId } from "@rads/standards-engine";
+import { getStandard, internalDiameterForMaterial, defaultCFactorForMaterial, pipeMaterial, type StandardId } from "@rads/standards-engine";
 
 export interface NodeResult {
   totalPressurePsi?: number;
@@ -104,10 +104,14 @@ function supplyCurveFor(model: ProjectModel): { curve: SupplyCurve; maxFlowGpm: 
   return { curve: constantPressureCurve(100), maxFlowGpm: 2000 };
 }
 
-function pipeCFactor(p: Pipe, std: ReturnType<typeof getStandard> | undefined): number {
+function pipeCFactor(p: Pipe, std: ReturnType<typeof getStandard> | undefined, dry: boolean): number {
   if (typeof p.cFactor === "number") return p.cFactor;
-  if (p.material) return std?.cFactor?.(p.material) ?? defaultCFactorForMaterial(p.material);
-  return 120;
+  if (p.material) {
+    const c = std?.cFactor?.(p.material) ?? defaultCFactorForMaterial(p.material);
+    // Dry/pre-action steel systems use C = 100 (NFPA 13 Table 27.2.4.8.1).
+    return dry && pipeMaterial(p.material).family === "steel" ? Math.min(c, 100) : c;
+  }
+  return dry ? 100 : 120;
 }
 function pipeId(p: Pipe): number {
   if (typeof p.internalDiameterIn === "number") return p.internalDiameterIn;
@@ -165,9 +169,10 @@ function buildGga(model: ProjectModel, source: { id: string; elevationFt: number
     else nodes.push({ id: n.id, elevationFt: n.elevationFt ?? 0, demandGpm: n.flowGpm && n.type !== "sprinkler" ? n.flowGpm : 0 });
   }
 
+  const dry = model.meta.fillType === "dry" || model.meta.fillType === "preaction";
   for (const p of model.network.pipes) {
     const eq = pipeEquivLen(p) + (extraEquiv.get(p.id) ?? 0);
-    const cFactor = pipeCFactor(p, std);
+    const cFactor = pipeCFactor(p, std, dry);
     const id = pipeId(p);
     const physLen = Math.max(0, (p.lengthFt ?? 0) + (p.additionalLengthFt ?? 0));
     const link = hwPipeLink(p.id, p.from, p.to, { cFactor, internalDiameterIn: id, lengthFt: physLen, equivalentLengthFt: eq });

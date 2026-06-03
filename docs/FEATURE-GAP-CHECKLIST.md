@@ -106,10 +106,10 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 
 **Already covered:** ✅ Design density · ✅ Design area · ✅ Operating sprinklers · ✅ Sprinkler K · ✅ Min pressure · ✅ Hose allowance · ✅ Flow test static/residual/test-flow · ✅ Fire pump (curve + datasheet upload) · ✅ Reservoir · ✅ Suction
 
-- [ ] Hazard classification picker (Light/OG1/OG2/EG1/EG2) — drives criteria + nameplate; **small, high value**
-- [ ] System type (Wet/Dry/Preaction/Deluge) — affects C-factor/dry adjustments + nameplate
-- [ ] Administrative fields (project name/job no./date/description) — submittal cover; trivial
-- [ ] Contact block (client/contractor/designer/company) — cover-sheet completeness; trivial
+- [x] Hazard classification picker (Light/OH1/OH2/EH1/EH2) ✅ DONE
+- [x] System type (Wet/Dry/Preaction/Deluge) + dry steel C derate ✅ DONE
+- [x] Administrative fields (project name/no/date) ✅ DONE
+- [x] Contact block (client/contractor/designer/company/address) ✅ DONE
 - [ ] Sheet layout (drawing numbers / sheet refs / revisions) — submittal metadata
 - [ ] Inside/outside hose + hydrant allowance split — finer than single hose allowance
 - [ ] Min stored-water volume from demand × duration — tank sizing

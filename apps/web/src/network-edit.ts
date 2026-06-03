@@ -5,7 +5,7 @@
  * the directions to build the 3D/iso, so no drawing is needed.
  */
 import { parseProject, type ProjectModel, type NetworkNode, type Pipe, type Direction } from "@rads/model";
-import { internalDiameterForMaterial, defaultCFactorForMaterial, PIPE_MATERIALS } from "@rads/standards-engine";
+import { internalDiameterForMaterial, PIPE_MATERIALS } from "@rads/standards-engine";
 
 /** Nominal pipe sizes offered in the size dropdown (Schedule-40 bore known). */
 export const NOMINAL_SIZES = ["1/2", "3/4", "1", "1-1/4", "1-1/2", "2", "2-1/2", "3", "3-1/2", "4", "5", "6", "8", "10", "12"] as const;
@@ -66,16 +66,15 @@ export function renumberNetwork(nodes: NetworkNode[], pipes: Pipe[]): { nodes: N
   return { nodes: outNodes, pipes: outPipes };
 }
 
-/** Fill internalDiameterIn from the material + nominal size, and default the
- * C-factor from the material when not explicitly set. A pipe with idOverride
- * keeps its manual internal diameter (nominal-vs-actual toggle). */
+/** Fill internalDiameterIn from the material + nominal size. The C-factor is
+ * left for the solver to derive from material + system fill-type (so it isn't
+ * baked here, which would mask the dry-system derate) unless the user overrides
+ * it. A pipe with idOverride keeps its manual internal diameter. */
 export function normalizePipe(p: Pipe): Pipe {
-  const cFactor = p.cFactor ?? defaultCFactorForMaterial(p.material);
-  if (p.idOverride && typeof p.internalDiameterIn === "number") return { ...p, cFactor };
+  if (p.idOverride && typeof p.internalDiameterIn === "number") return p;
   return {
     ...p,
     internalDiameterIn: p.nominalSize ? internalDiameterForMaterial(p.material, p.nominalSize) : p.internalDiameterIn,
-    cFactor,
   };
 }
 

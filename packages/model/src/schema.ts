@@ -185,10 +185,20 @@ export const ProjectMetaSchema = z
     standardId: z.string().optional(), // engine id, e.g. "nfpa13"
     hazardClass: z.string().optional(),
     standpipeClass: z.string().optional(),
+    /** Pipe-fill type: "wet" | "dry" | "preaction" | "deluge" — dry/preaction
+     * derate steel C-factor (100 vs 120) and appear on the nameplate. */
+    fillType: z.string().optional(),
     units: UnitsSchema.default("imperial"),
     engineer: z.string().optional(),
     date: z.string().optional(),
     rev: z.number().optional(),
+    // ── administrative / submittal fields (display only) ──
+    client: z.string().optional(),
+    contractor: z.string().optional(),
+    designer: z.string().optional(),
+    company: z.string().optional(),
+    address: z.string().optional(),
+    drawingNo: z.string().optional(),
     createdAt: z.string().optional(),
     updatedAt: z.string().optional(),
     appVersion: z.string().optional(),

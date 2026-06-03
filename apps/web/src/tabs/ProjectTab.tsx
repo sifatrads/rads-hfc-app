@@ -11,7 +11,7 @@ import {
   NOMINAL_SIZES, PIPE_ROLES, NODE_TYPES, VALVE_TYPES, PUMP_TYPES, PUMP_DRIVERS, VALVE_EQUIV_FT, MATERIAL_OPTIONS,
   DIRECTIONS, DIRECTION_LABEL, renumberNetwork, normalizePipe, withModel, splitPipeInModel,
 } from "../network-edit";
-import { defaultCFactorForMaterial } from "@rads/standards-engine";
+import { defaultCFactorForMaterial, pipeMaterial } from "@rads/standards-engine";
 import { C, FONT, card, sectionTitle, field, fieldLabel, input, select, btnPrimary, btnGhost, btnDanger, th, td } from "../ui";
 
 export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange: (m: ProjectModel) => void }): JSX.Element {
@@ -28,6 +28,14 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
   const nodes = model.network.nodes;
   const pipes = model.network.pipes;
   const nodeIds = useMemo(() => nodes.map((n) => n.id), [nodes]);
+  // Effective C-factor a pipe will solve with (material default, derated for dry
+  // steel) — shown in the C cell so it always matches the calc.
+  const dryFill = model.meta.fillType === "dry" || model.meta.fillType === "preaction";
+  const effC = (p: Pipe): number => {
+    if (typeof p.cFactor === "number") return p.cFactor;
+    const c = defaultCFactorForMaterial(p.material);
+    return dryFill && pipeMaterial(p.material).family === "steel" ? Math.min(c, 100) : c;
+  };
 
   // ---- committers ------------------------------------------------------
   const setMeta = (k: string, v: unknown) => onChange(withModel(model, { meta: { ...model.meta, [k]: v } }));
@@ -127,12 +135,23 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
           </Row>
           <Row>
             <Sel label="System" value={str(model.meta.systemType, "sprinkler")} options={["sprinkler", "standpipe"]} onChange={(v) => setMeta("systemType", v)} />
+            <Sel label="Fill type" value={str(model.meta.fillType, "wet")} options={["wet", "dry", "preaction", "deluge"]} onChange={(v) => setMeta("fillType", v)} />
             <Sel label="Hazard" value={str(model.meta.hazardClass, "oh2")} options={["lh", "oh1", "oh2", "eh1", "eh2"]} onChange={(v) => setMeta("hazardClass", v)} />
             <Sel label="Units" value={str(model.meta.units, "imperial")} options={["imperial", "metric"]} onChange={(v) => setMeta("units", v)} />
           </Row>
           <Row>
             <Txt label="Standard" value={str(model.meta.standard, "NFPA 13 (2019)")} onChange={(v) => setMeta("standard", v)} />
             <Txt label="Engineer" value={str(model.meta.engineer)} onChange={(v) => setMeta("engineer", v)} />
+            <Txt label="Drawing no." value={str(model.meta.drawingNo)} onChange={(v) => setMeta("drawingNo", v)} />
+            <Txt label="Date" value={str(model.meta.date)} onChange={(v) => setMeta("date", v)} />
+          </Row>
+          <Row>
+            <Txt label="Client" value={str(model.meta.client)} onChange={(v) => setMeta("client", v)} />
+            <Txt label="Contractor" value={str(model.meta.contractor)} onChange={(v) => setMeta("contractor", v)} />
+          </Row>
+          <Row>
+            <Txt label="Designer / company" value={str(model.meta.designer)} onChange={(v) => setMeta("designer", v)} />
+            <Txt label="Site address" value={str(model.meta.address)} onChange={(v) => setMeta("address", v)} />
           </Row>
         </Section>
 
@@ -258,8 +277,8 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
                   <td style={td}><NodeSel ids={nodeIds} value={p.to} onChange={(v) => setPipe(i, { to: v })} /></td>
                   <td style={td}><select style={cellInput} value={p.role ?? "branch-line"} onChange={(e) => setPipe(i, { role: e.target.value })}>{PIPE_ROLES.map((o) => <option key={o} value={o}>{o}</option>)}</select></td>
                   <td style={td}><select style={{ ...cellInput, width: 64 }} value={p.nominalSize ?? "1"} onChange={(e) => setPipe(i, { nominalSize: e.target.value })}>{NOMINAL_SIZES.map((o) => <option key={o} value={o}>{o}"</option>)}</select></td>
-                  <td style={td}><select style={{ ...cellInput, width: 130 }} value={p.material ?? "steel-sch40"} onChange={(e) => setPipe(i, { material: e.target.value, cFactor: defaultCFactorForMaterial(e.target.value) })}>{MATERIAL_OPTIONS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></td>
-                  <td style={td}><NumCell value={p.cFactor} onChange={(v) => setPipe(i, { cFactor: v })} /></td>
+                  <td style={td}><select style={{ ...cellInput, width: 130 }} value={p.material ?? "steel-sch40"} onChange={(e) => setPipe(i, { material: e.target.value })}>{MATERIAL_OPTIONS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></td>
+                  <td style={td}><NumCell value={effC(p)} onChange={(v) => setPipe(i, { cFactor: v })} /></td>
                   <td style={td}><NumCell value={p.internalDiameterIn} onChange={(v) => setPipe(i, v === undefined ? { idOverride: false, internalDiameterIn: undefined } : { idOverride: true, internalDiameterIn: v })} /></td>
                   <td style={td}><NumCell value={p.lengthFt} onChange={(v) => setPipe(i, { lengthFt: v ?? 0 })} /></td>
                   <td style={td}><NumCell value={p.additionalLengthFt} onChange={(v) => setPipe(i, { additionalLengthFt: v })} /></td>
