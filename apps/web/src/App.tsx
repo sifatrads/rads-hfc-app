@@ -39,13 +39,21 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 
 interface Pending { doc: DxfDoc; analysis: DxfAnalysis; fileName: string; }
 
+// Whether cloud is even possible — read straight from env (no firebase import,
+// so the SDK stays off the startup path until the user opts in).
+const cloudConfigured = !!import.meta.env.VITE_FIREBASE_API_KEY;
+
 export function App(): JSX.Element {
   const [model, setModel] = useState<ProjectModel | null>(null);
   const [tab, setTab] = useState<TabId>("project");
   const [note, setNote] = useState("Built-in sample");
   const [pending, setPending] = useState<Pending | null>(null);
+  const [cloudOpen, setCloudOpen] = useState(false);
 
   useEffect(() => { setModel(sampleProject()); }, []);
+  // Auto-mount the cloud bar (loads firebase) only for users who were signed in
+  // last time — everyone else pays nothing until they click "Cloud".
+  useEffect(() => { if (cloudConfigured && localStorage.getItem("rads-cloud") === "1") setCloudOpen(true); }, []);
 
   // Solve + scene derive from the model so every tab stays in sync with edits.
   const { sol, solveError } = useMemo<{ sol: ProjectSolution | null; solveError?: string }>(() => {
@@ -125,9 +133,13 @@ export function App(): JSX.Element {
         <button style={{ ...fileBtn, ...(model ? {} : disabledBtn) }} disabled={!model} title="Export plain JSON" onClick={exportJson}>JSON</button>
         <span style={statusPill}>{status}</span>
         <span style={{ flex: 1 }} />
-        <Suspense fallback={null}>
-          <CloudBar model={model} onLoadProject={(m) => load(m, `Restored ${m.meta.name}`, "summary")} />
-        </Suspense>
+        {cloudConfigured && (cloudOpen ? (
+          <Suspense fallback={<span style={statusPill}>☁ loading…</span>}>
+            <CloudBar model={model} onLoadProject={(m) => load(m, `Restored ${m.meta.name}`, "summary")} />
+          </Suspense>
+        ) : (
+          <button style={fileBtn} title="Sign in to sync projects across devices" onClick={() => setCloudOpen(true)}>☁ Cloud</button>
+        ))}
       </header>
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>

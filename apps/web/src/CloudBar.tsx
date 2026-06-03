@@ -42,7 +42,9 @@ export function CloudBar({ model, onLoadProject }: { model: ProjectModel | null;
   const [auto, setAuto] = useState(true);
   const skipFirst = useRef(true);
 
-  useEffect(() => onUser(setUser), []);
+  // Remember a signed-in session so the next visit auto-loads the cloud bar
+  // (and restores it) instead of waiting for a click.
+  useEffect(() => onUser((u) => { setUser(u); if (u) localStorage.setItem("rads-cloud", "1"); }), []);
   useEffect(() => void messagingSupported().then(setCanPush), []);
 
   // Debounced auto-save to Firestore (cross-device, offline-capable). Skips the
@@ -227,7 +229,7 @@ export function CloudBar({ model, onLoadProject }: { model: ProjectModel | null;
             )}
           </div>
           {canPush && <button style={btn} title="Enable push notifications" onClick={() => void notify()}>🔔</button>}
-          <button style={ghost} onClick={() => void signOutUser()}>Sign out</button>
+          <button style={ghost} onClick={() => { localStorage.removeItem("rads-cloud"); void signOutUser(); }}>Sign out</button>
         </>
       ) : (
         <button style={btn} onClick={() => void signIn().catch((e: Error) => setMsg(e.message))}>Sign in with Google</button>
