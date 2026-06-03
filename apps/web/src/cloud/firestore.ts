@@ -15,6 +15,7 @@ import {
   getDoc,
   setDoc,
   getDocs,
+  deleteDoc,
   collection,
   serverTimestamp,
   type Firestore,
@@ -72,4 +73,10 @@ export async function getProject(uid: string, id: string): Promise<ProjectModel 
   const snap = await getDoc(doc(db, "users", uid, "projects", id));
   const data = snap.data()?.["data"];
   return typeof data === "string" ? parseProject(JSON.parse(data)) : undefined;
+}
+
+/** Delete a saved project. */
+export async function deleteProject(uid: string, id: string): Promise<void> {
+  if (!db) return;
+  await deleteDoc(doc(db, "users", uid, "projects", id));
 }
