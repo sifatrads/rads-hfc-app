@@ -249,7 +249,7 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
         </div>
         <div style={tableScroll}>
           <table style={table}>
-            <thead><tr>{["#", "From", "To", "Role", "Size", "Material", "C", "Length (ft)", "Direction", "ΔElev (ft)", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+            <thead><tr>{["#", "From", "To", "Role", "Size", "Material", "C", "Length (ft)", "Direction", "ΔElev (ft)", "Fixed ΔP", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
               {pipes.map((p, i) => (
                 <tr key={i} style={i % 2 ? { background: C.zebra } : undefined}>
@@ -268,6 +268,7 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
                     </select>
                   </td>
                   <td style={td}><NumCell value={p.elevationChangeFt} onChange={(v) => setPipe(i, { elevationChangeFt: v })} /></td>
+                  <td style={td}><NumCell value={p.fixedDropPsi} onChange={(v) => setPipe(i, { fixedDropPsi: v })} /></td>
                   <td style={td}>
                     <div style={{ display: "flex", gap: 4 }}>
                       <button style={splitBtn} onClick={() => splitPipe(i)} title="Divide pipe (insert a node at the midpoint)">⊟ Split</button>
@@ -276,7 +277,7 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
                   </td>
                 </tr>
               ))}
-              {pipes.length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={11}>No pipes yet — add nodes, then connect them. The first node (#1) is the supply source.</td></tr>}
+              {pipes.length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={12}>No pipes yet — add nodes, then connect them. The first node (#1) is the supply source.</td></tr>}
             </tbody>
           </table>
         </div>

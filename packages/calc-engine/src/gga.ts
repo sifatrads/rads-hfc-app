@@ -39,6 +39,10 @@ export interface GgaLink {
   resistance: number;
   /** Exponent n (1.85 pipe, 2 emitter). */
   exponent: number;
+  /** Constant device loss (psi) added on top of friction — e.g. a backflow
+   * preventer / meter. hL += fixedDropPsi·sign(Q); linearized by a secant
+   * gradient fixedDropPsi/|Q| so the GGA stays conditioned. */
+  fixedDropPsi?: number;
   internalDiameterIn?: number;
   // ── optional reporting passthrough (echoed into the link result) ──
   nominalSize?: string;
@@ -104,6 +108,21 @@ export interface GgaOptions {
 /** Floor on |Q| when forming the gradient, to keep the matrix conditioned near zero flow. */
 const Q_FLOOR = 1e-4;
 
+/** Head loss hL(Q) and its linearization gradient dhL/dQ for a link (friction +
+ * optional constant device drop). Friction-only links are unchanged. */
+function linkState(link: GgaLink, q: number): { hL: number; grad: number } {
+  const aq = Math.max(Math.abs(q), Q_FLOOR);
+  const n = link.exponent;
+  const hLfric = link.resistance * q * Math.pow(Math.abs(q), n - 1);
+  let hL = hLfric;
+  let grad = n * link.resistance * Math.pow(aq, n - 1);
+  if (link.fixedDropPsi) {
+    hL += link.fixedDropPsi * Math.sign(q);
+    grad += link.fixedDropPsi / aq; // secant slope of the constant drop
+  }
+  return { hL, grad };
+}
+
 /**
  * Hazen-Williams resistance r for hL(psi) = r·Q^1.85 (Q in gpm), per NFPA 13
  * §27.2.2.1.1 where p is psi/ft:  r = 4.52·L / (C^1.85·d^4.87).
@@ -135,6 +154,12 @@ export function hwPipeLink(id: string, from: string, to: string, params: HwPipeP
 /** Build a sprinkler/orifice emitter link (`to` should be a fixed sink at gauge 0). */
 export function emitterLink(id: string, from: string, to: string, kFactor: number): GgaLink {
   return { id, from, to, resistance: 1 / (kFactor * kFactor), exponent: 2 };
+}
+
+/** Build a constant device-loss link (backflow preventer / meter / filter):
+ * hL ≈ fixedDropPsi regardless of flow. */
+export function constantLossLink(id: string, from: string, to: string, fixedDropPsi: number): GgaLink {
+  return { id, from, to, resistance: 0, exponent: HW_EXPONENT, fixedDropPsi };
 }
 
 export function solveGga(network: GgaNetwork, opts: GgaOptions = {}): GgaResult {
@@ -171,11 +196,10 @@ export function solveGga(network: GgaNetwork, opts: GgaOptions = {}): GgaResult 
 
     network.links.forEach((link, p) => {
       const q = Q[p]!;
-      const aq = Math.max(Math.abs(q), Q_FLOOR);
       const n = link.exponent;
-      const grad = n * link.resistance * Math.pow(aq, n - 1); // dhL/dQ > 0
+      const { hL, grad } = linkState(link, q);
       const pc = 1 / grad;
-      const correction = (1 - 1 / n) * q; // F-term per the GGA derivation
+      const correction = link.fixedDropPsi ? q - hL / grad : (1 - 1 / n) * q; // F-term
 
       const ai = idx.get(link.from);
       const bi = idx.get(link.to);
@@ -202,11 +226,8 @@ export function solveGga(network: GgaNetwork, opts: GgaOptions = {}): GgaResult 
     let sumQ = 0;
     network.links.forEach((link, p) => {
       const q = Q[p]!;
-      const aq = Math.max(Math.abs(q), Q_FLOOR);
-      const n = link.exponent;
-      const grad = n * link.resistance * Math.pow(aq, n - 1);
+      const { hL, grad } = linkState(link, q);
       const pc = 1 / grad;
-      const hL = link.resistance * q * Math.pow(Math.abs(q), n - 1);
       const hFrom = idx.has(link.from) ? H[idx.get(link.from)!]! : headOf(link.from);
       const hTo = idx.has(link.to) ? H[idx.get(link.to)!]! : headOf(link.to);
       const qNew = q + pc * (hFrom - hTo - hL);
@@ -242,7 +263,7 @@ export function solveGga(network: GgaNetwork, opts: GgaOptions = {}): GgaResult 
   network.links.forEach((link, p) => {
     const q = Q[p]!;
     const aq = Math.abs(q);
-    const hL = link.resistance * q * Math.pow(aq, link.exponent - 1);
+    const hL = linkState(link, q).hL;
     const elevTo = nodeById.get(link.to)?.elevationFt ?? 0;
     const elevFrom = nodeById.get(link.from)?.elevationFt ?? 0;
     const elevationLossPsi = 0.433 * (elevTo - elevFrom);

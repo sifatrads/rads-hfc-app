@@ -58,6 +58,9 @@ export const PipeSchema = z
     internalDiameterIn: z.number().optional(),
     lengthFt: z.number().default(0),
     elevationChangeFt: z.number().optional(),
+    /** Constant device pressure drop (psi) across the segment — e.g. a backflow
+     * preventer, meter, or filter. Added on top of friction, flow-independent. */
+    fixedDropPsi: z.number().optional(),
     /** Canute-compatible routing direction; alternate geometry input. */
     direction: DirectionSchema.optional(),
     fittings: z.array(FittingSchema).default([]),

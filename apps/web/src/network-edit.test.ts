@@ -152,6 +152,20 @@ describe("in-app data entry → solve", () => {
     expect(steel.results.pipes["P-1"]).toBeDefined();
   });
 
+  it("a pipe's fixed pressure-drop adds a constant loss to the demand", () => {
+    const build = (drop?: number) => {
+      const m = newProject("2026-06-03T00:00:00.000Z");
+      const nodes: NetworkNode[] = [m.network.nodes[0]!, { id: "2", type: "sprinkler", elevationFt: 0, kFactor: 5.6, fittings: [] } as unknown as NetworkNode];
+      const pipes: Pipe[] = [{ id: "P-1", from: "1", to: "2", role: "branch-line", nominalSize: "2", lengthFt: 5, ...(drop ? { fixedDropPsi: drop } : {}), fittings: [] }];
+      return withModel(m, { designBasis: { ...m.designBasis, operatingSprinklers: 1 }, network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } });
+    };
+    const base = solveProject(build());
+    const withDrop = solveProject(build(10));
+    // a 10-psi backflow-preventer-style drop raises the required source pressure by ~10 psi
+    expect(withDrop.summary.sourcePressurePsi - base.summary.sourcePressurePsi).toBeCloseTo(10, 0);
+    expect(withDrop.summary.converged).toBe(true);
+  });
+
   it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {
     const out = setNodeGeometryInModel(line3(), "3", { x: 42, y: 7, z: 10 });
     const n3 = out.network.nodes.find((n) => n.id === "3")!;

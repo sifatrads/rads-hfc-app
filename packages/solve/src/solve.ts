@@ -174,6 +174,7 @@ function buildGga(model: ProjectModel, source: { id: string; elevationFt: number
     link.cFactorUsed = cFactor;
     link.lengthFt = p.lengthFt ?? 0;
     link.equivalentLengthFt = eq;
+    if (typeof p.fixedDropPsi === "number" && p.fixedDropPsi !== 0) link.fixedDropPsi = p.fixedDropPsi;
     links.push(link);
   }
 

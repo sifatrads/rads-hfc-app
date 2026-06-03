@@ -27,7 +27,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [ ] Nominal-vs-Actual ID toggle + manual ID override UI — model stores ID, just needs the control
 - [ ] Auto-fitting allocation from drawn direction changes — turn → elbow equiv automatically
 - [ ] Manual fittings via alphanumeric codes (2E, 1T) — fast fitting entry
-- [ ] Fixed pressure-drop per segment (psi/bar) — model BFP/meter/filter; small, high-utility
+- [x] Fixed pressure-drop per segment (psi) — BFP/meter/filter constant loss ✅ DONE
 - [ ] Added/negative length (off-drawing run, ≥0 floor) — trivial field add
 - [ ] Fittings allocation mode (Pipe-Type-Specific vs physics) — affects equiv-length distribution
 - [ ] Darcy-Weisbach roughness (e) + C→e calculator — only with D-W method (see Standards)
