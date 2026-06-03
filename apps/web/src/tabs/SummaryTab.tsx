@@ -25,6 +25,7 @@ export function SummaryTab({ model, solution, error }: { model: ProjectModel; so
     ["Required source pressure", `${s.sourcePressurePsi.toFixed(1)} psi`],
     ["Available at demand", `${s.availablePsi.toFixed(1)} psi`],
     ["Supply margin", `${s.marginPsi >= 0 ? "+" : ""}${s.marginPsi.toFixed(1)} psi`, s.passesSupply ? "good" : "bad"],
+    ...(s.requiredStoredGal !== undefined ? [["Required stored water", `${s.requiredStoredGal.toLocaleString()} gal @ ${s.durationMin} min${model.network.reservoir?.capacityGal ? ` (tank ${model.network.reservoir.capacityGal.toLocaleString()})` : ""}`, model.network.reservoir?.capacityGal ? (model.network.reservoir.capacityGal >= s.requiredStoredGal ? "good" : "bad") : undefined]] as [string, string, ("good" | "warn" | "bad")?][] : []),
     ["Most-remote sprinkler", s.mostRemoteSprinkler ? `${s.mostRemoteSprinkler.id} — ${s.mostRemoteSprinkler.pressurePsi.toFixed(1)} psi, ${s.mostRemoteSprinkler.flowGpm.toFixed(1)} gpm` : "—"],
     ["Min head pressure required", `${s.minSprinklerPressurePsi.toFixed(1)} psi`, s.meetsMinPressure ? "good" : "bad"],
     ["Heads below minimum", s.lowPressureNodes.length ? `${s.lowPressureNodes.length} (${s.lowPressureNodes.slice(0, 3).map((n) => n.id).join(", ")}${s.lowPressureNodes.length > 3 ? "…" : ""})` : "none", s.lowPressureNodes.length ? "bad" : "good"],

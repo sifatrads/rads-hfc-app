@@ -112,7 +112,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Contact block (client/contractor/designer/company/address) ✅ DONE
 - [ ] Sheet layout (drawing numbers / sheet refs / revisions) — submittal metadata
 - [ ] Inside/outside hose + hydrant allowance split — finer than single hose allowance
-- [ ] Min stored-water volume from demand × duration — tank sizing
+- [x] Min stored-water volume (total demand × supply duration) ✅ DONE
 - [ ] Parts / sprinkler catalog profiles — unlocks Parts-Profile + BOM
 - [ ] Continuous pressure tank / alt supply source types — medium
 

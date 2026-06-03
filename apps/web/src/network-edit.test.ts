@@ -326,6 +326,15 @@ describe("in-app data entry → solve", () => {
     expect(solveProject(build(true)).summary.operatingHeads).toBe(8); // all nozzles
   });
 
+  it("computes required stored water = total demand × supply duration", () => {
+    const m = newProject("2026-06-03T00:00:00.000Z");
+    const nodes: NetworkNode[] = [m.network.nodes[0]!, { id: "2", type: "sprinkler", elevationFt: 0, kFactor: 5.6, fittings: [] } as unknown as NetworkNode];
+    const pipes: Pipe[] = [{ id: "P-1", from: "1", to: "2", role: "branch-line", nominalSize: "1", lengthFt: 10, fittings: [] }];
+    const sol = solveProject(withModel(m, { designBasis: { operatingSprinklers: 1, hoseAllowanceGpm: 100, durationMin: 60, minSprinklerPressurePsi: 7 }, network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } }));
+    expect(sol.summary.durationMin).toBe(60);
+    expect(sol.summary.requiredStoredGal).toBe(Math.round(sol.summary.totalDemandGpm * 60));
+  });
+
   it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {
     const out = setNodeGeometryInModel(line3(), "3", { x: 42, y: 7, z: 10 });
     const n3 = out.network.nodes.find((n) => n.id === "3")!;

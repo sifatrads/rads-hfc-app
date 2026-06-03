@@ -142,6 +142,7 @@ function riserNameplateSpec(model: ProjectModel, sol: ProjectSolution): Spec {
     ["@ test flow", u.qU(num(ft, "testFlowGpm"))],
     ["Available @ demand", u.pU(s.availablePsi)],
     ["Safety margin", u.pU(s.marginPsi)],
+    ["Stored water (req)", s.requiredStoredGal !== undefined ? `${s.requiredStoredGal.toLocaleString()} gal @ ${s.durationMin}m` : "—"],
     ["Supply adequate", s.passesSupply ? "YES" : "NO"],
   ]);
   const basis = infoBox(rx, y, half, "Design basis", [

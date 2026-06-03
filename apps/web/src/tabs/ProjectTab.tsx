@@ -187,6 +187,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
           <Row>
             <Num label="Min head pressure (psi)" value={num(ds["minSprinklerPressurePsi"])} step={1} onChange={(v) => setBasis("minSprinklerPressurePsi", v)} />
             <Num label="Hose allowance (gpm)" value={num(ds["hoseAllowanceGpm"])} step={50} onChange={(v) => setBasis("hoseAllowanceGpm", v)} />
+            <Num label="Supply duration (min)" value={num(ds["durationMin"])} step={10} onChange={(v) => setBasis("durationMin", v)} />
           </Row>
           <label style={checkRow}>
             <input type="checkbox" checked={!!ds["autoFittings"]} onChange={(e) => setBasis("autoFittings", e.target.checked)} />

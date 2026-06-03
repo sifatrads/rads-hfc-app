@@ -65,6 +65,10 @@ export interface SolveSummary {
   supplyCurveSamples: CurvePoint[];
   /** NFPA 20 pump suction-velocity check at 150% rated flow (limit 15 ft/s). */
   suctionCheck?: { velocityFps: number; atFlowGpm: number; ok: boolean };
+  /** Required stored water = total demand × supply duration (gal), when a
+   * duration is given; with the reservoir capacity if modeled. */
+  requiredStoredGal?: number;
+  durationMin?: number;
   converged: boolean;
 }
 
@@ -397,6 +401,10 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   const availablePsi = supply(totalDemandGpm);
   const marginPsi = availablePsi - sourceP;
 
+  // Stored-water requirement = total demand × supply duration.
+  const durationMin = num(model.designBasis, "durationMin");
+  const requiredStoredGal = durationMin !== undefined ? Math.round(totalDemandGpm * durationMin) : undefined;
+
   // NFPA 20: suction velocity at 150% rated flow must not exceed 15 ft/s.
   const suction = model.network.suction;
   const pumpDs = model.network.pump?.datasheet;
@@ -431,6 +439,7 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     maxJunctionImbalanceGpm: gga.maxImbalanceGpm,
     supplyCurveSamples: sampleCurve(supply, maxFlowGpm, 24),
     ...(suctionCheck ? { suctionCheck } : {}),
+    ...(requiredStoredGal !== undefined ? { requiredStoredGal, durationMin } : {}),
     converged: gga.converged,
   };
 
