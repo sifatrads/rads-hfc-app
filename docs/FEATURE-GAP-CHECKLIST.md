@@ -52,9 +52,9 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 
 - [x] Auto-Peak: derives operating heads from design area + density-driven min pressure ✅ DONE
 - [x] NFPA 14 standpipe auto-sizing (residual at most-remote outlet, per-standpipe flow) ✅ DONE
-- [ ] NFPA 13D automation (weakest head / 2 most-remote in a room + safety margin) — residential
-- [ ] NFPA 13R automation — low-rise residential
-- [ ] Compliance-path selector (route project to a code framework) — top-level UX that unlocks the rest
+- [x] NFPA 13D automation (two most-remote heads, no hose allowance) ✅ DONE
+- [x] NFPA 13R automation (four most-remote heads) ✅ DONE
+- [x] Compliance-path selector (Code picker: NFPA 13/13D/13R/14/EN) ✅ DONE
 - [x] NFPA 20 suction-velocity check (≤15 ft/s at 150% flow) ✅ DONE
 - [ ] NFPA 15 water-spray / deluge (uniform density, spray-nozzle discharge) — specialty
 - [ ] Darcy-Weisbach method (full) — prerequisite for mist + Europe

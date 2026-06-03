@@ -184,6 +184,13 @@ function autoPeakAreaSet(model: ProjectModel, sourceId: string): Set<string> | u
   return set;
 }
 
+/** Residential design-head count: 13D = two most-remote, 13R = four most-remote. */
+function residentialDesignCount(standardId: string | undefined): number | undefined {
+  if (standardId === "nfpa13d") return 2;
+  if (standardId === "nfpa13r") return 4;
+  return undefined;
+}
+
 interface StandpipeParams { minResidual: number; firstFlow: number; addFlow: number; maxTotal: number }
 
 /** NFPA 14 §7.10 design parameters by standpipe class. Class I/III: 100 psi at
@@ -284,15 +291,18 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   // Design area: explicit operating-head count → most-remote N; else NFPA
   // area-density Auto-Peak (accumulate coverage to the design area); else all.
   const explicitCount = num(model.designBasis, "operatingSprinklers");
+  const residentialCount = residentialDesignCount(model.meta.standardId);
   const open =
     opts.designArea ??
     (explicitCount !== undefined
       ? designAreaSet(model, source.id, explicitCount)
-      : autoPeakAreaSet(model, source.id) ?? designAreaSet(model, source.id, sprinklers.length));
+      : residentialCount !== undefined
+        ? designAreaSet(model, source.id, residentialCount)
+        : autoPeakAreaSet(model, source.id) ?? designAreaSet(model, source.id, sprinklers.length));
   const openSprinklers = sprinklers.filter((n) => open.has(n.id));
 
   // Standpipe (NFPA 14) vs sprinkler (NFPA 13) design mode.
-  const standpipeMode = model.meta.systemType === "standpipe" && model.network.nodes.some((n) => n.type === "hose-station");
+  const standpipeMode = (model.meta.systemType === "standpipe" || model.meta.standardId === "nfpa14") && model.network.nodes.some((n) => n.type === "hose-station");
   const spParams = standpipeMode ? standpipeClassParams(model.meta.standpipeClass) : undefined;
   const demandOverride = standpipeMode ? standpipeDemands(model, source.id, spParams!) : undefined;
 

@@ -290,6 +290,24 @@ describe("in-app data entry → solve", () => {
     expect(sol.summary.mostRemoteSprinkler!.pressurePsi).toBeGreaterThan(99); // held at ~100 psi
   });
 
+  it("residential codes set the design-head count (13D = 2, 13R = 4)", () => {
+    const build = (standardId: string) => {
+      const m = newProject("2026-06-03T00:00:00.000Z");
+      const nodes: NetworkNode[] = [m.network.nodes[0]!];
+      const pipes: Pipe[] = [];
+      let prev = "1";
+      for (let i = 2; i <= 11; i++) {
+        nodes.push({ id: String(i), type: "sprinkler", elevationFt: 0, kFactor: 4.9, coverageAreaFt2: 100, fittings: [] } as unknown as NetworkNode);
+        pipes.push({ id: `P-${i}`, from: prev, to: String(i), role: "branch-line", nominalSize: "1", lengthFt: 8, fittings: [] });
+        prev = String(i);
+      }
+      // no operatingSprinklers / designAreaFt2 → the standard's residential count governs
+      return withModel(m, { meta: { ...m.meta, standardId }, designBasis: { sprinklerKFactor: 4.9, minSprinklerPressurePsi: 7 }, network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } });
+    };
+    expect(solveProject(build("nfpa13d")).summary.operatingHeads).toBe(2);
+    expect(solveProject(build("nfpa13r")).summary.operatingHeads).toBe(4);
+  });
+
   it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {
     const out = setNodeGeometryInModel(line3(), "3", { x: 42, y: 7, z: 10 });
     const n3 = out.network.nodes.find((n) => n.id === "3")!;
