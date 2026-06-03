@@ -81,8 +81,8 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Bulk edit (filter pipes by role → set material/size/role across them) ✅ DONE
 - [x] Find node / pipe (filter the tables by id/role/material/note) ✅ DONE
 - [ ] Toggle fixed / variable pressure source node — static supply vs flow-test source
-- [ ] Merge file (combine two networks) — multi-system assembly
-- [ ] Clean-up intersections (remove redundant/overlapping nodes) — drawing hygiene
+- [x] Merge file (combine two networks into one) ✅ DONE
+- [x] Cleanup (remove orphan nodes) ✅ DONE
 - [x] Draft auto-restore (localStorage) so a reload never loses work ✅ DONE
 - [ ] Convert pipe → fixed-loss element (and back) — pairs with fixed pressure-drop
 - [ ] Auto-hanger insertion + spacing — niche for hydraulics

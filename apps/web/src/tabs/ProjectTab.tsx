@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode, type 
 import type { ProjectModel, NetworkNode, Pipe, Valve, Pump, PumpCurvePoint, Direction } from "@rads/model";
 import {
   NOMINAL_SIZES, PIPE_ROLES, NODE_TYPES, VALVE_TYPES, PUMP_TYPES, PUMP_DRIVERS, VALVE_EQUIV_FT, MATERIAL_OPTIONS,
-  DIRECTIONS, DIRECTION_LABEL, renumberNetwork, normalizePipe, withModel, splitPipeInModel,
+  DIRECTIONS, DIRECTION_LABEL, renumberNetwork, normalizePipe, withModel, splitPipeInModel, cleanupModel,
 } from "../network-edit";
 import { defaultCFactorForMaterial, pipeMaterial, parseFittingCodes } from "@rads/standards-engine";
 import { C, FONT, card, sectionTitle, field, fieldLabel, input, select, btnPrimary, btnGhost, btnDanger, th, td } from "../ui";
@@ -266,6 +266,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
         <div style={tableHead}>
           <span style={sectionTitle}>Nodes · {nodes.length}</span>
           <span style={{ flex: 1 }} />
+          <button style={btnGhost} onClick={() => onChange(cleanupModel(model))} title="Remove nodes connected to no pipe">Cleanup</button>
           <button style={btnGhost} onClick={renumber} title="Renumber nodes 1…N and pipes P-1…">Renumber 1…N</button>
           <button style={btnPrimary} onClick={addNode}>+ Add node</button>
         </div>

@@ -160,6 +160,23 @@ export function deletePipeInModel(model: ProjectModel, pipeId: string): ProjectM
   return commitNetwork(model, model.network.nodes, model.network.pipes.filter((p) => p.id !== pipeId));
 }
 
+/** Merge another project's network into this one (two disconnected systems until
+ * you connect them). Incoming ids are made unique, then everything renumbers. */
+export function mergeModels(base: ProjectModel, incoming: ProjectModel): ProjectModel {
+  const remap = new Map<string, string>();
+  const inNodes = incoming.network.nodes.map((n, i) => { const id = `m${i}`; remap.set(n.id, id); return { ...n, id }; });
+  const inPipes = incoming.network.pipes.map((p, i) => ({ ...p, id: `mp${i}`, from: remap.get(p.from) ?? p.from, to: remap.get(p.to) ?? p.to }));
+  return commitNetwork(base, [...base.network.nodes, ...inNodes], [...base.network.pipes, ...inPipes]);
+}
+
+/** Remove orphan nodes (connected to no pipe), keeping the source, then renumber. */
+export function cleanupModel(model: ProjectModel): ProjectModel {
+  const touched = new Set<string>();
+  for (const p of model.network.pipes) { touched.add(p.from); touched.add(p.to); }
+  const keep = model.network.nodes.filter((n, i) => i === 0 || touched.has(n.id));
+  return commitNetwork(model, keep, model.network.pipes);
+}
+
 export interface AddBranchOpts {
   direction: Direction;
   lengthFt: number;

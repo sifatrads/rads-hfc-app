@@ -12,7 +12,7 @@ import type { DxfDoc, DxfAnalysis } from "@rads/dxf-import";
 import { solveProject, type ProjectSolution } from "@rads/solve";
 import { decodeJSON, encodeJSON, isRhfc } from "@rads/container";
 import { sampleProject } from "./sample";
-import { newProject, splitPipeInModel, deleteNodeInModel, addBranchInModel, addPipeBetweenInModel, setNodeGeometryInModel } from "./network-edit";
+import { newProject, splitPipeInModel, deleteNodeInModel, addBranchInModel, addPipeBetweenInModel, setNodeGeometryInModel, mergeModels } from "./network-edit";
 import { useModelHistory } from "./useModelHistory";
 import { checkModel, issueCounts } from "./network-validate";
 import { ProjectTab } from "./tabs/ProjectTab";
@@ -131,6 +131,19 @@ export function App(): JSX.Element {
     download(`${model.meta.id}.json`, JSON.stringify(model, null, 2), "application/json");
     setNote(`Exported ${model.meta.id}.json`);
   }
+  async function mergeFile(file: File): Promise<void> {
+    if (!model) return;
+    setNote(`Merging ${file.name}…`);
+    try {
+      const name = file.name.toLowerCase();
+      const incoming = name.endsWith(".rhfc")
+        ? parseProject(await decodeJSON(new Uint8Array(await file.arrayBuffer())))
+        : parseProject(JSON.parse(await file.text()));
+      setModel(mergeModels(model, incoming));
+      setNote(`Merged ${file.name} (${incoming.network.nodes.length} nodes)`);
+      setTab("project");
+    } catch (e) { setNote(`Merge error: ${(e as Error).message}`); }
+  }
 
   async function openFile(file: File): Promise<void> {
     setNote(`Loading ${file.name}…`);
@@ -165,6 +178,10 @@ export function App(): JSX.Element {
         </label>
         <button style={{ ...iconBtn, ...(canUndo ? {} : disabledBtn) }} disabled={!canUndo} title="Undo (Ctrl+Z)" onClick={() => { undo(); setNote("Undo"); }}>↶</button>
         <button style={{ ...iconBtn, ...(canRedo ? {} : disabledBtn) }} disabled={!canRedo} title="Redo (Ctrl+Y)" onClick={() => { redo(); setNote("Redo"); }}>↷</button>
+        <label style={{ ...fileBtn, ...(model ? {} : disabledBtn) }} title="Merge another .rhfc/.json network into this project">
+          ⊕ Merge
+          <input type="file" accept=".rhfc,.json" style={{ display: "none" }} disabled={!model} onChange={(e) => { const f = e.target.files?.[0]; if (f) void mergeFile(f); e.target.value = ""; }} />
+        </label>
         <button style={{ ...fileBtn, ...(model ? {} : disabledBtn) }} disabled={!model} title="Save the project as an encrypted .rhfc file" onClick={() => void saveRhfc()}>💾 Save</button>
         <button style={{ ...fileBtn, ...(model ? {} : disabledBtn) }} disabled={!model} title="Export plain JSON" onClick={exportJson}>JSON</button>
         <span style={statusPill}>{status}</span>

@@ -3,7 +3,7 @@ import { solveProject } from "@rads/solve";
 import { parseFittingCodes } from "@rads/standards-engine";
 import { encodeJSON, decodeJSON } from "@rads/container";
 import { parseProject } from "@rads/model";
-import { newProject, renumberNetwork, normalizePipe, internalDiameterFor, withModel, splitPipeInModel, deleteNodeInModel, deletePipeInModel, addBranchInModel, addPipeBetweenInModel, setNodeGeometryInModel } from "./network-edit";
+import { newProject, renumberNetwork, normalizePipe, internalDiameterFor, withModel, splitPipeInModel, deleteNodeInModel, deletePipeInModel, addBranchInModel, addPipeBetweenInModel, setNodeGeometryInModel, mergeModels, cleanupModel } from "./network-edit";
 import type { NetworkNode, Pipe } from "@rads/model";
 
 describe("in-app data entry → solve", () => {
@@ -333,6 +333,36 @@ describe("in-app data entry → solve", () => {
     const sol = solveProject(withModel(m, { designBasis: { operatingSprinklers: 1, hoseAllowanceGpm: 100, durationMin: 60, minSprinklerPressurePsi: 7 }, network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } }));
     expect(sol.summary.durationMin).toBe(60);
     expect(sol.summary.requiredStoredGal).toBe(Math.round(sol.summary.totalDemandGpm * 60));
+  });
+
+  it("mergeModels combines two networks without id clashes", () => {
+    const mk = () => {
+      const m = newProject("2026-06-03T00:00:00.000Z");
+      const nodes: NetworkNode[] = [m.network.nodes[0]!, { id: "2", type: "sprinkler", elevationFt: 0, kFactor: 5.6, fittings: [] } as unknown as NetworkNode];
+      const pipes: Pipe[] = [{ id: "P-1", from: "1", to: "2", role: "branch-line", nominalSize: "1", lengthFt: 10, fittings: [] }];
+      return withModel(m, { network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } });
+    };
+    const merged = mergeModels(mk(), mk());
+    expect(merged.network.nodes.length).toBe(4); // 2 + 2, renumbered 1..4
+    expect(merged.network.pipes.length).toBe(2);
+    expect(merged.network.nodes.map((n) => n.id)).toEqual(["1", "2", "3", "4"]);
+    // every pipe references an existing node
+    const ids = new Set(merged.network.nodes.map((n) => n.id));
+    expect(merged.network.pipes.every((p) => ids.has(p.from) && ids.has(p.to))).toBe(true);
+  });
+
+  it("cleanupModel removes orphan nodes (keeps the source)", () => {
+    let m = newProject("2026-06-03T00:00:00.000Z");
+    const nodes: NetworkNode[] = [
+      m.network.nodes[0]!,
+      { id: "2", type: "sprinkler", elevationFt: 0, kFactor: 5.6, fittings: [] } as unknown as NetworkNode,
+      { id: "3", type: "junction", elevationFt: 0, fittings: [] } as unknown as NetworkNode, // orphan
+    ];
+    const pipes: Pipe[] = [{ id: "P-1", from: "1", to: "2", role: "branch-line", nominalSize: "1", lengthFt: 10, fittings: [] }];
+    m = withModel(m, { network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } });
+    const cleaned = cleanupModel(m);
+    expect(cleaned.network.nodes.length).toBe(2); // orphan node 3 removed
+    expect(cleaned.network.pipes.length).toBe(1);
   });
 
   it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {
