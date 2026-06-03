@@ -5,24 +5,27 @@
  * Project tab keeps every other tab live. Open .dxf/.rhfc/.json or build from
  * scratch with "New".
  */
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Viewer } from "@rads/viewer-3d";
+import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { buildScene, type AnnotatedScene } from "@rads/scene";
-import { parseProject, type ProjectModel } from "@rads/model";
-import { parseDxf, analyzeDxf, type DxfDoc, type DxfAnalysis } from "@rads/dxf-import";
+import { parseProject, type ProjectModel, type Direction } from "@rads/model";
+import type { DxfDoc, DxfAnalysis } from "@rads/dxf-import";
 import { solveProject, type ProjectSolution } from "@rads/solve";
 import { decodeJSON, encodeJSON, isRhfc } from "@rads/container";
 import { sampleProject } from "./sample";
 import { newProject, splitPipeInModel, deleteNodeInModel, addBranchInModel, addPipeBetweenInModel } from "./network-edit";
-import type { Direction } from "@rads/model";
-import { ImportDialog } from "./ImportDialog";
-import { CloudBar } from "./CloudBar";
 import { ProjectTab } from "./tabs/ProjectTab";
 import { SummaryTab } from "./tabs/SummaryTab";
 import { AnalysisTab } from "./tabs/AnalysisTab";
 import { GraphTab } from "./tabs/GraphTab";
-import { ReportTab } from "./tabs/ReportTab";
 import { C, FONT } from "./ui";
+
+// Heavy/optional pieces are code-split: three.js (viewer), firebase (cloud),
+// the report renderer, and the DXF dialog load only when first needed — so the
+// initial bundle (shell + data entry) is small and paints fast.
+const Viewer = lazy(() => import("@rads/viewer-3d").then((m) => ({ default: m.Viewer })));
+const CloudBar = lazy(() => import("./CloudBar").then((m) => ({ default: m.CloudBar })));
+const ReportTab = lazy(() => import("./tabs/ReportTab").then((m) => ({ default: m.ReportTab })));
+const ImportDialog = lazy(() => import("./ImportDialog").then((m) => ({ default: m.ImportDialog })));
 
 type TabId = "project" | "view" | "summary" | "analysis" | "graph" | "report";
 const TABS: { id: TabId; label: string; icon: string }[] = [
@@ -92,6 +95,7 @@ export function App(): JSX.Element {
     try {
       const name = file.name.toLowerCase();
       if (name.endsWith(".dxf")) {
+        const { parseDxf, analyzeDxf } = await import("@rads/dxf-import");
         const doc = parseDxf(await file.text());
         setPending({ doc, analysis: analyzeDxf(doc), fileName: file.name });
         setNote(`Mapping ${file.name}…`);
@@ -121,7 +125,9 @@ export function App(): JSX.Element {
         <button style={{ ...fileBtn, ...(model ? {} : disabledBtn) }} disabled={!model} title="Export plain JSON" onClick={exportJson}>JSON</button>
         <span style={statusPill}>{status}</span>
         <span style={{ flex: 1 }} />
-        <CloudBar model={model} onLoadProject={(m) => load(m, `Restored ${m.meta.name}`, "summary")} />
+        <Suspense fallback={null}>
+          <CloudBar model={model} onLoadProject={(m) => load(m, `Restored ${m.meta.name}`, "summary")} />
+        </Suspense>
       </header>
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
@@ -135,6 +141,7 @@ export function App(): JSX.Element {
         </nav>
 
         <main style={{ flex: 1, position: "relative", minWidth: 0, background: C.page }}>
+          <Suspense fallback={<div style={{ padding: 24, color: C.muted }}>Loading…</div>}>
           {!model ? (
             <div style={{ padding: 24, color: C.muted }}>Loading…</div>
           ) : tab === "project" ? (
@@ -158,10 +165,12 @@ export function App(): JSX.Element {
           ) : (
             <ReportTab model={model} />
           )}
+          </Suspense>
         </main>
       </div>
 
       {pending && (
+        <Suspense fallback={null}>
         <ImportDialog
           doc={pending.doc}
           analysis={pending.analysis}
@@ -169,6 +178,7 @@ export function App(): JSX.Element {
           onCancel={() => { setPending(null); setNote("Import cancelled"); }}
           onImport={(m) => { setPending(null); load(m, `Imported ${pending.fileName}`); }}
         />
+        </Suspense>
       )}
     </div>
   );

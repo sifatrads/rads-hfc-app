@@ -58,6 +58,9 @@ export default defineConfig(({ mode }) => {
     ],
     // workspace @rads/* packages ship TS source; let esbuild transpile them
     optimizeDeps: { exclude: ["@rads/scene", "@rads/model", "@rads/viewer-3d", "@rads/dxf-import", "@rads/container", "@rads/report", "@rads/labeling", "@rads/nfpa170", "@rads/geometry", "@rads/standards-engine", "@rads/calc-engine"] },
+    // three.js (viewer) + firebase (cloud) are code-split into on-demand chunks,
+    // so large-but-lazy chunks here are expected — not an initial-load cost.
+    build: { chunkSizeWarningLimit: 900 },
     server: { port: 5173 },
   };
 });
