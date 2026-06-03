@@ -169,10 +169,11 @@ function buildGga(model: ProjectModel, source: { id: string; elevationFt: number
     const eq = pipeEquivLen(p) + (extraEquiv.get(p.id) ?? 0);
     const cFactor = pipeCFactor(p, std);
     const id = pipeId(p);
-    const link = hwPipeLink(p.id, p.from, p.to, { cFactor, internalDiameterIn: id, lengthFt: p.lengthFt ?? 0, equivalentLengthFt: eq });
+    const physLen = Math.max(0, (p.lengthFt ?? 0) + (p.additionalLengthFt ?? 0));
+    const link = hwPipeLink(p.id, p.from, p.to, { cFactor, internalDiameterIn: id, lengthFt: physLen, equivalentLengthFt: eq });
     link.nominalSize = p.nominalSize;
     link.cFactorUsed = cFactor;
-    link.lengthFt = p.lengthFt ?? 0;
+    link.lengthFt = physLen;
     link.equivalentLengthFt = eq;
     if (typeof p.fixedDropPsi === "number" && p.fixedDropPsi !== 0) link.fixedDropPsi = p.fixedDropPsi;
     links.push(link);

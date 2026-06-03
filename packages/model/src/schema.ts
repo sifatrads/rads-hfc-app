@@ -56,7 +56,13 @@ export const PipeSchema = z
     cFactor: z.number().optional(),
     nominalSize: z.string().optional(),
     internalDiameterIn: z.number().optional(),
+    /** When true, internalDiameterIn is a manual override and is NOT recomputed
+     * from material + nominal size (nominal-vs-actual ID toggle). */
+    idOverride: z.boolean().optional(),
     lengthFt: z.number().default(0),
+    /** Extra (or negative) length added to the drawn run, ft — e.g. an off-drawing
+     * run. Effective length floors at 0. */
+    additionalLengthFt: z.number().optional(),
     elevationChangeFt: z.number().optional(),
     /** Constant device pressure drop (psi) across the segment — e.g. a backflow
      * preventer, meter, or filter. Added on top of friction, flow-independent. */

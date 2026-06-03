@@ -67,12 +67,15 @@ export function renumberNetwork(nodes: NetworkNode[], pipes: Pipe[]): { nodes: N
 }
 
 /** Fill internalDiameterIn from the material + nominal size, and default the
- * C-factor from the material when not explicitly set. */
+ * C-factor from the material when not explicitly set. A pipe with idOverride
+ * keeps its manual internal diameter (nominal-vs-actual toggle). */
 export function normalizePipe(p: Pipe): Pipe {
+  const cFactor = p.cFactor ?? defaultCFactorForMaterial(p.material);
+  if (p.idOverride && typeof p.internalDiameterIn === "number") return { ...p, cFactor };
   return {
     ...p,
     internalDiameterIn: p.nominalSize ? internalDiameterForMaterial(p.material, p.nominalSize) : p.internalDiameterIn,
-    cFactor: p.cFactor ?? defaultCFactorForMaterial(p.material),
+    cFactor,
   };
 }
 

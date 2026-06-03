@@ -166,6 +166,23 @@ describe("in-app data entry → solve", () => {
     expect(withDrop.summary.converged).toBe(true);
   });
 
+  it("additional length adds to the effective pipe length", () => {
+    const build = (addl?: number) => {
+      const m = newProject("2026-06-03T00:00:00.000Z");
+      const nodes: NetworkNode[] = [m.network.nodes[0]!, { id: "2", type: "sprinkler", elevationFt: 0, kFactor: 5.6, fittings: [] } as unknown as NetworkNode];
+      const pipes: Pipe[] = [{ id: "P-1", from: "1", to: "2", role: "branch-line", nominalSize: "1", lengthFt: 20, ...(addl ? { additionalLengthFt: addl } : {}), fittings: [] }];
+      return withModel(m, { designBasis: { ...m.designBasis, operatingSprinklers: 1 }, network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } });
+    };
+    expect(solveProject(build(30)).summary.sourcePressurePsi).toBeGreaterThan(solveProject(build()).summary.sourcePressurePsi);
+  });
+
+  it("normalizePipe keeps a manual ID override but otherwise recomputes from material+size", () => {
+    const overridden = normalizePipe({ id: "P1", from: "1", to: "2", nominalSize: "2", material: "steel-sch40", idOverride: true, internalDiameterIn: 1.5, lengthFt: 10, fittings: [] });
+    expect(overridden.internalDiameterIn).toBe(1.5);
+    const auto = normalizePipe({ id: "P1", from: "1", to: "2", nominalSize: "2", material: "steel-sch40", internalDiameterIn: 1.5, lengthFt: 10, fittings: [] });
+    expect(auto.internalDiameterIn).toBeCloseTo(2.067, 3);
+  });
+
   it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {
     const out = setNodeGeometryInModel(line3(), "3", { x: 42, y: 7, z: 10 });
     const n3 = out.network.nodes.find((n) => n.id === "3")!;

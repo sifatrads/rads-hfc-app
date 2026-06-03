@@ -249,7 +249,7 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
         </div>
         <div style={tableScroll}>
           <table style={table}>
-            <thead><tr>{["#", "From", "To", "Role", "Size", "Material", "C", "Length (ft)", "Direction", "ΔElev (ft)", "Fixed ΔP", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+            <thead><tr>{["#", "From", "To", "Role", "Size", "Material", "C", "ID (in)", "Length (ft)", "Add'l (ft)", "Direction", "ΔElev (ft)", "Fixed ΔP", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
               {pipes.map((p, i) => (
                 <tr key={i} style={i % 2 ? { background: C.zebra } : undefined}>
@@ -260,7 +260,9 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
                   <td style={td}><select style={{ ...cellInput, width: 64 }} value={p.nominalSize ?? "1"} onChange={(e) => setPipe(i, { nominalSize: e.target.value })}>{NOMINAL_SIZES.map((o) => <option key={o} value={o}>{o}"</option>)}</select></td>
                   <td style={td}><select style={{ ...cellInput, width: 130 }} value={p.material ?? "steel-sch40"} onChange={(e) => setPipe(i, { material: e.target.value, cFactor: defaultCFactorForMaterial(e.target.value) })}>{MATERIAL_OPTIONS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></td>
                   <td style={td}><NumCell value={p.cFactor} onChange={(v) => setPipe(i, { cFactor: v })} /></td>
+                  <td style={td}><NumCell value={p.internalDiameterIn} onChange={(v) => setPipe(i, v === undefined ? { idOverride: false, internalDiameterIn: undefined } : { idOverride: true, internalDiameterIn: v })} /></td>
                   <td style={td}><NumCell value={p.lengthFt} onChange={(v) => setPipe(i, { lengthFt: v ?? 0 })} /></td>
+                  <td style={td}><NumCell value={p.additionalLengthFt} onChange={(v) => setPipe(i, { additionalLengthFt: v })} /></td>
                   <td style={td}>
                     <select style={{ ...cellInput, width: 92 }} value={p.direction ?? ""} onChange={(e) => setPipe(i, { direction: (e.target.value || undefined) as Direction | undefined })}>
                       <option value="">(auto)</option>
@@ -277,7 +279,7 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
                   </td>
                 </tr>
               ))}
-              {pipes.length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={12}>No pipes yet — add nodes, then connect them. The first node (#1) is the supply source.</td></tr>}
+              {pipes.length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={14}>No pipes yet — add nodes, then connect them. The first node (#1) is the supply source.</td></tr>}
             </tbody>
           </table>
         </div>
