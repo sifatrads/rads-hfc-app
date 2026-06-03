@@ -6,6 +6,7 @@
  * produce wrong calcs.
  */
 import type { ProjectModel } from "@rads/model";
+import { sprinklerBySin } from "@rads/standards-engine";
 
 export type IssueSeverity = "error" | "warning";
 export interface Issue {
@@ -63,6 +64,22 @@ export function checkModel(model: ProjectModel): Issue[] {
   // discharging sprinklers
   const spk = nodes.filter((n) => n.type === "sprinkler" && (n.kFactor ?? 0) > 0);
   if (spk.length === 0) issues.push({ severity: "warning", message: "No sprinklers with a K-factor — nothing will discharge." });
+
+  // catalog cross-checks for heads assigned a SIN (opt-in: heads without a sin
+  // are skipped, so legacy/manual designs produce no new noise). All warnings —
+  // catalog data is AUDIT-flagged and manual K overrides are legitimate.
+  for (const n of spk) {
+    if (!n.sin) continue;
+    const p = sprinklerBySin(n.sin);
+    if (!p) { issues.push({ severity: "warning", message: `Node ${n.id}: SIN "${n.sin}" not in the sprinkler catalog (custom/unverified head).` }); continue; }
+    const k = n.kFactor!;
+    if (Math.abs(k - p.kImperial) / p.kImperial > 0.05) // ±5% per UL listing tolerance
+      issues.push({ severity: "warning", message: `Node ${n.id}: K=${k} differs from catalog K=${p.kImperial} for ${n.sin} (>5%). Re-sync or override intentionally.` });
+    if (n.sprinkler && n.sprinkler !== p.orientation)
+      issues.push({ severity: "warning", message: `Node ${n.id}: orientation "${n.sprinkler}" doesn't match ${n.sin} (${p.orientation}).` });
+    if (typeof n.tempRatingF === "number" && !p.tempRatingsF.includes(n.tempRatingF))
+      issues.push({ severity: "warning", message: `Node ${n.id}: temp ${n.tempRatingF}°F not a listed rating for ${n.sin} (${p.tempRatingsF.join("/")}).` });
+  }
 
   return issues;
 }

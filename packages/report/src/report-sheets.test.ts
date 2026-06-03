@@ -77,6 +77,45 @@ describe("NFPA §27.4 report sheets", () => {
     expect(sheet!.svg).toContain("16.8");
   });
 
+  it("adds a Sprinkler Schedule grouped by SIN when heads carry catalog data", () => {
+    const cat = parseProject({
+      schemaVersion: 2,
+      meta: { id: "CAT", name: "Catalog Test", systemType: "sprinkler", standardId: "nfpa13", hazardClass: "oh2", units: "imperial" },
+      designBasis: { densityGpmFt2: 0.2, designAreaFt2: 1500, sprinklerKFactor: 5.6, minSprinklerPressurePsi: 7, hoseAllowanceGpm: 250 },
+      waterSupply: { type: "city", flowTest: { staticPsi: 72, residualPsi: 53, testFlowGpm: 1944 } },
+      network: {
+        nodes: [
+          { id: "SRC", type: "junction", elevationFt: 0 },
+          { id: "CM", type: "junction", elevationFt: 10 },
+          { id: "S1", type: "sprinkler", elevationFt: 10, kFactor: 5.6, coverageAreaFt2: 100, sin: "TY3251", manufacturer: "Tyco/JCI", model: "TY-B Pendent (K5.6)", sprinkler: "pendent", tempRatingF: 155, response: "SR" },
+          { id: "S2", type: "sprinkler", elevationFt: 10, kFactor: 5.6, coverageAreaFt2: 100, sin: "TY3251", manufacturer: "Tyco/JCI", model: "TY-B Pendent (K5.6)", sprinkler: "pendent", tempRatingF: 155, response: "SR" },
+          { id: "S3", type: "sprinkler", elevationFt: 10, kFactor: 5.6, coverageAreaFt2: 100, sin: "TY3231", manufacturer: "Tyco/JCI", model: "TY-FRB Pendent (K5.6 QR)", sprinkler: "pendent", tempRatingF: 155, response: "QR" },
+        ],
+        pipes: [
+          { id: "P0", from: "SRC", to: "CM", role: "riser", nominalSize: "4", internalDiameterIn: 4.026, cFactor: 120, lengthFt: 20, elevationChangeFt: 10 },
+          { id: "P1", from: "CM", to: "S1", role: "branch-line", nominalSize: "1-1/4", internalDiameterIn: 1.38, cFactor: 120, lengthFt: 12 },
+          { id: "P2", from: "S1", to: "S2", role: "branch-line", nominalSize: "1", internalDiameterIn: 1.049, cFactor: 120, lengthFt: 12 },
+          { id: "P3", from: "S2", to: "S3", role: "branch-line", nominalSize: "1", internalDiameterIn: 1.049, cFactor: 120, lengthFt: 12 },
+        ],
+        valves: [],
+      },
+    });
+    const sheets = reportSheets(cat, solveProject(cat));
+    const sched = sheets.find((s) => s.title.includes("Sprinkler Schedule"));
+    expect(sched).toBeDefined();
+    expect(sched!.svg).toContain("TY3251");
+    expect(sched!.svg).toContain("TY3231");
+    // the two identical TY3251 heads group into a single row with count 2
+    expect(sched!.svg).toContain(">2<");
+    // provenance caveat present on the schedule (representative parts data)
+    expect(sched!.svg).toContain("Representative parts data");
+
+    // a model with no catalog data still renders (no schedule sheet, no crash)
+    const plain = reportSheets(model, solveProject(model));
+    expect(plain.some((s) => s.title.includes("Sprinkler Schedule"))).toBe(false);
+    expect(plain.length).toBeGreaterThanOrEqual(6);
+  });
+
   it("renders computed flows/pressures into the worksheet", () => {
     const sol = solveProject(model);
     const pages = pipeWorksheetSheets(model, sol);

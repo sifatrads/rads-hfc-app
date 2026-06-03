@@ -32,4 +32,32 @@ describe("checkModel", () => {
     const m = mk([{ id: "1", type: "junction" }, { id: "2", type: "junction" }], [{ id: "P1", from: "1", to: "2", nominalSize: "1", lengthFt: 5 }]);
     expect(checkModel(m).some((i) => i.message.includes("No sprinklers"))).toBe(true);
   });
+
+  // ── sprinkler catalog cross-checks (opt-in: only heads with a SIN) ──
+  const head = (extra: Record<string, unknown>) =>
+    mk([{ id: "1", type: "junction" }, { id: "2", type: "sprinkler", kFactor: 5.6, ...extra }], [{ id: "P1", from: "1", to: "2", nominalSize: "1", lengthFt: 10 }]);
+
+  it("does not cross-check legacy heads without a SIN (backward-compat)", () => {
+    const issues = checkModel(head({}));
+    expect(issues.some((i) => i.message.includes("catalog") || i.message.includes("differs"))).toBe(false);
+    expect(issueCounts(issues).errors).toBe(0);
+  });
+
+  it("accepts a head whose K matches its assigned SIN (within ±5%)", () => {
+    expect(checkModel(head({ sin: "TY3251", kFactor: 5.6 })).some((i) => i.message.includes("differs"))).toBe(false);
+    expect(checkModel(head({ sin: "TY3251", kFactor: 5.7 })).some((i) => i.message.includes("differs"))).toBe(false); // rounding tolerance
+  });
+
+  it("warns on a K-mismatch vs the catalog (>5%)", () => {
+    const issues = checkModel(head({ sin: "TY3251", kFactor: 8.0 }));
+    expect(issues.some((i) => i.severity === "warning" && i.message.includes("differs from catalog K"))).toBe(true);
+    expect(issueCounts(issues).errors).toBe(0); // never an error — manual overrides are legitimate
+  });
+
+  it("warns on orientation / temp / unknown-SIN mismatches", () => {
+    expect(checkModel(head({ sin: "TY3251", sprinkler: "upright" })).some((i) => i.message.includes("orientation"))).toBe(true);
+    expect(checkModel(head({ sin: "TY3251", tempRatingF: 999 })).some((i) => i.message.includes("not a listed rating"))).toBe(true);
+    expect(checkModel(head({ sin: "TY3251", tempRatingF: 155 })).some((i) => i.message.includes("not a listed rating"))).toBe(false);
+    expect(checkModel(head({ sin: "ZZZ99" })).some((i) => i.message.includes("not in the sprinkler catalog"))).toBe(true);
+  });
 });

@@ -356,6 +356,40 @@ function headsSummarySpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
   return tableSpecs("Sprinkler Heads Summary", cols, rows);
 }
 
+// ── sprinkler schedule (parts master, grouped by SIN) — device schedule / BOM ──
+function sprinklerScheduleSpecs(model: ProjectModel): Spec[] {
+  // Only emit the device schedule when the catalog is actually in use (≥1 head
+  // carries a SIN) — otherwise the per-head Heads Summary already suffices.
+  if (!model.network.nodes.some((n) => n.type === "sprinkler" && typeof n.sin === "string" && n.sin.length > 0)) return [];
+  const agg = new Map<string, { mfr: string; model: string; sin: string; k: number; orient: string; temp: string; resp: string; count: number }>();
+  for (const n of model.network.nodes) {
+    if (n.type !== "sprinkler" || (n.kFactor ?? 0) <= 0) continue;
+    const sin = typeof n.sin === "string" ? n.sin : "—";
+    const temp = typeof n.tempRatingF === "number" ? String(n.tempRatingF) : "—";
+    const key = `${n.manufacturer ?? "—"}|${n.model ?? "—"}|${sin}|${n.kFactor}|${n.sprinkler ?? "—"}|${temp}|${n.response ?? "—"}`;
+    const a = agg.get(key) ?? { mfr: String(n.manufacturer ?? "—"), model: String(n.model ?? "—"), sin, k: n.kFactor!, orient: String(n.sprinkler ?? "—"), temp, resp: String(n.response ?? "—"), count: 0 };
+    a.count++;
+    agg.set(key, a);
+  }
+  const rows = [...agg.values()]
+    .sort((x, y) => x.mfr.localeCompare(y.mfr) || x.sin.localeCompare(y.sin) || x.k - y.k)
+    .map((a) => [a.mfr, a.model, a.sin, String(a.k), a.orient, a.temp, a.resp, String(a.count)]);
+  if (rows.length === 0) return [];
+  const cols: Column[] = [
+    { label: "Manufacturer", w: 0.16 }, { label: "Model", w: 0.16 }, { label: "SIN", w: 0.12 },
+    { label: "K", w: 0.08, align: "r" }, { label: "Orientation", w: 0.14 },
+    { label: "Temp", unit: "°F", w: 0.1, align: "r" }, { label: "Response", w: 0.1 },
+    { label: "Count", w: 0.14, align: "r" },
+  ];
+  const specs = tableSpecs("Sprinkler Schedule", cols, rows);
+  // Provenance caveat on the last page — the catalog is representative/AUDIT data
+  // (mirrors the FM DS 8-9 + C-values reference notes); SINs must be verified.
+  const last = specs[specs.length - 1];
+  if (last) last.inner += T(INNER.x, CONTENT_BOTTOM - mm(5), "⚠ Representative parts data — verify SIN, K-factor, temperature ratings and listings", { size: mm(2), fill: C.faint })
+    + T(INNER.x, CONTENT_BOTTOM - mm(2), "against the current manufacturer datasheet / edition before procurement or approval.", { size: mm(2), fill: C.faint });
+  return specs;
+}
+
 // ── four most-unfavourable sprinklers (EN 12845 §; also a useful NFPA check) ──
 function fourWeakestSpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
   const u = units(model);
@@ -624,6 +658,7 @@ export function reportSheets(model: ProjectModel, sol: ProjectSolution): Sheet[]
     supplySpec(model, sol),
     ...nodeSpecs(model, sol),
     ...headsSummarySpecs(model, sol),
+    ...sprinklerScheduleSpecs(model),
     ...fourWeakestSpecs(model, sol),
     ...pipeSpecs(model, sol),
     ...junctionSpecs(model, sol),

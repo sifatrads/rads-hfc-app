@@ -40,6 +40,14 @@ export const NodeSchema = z
     hoseValveSizeIn: z.number().optional(),
     hoseValve: z.boolean().optional(),
     flowGpm: z.number().optional(),
+    /** Catalog reference (parts master) — denormalized from a SprinklerProfile
+     * at assignment (see @rads/standards-engine sprinklers). K stays in kFactor,
+     * orientation in `sprinkler`; these carry the part identity for BOM + checks. */
+    sin: z.string().optional(),
+    manufacturer: z.string().optional(),
+    model: z.string().optional(),
+    tempRatingF: z.number().optional(),
+    response: z.string().optional(), // "QR" | "SR"
     /** Explicit geometry; when absent, @rads/geometry auto-layout fills it. */
     geometry: Vec3Schema.optional(),
     note: z.string().optional(),

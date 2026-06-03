@@ -15,7 +15,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [ ] CAD auto-heal on node delete (Merge Pipes vs Leave Open) — merge adjacent segments + sum length
 - [ ] Mid-point insertion auto-divide + auto-Tee on snapped branch — depends on auto-fitting engine
 - [ ] Coordinate extraction → auto-elevation from CAD — minor; only with full CAD snap placement
-- [ ] Parts-Profile linking (default style/orientation/thread/K on new node) — needs catalog system first
+- [x] Parts-Profile linking (default style/orientation/thread/K on new node) ✅ DONE (catalog SIN picker prefills K/orientation/temp/response; project default applied to new heads in table + 3D view)
 - [ ] Suppress-leaks on open pipe ends — solver balances open-ended runs; niche (dry test headers)
 
 ## Pipe Properties & Segments
@@ -114,7 +114,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [ ] Sheet layout (drawing numbers / sheet refs / revisions) — submittal metadata
 - [ ] Inside/outside hose + hydrant allowance split — finer than single hose allowance
 - [x] Min stored-water volume (total demand × supply duration) ✅ DONE
-- [ ] Parts / sprinkler catalog profiles — unlocks Parts-Profile + BOM
+- [x] Parts / sprinkler catalog profiles ✅ DONE (standards-engine/sprinklers.ts: ~38 real SINs across Tyco/Viking/Reliable/Victaulic/Senju; picker prefill, K-mismatch/temp/orientation validation, Sprinkler Schedule report by SIN; AUDIT-flagged)
 - [ ] Continuous pressure tank / alt supply source types — medium
 
 ---

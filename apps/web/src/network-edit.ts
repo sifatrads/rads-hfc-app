@@ -5,7 +5,7 @@
  * the directions to build the 3D/iso, so no drawing is needed.
  */
 import { parseProject, type ProjectModel, type NetworkNode, type Pipe, type Direction } from "@rads/model";
-import { internalDiameterForMaterial, PIPE_MATERIALS } from "@rads/standards-engine";
+import { internalDiameterForMaterial, PIPE_MATERIALS, sprinklerBySin } from "@rads/standards-engine";
 
 /** Nominal pipe sizes offered in the size dropdown (Schedule-40 bore known). */
 export const NOMINAL_SIZES = ["1/2", "3/4", "1", "1-1/4", "1-1/2", "2", "2-1/2", "3", "3-1/2", "4", "5", "6", "8", "10", "12"] as const;
@@ -197,13 +197,17 @@ export function addBranchInModel(model: ProjectModel, fromNodeId: string, opts: 
   const fromElev = from?.elevationFt ?? 0;
   const dz = opts.direction === "U" ? opts.lengthFt : opts.direction === "D" ? -opts.lengthFt : 0;
   const isSpk = opts.nodeType === "sprinkler";
-  const dbK = (model.designBasis as Record<string, unknown> | undefined)?.["sprinklerKFactor"];
-  const k = opts.kFactor ?? (typeof dbK === "number" ? dbK : 5.6);
+  const db = model.designBasis as Record<string, unknown> | undefined;
+  // Heads added from the 3D view inherit the project's default catalog sprinkler
+  // (parity with the Project-tab table), so K/orientation/temp/response/SIN match.
+  const def = isSpk && typeof db?.["defaultSprinklerSin"] === "string" ? sprinklerBySin(db["defaultSprinklerSin"] as string) : undefined;
+  const dbK = db?.["sprinklerKFactor"];
+  const k = opts.kFactor ?? def?.kImperial ?? (typeof dbK === "number" ? dbK : 5.6);
   const newNode = {
     id: "tmp-new",
     type: isSpk ? "sprinkler" : "junction",
     elevationFt: fromElev + dz,
-    ...(isSpk ? { kFactor: k, coverageAreaFt2: 100 } : {}),
+    ...(isSpk ? { kFactor: k, coverageAreaFt2: 100, ...(def ? { sprinkler: def.orientation, sin: def.sin, manufacturer: def.manufacturer, model: def.model, tempRatingF: def.tempRatingsF[0], response: def.response } : {}) } : {}),
     fittings: [],
   } as NetworkNode;
   const newPipe: Pipe = {

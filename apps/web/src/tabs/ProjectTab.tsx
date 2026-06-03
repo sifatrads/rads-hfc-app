@@ -11,7 +11,7 @@ import {
   NOMINAL_SIZES, PIPE_ROLES, NODE_TYPES, VALVE_TYPES, PUMP_TYPES, PUMP_DRIVERS, VALVE_EQUIV_FT, MATERIAL_OPTIONS,
   DIRECTIONS, DIRECTION_LABEL, renumberNetwork, normalizePipe, withModel, splitPipeInModel, cleanupModel,
 } from "../network-edit";
-import { defaultCFactorForMaterial, pipeMaterial, parseFittingCodes, hazardClassesFor, designBasisForHazard, standardIsMetric, storageSchemesFor, designBasisForScheme } from "@rads/standards-engine";
+import { defaultCFactorForMaterial, pipeMaterial, parseFittingCodes, hazardClassesFor, designBasisForHazard, standardIsMetric, storageSchemesFor, designBasisForScheme, catalog, sprinklerBySin, type SprinklerProfile } from "@rads/standards-engine";
 import { C, FONT, card, sectionTitle, field, fieldLabel, input, select, btnPrimary, btnGhost, btnDanger, th, td } from "../ui";
 import type { Issue } from "../network-validate";
 
@@ -151,7 +151,11 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
   };
   const addNode = () => {
     const last = nodes[nodes.length - 1];
-    commitStructural([...nodes, { id: String(nodes.length + 1), type: "sprinkler", elevationFt: last?.elevationFt ?? 0, kFactor: 5.6, coverageAreaFt2: 100 }], pipes);
+    const def = sprinklerBySin(str(ds["defaultSprinklerSin"]) || undefined);
+    const head: Partial<NetworkNode> = def
+      ? { kFactor: def.kImperial, sprinkler: def.orientation, sin: def.sin, manufacturer: def.manufacturer, model: def.model, tempRatingF: def.tempRatingsF[0], response: def.response }
+      : { kFactor: num(ds["sprinklerKFactor"]) ?? 5.6 };
+    commitStructural([...nodes, { id: String(nodes.length + 1), type: "sprinkler", elevationFt: last?.elevationFt ?? 0, coverageAreaFt2: 100, ...head }], pipes);
   };
   const delNode = (i: number) => {
     const id = nodes[i]!.id;
@@ -254,6 +258,16 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             </div>
           )}
           <Row>
+            <label style={{ ...field, flex: 1 }}>
+              <span style={fieldLabel}>Default sprinkler (SIN / model) — applied to new heads</span>
+              <select style={select} value={str(ds["defaultSprinklerSin"])} onChange={(e) => { const p = catalog().find((s) => s.sin === e.target.value); onChange(withModel(model, { designBasis: { ...ds, defaultSprinklerSin: e.target.value, sprinklerKFactor: p ? p.kImperial : num(ds["sprinklerKFactor"]), defaultSprinklerOrientation: p?.orientation, defaultSprinklerTempF: p?.tempRatingsF[0], defaultSprinklerResponse: p?.response } })); }}>
+                <option value="">(none / manual K)</option>
+                {catalog().map((s) => <option key={s.sin} value={s.sin}>{`${s.manufacturer} ${s.sin} — ${s.model} · K${dispK(s.kImperial)}${s.audit ? " ⚠" : ""}`}</option>)}
+              </select>
+            </label>
+          </Row>
+          <div style={hint}>Picking a catalog sprinkler (here or per‑head in the Nodes table) prefills K / orientation / temperature / response. ⚠ = SIN inferred from family convention. Catalog values are representative — confirm SIN, K‑factor, temperature ratings and listings against the current manufacturer datasheet/edition before approval.</div>
+          <Row>
             <Num label="Density (gpm/ft²)" value={num(ds["densityGpmFt2"])} step={0.01} onChange={(v) => setBasis("densityGpmFt2", v)} />
             <Num label="Design area (ft²)" value={num(ds["designAreaFt2"])} step={50} onChange={(v) => setBasis("designAreaFt2", v)} />
           </Row>
@@ -345,7 +359,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
         </div>
         <div style={tableScroll}>
           <table style={table}>
-            <thead><tr>{["#", "Type", `Elevation (${U.len})`, `K (${U.k})`, `Coverage (${U.area})`, `Fixed flow (${U.flow})`, "Note", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+            <thead><tr>{["#", "Type", "Sprinkler", `Elevation (${U.len})`, `K (${U.k})`, `Coverage (${U.area})`, `Fixed flow (${U.flow})`, "Note", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
               {nodes.map((n, i) => {
                 if (!nodeMatch(n)) return null;
@@ -354,6 +368,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
                   <tr key={i} style={i % 2 ? { background: C.zebra } : undefined}>
                     <td style={{ ...td, fontWeight: 700, color: C.primary }}>{n.id}</td>
                     <td style={td}><Cell><select style={cellInput} value={n.type} onChange={(e) => setNode(i, { type: e.target.value })}>{NODE_TYPES.map((o) => <option key={o} value={o}>{o}</option>)}</select></Cell></td>
+                    <td style={td}>{spk ? <SprinklerSel value={str(n.sin)} dispK={dispK} onPick={(p) => setNode(i, { sin: p.sin, manufacturer: p.manufacturer, model: p.model, kFactor: p.kImperial, sprinkler: p.orientation, tempRatingF: p.tempRatingsF[0], response: p.response })} /> : <Dim>—</Dim>}</td>
                     <td style={td}><NumCell value={dispLen(n.elevationFt)} onChange={(v) => setNode(i, { elevationFt: storLen(v) ?? 0 })} /></td>
                     <td style={td}>{spk ? <NumCell value={dispK(n.kFactor)} onChange={(v) => setNode(i, { kFactor: storK(v) })} /> : <Dim>—</Dim>}</td>
                     <td style={td}>{spk ? <NumCell value={dispArea(n.coverageAreaFt2)} onChange={(v) => setNode(i, { coverageAreaFt2: storArea(v) })} /> : <Dim>—</Dim>}</td>
@@ -572,6 +587,14 @@ function NumCell({ value, onChange }: { value: number | undefined; onChange: (v:
 }
 function NodeSel({ ids, value, onChange }: { ids: string[]; value: string; onChange: (v: string) => void }): JSX.Element {
   return <select style={{ ...cellInput, width: 58 }} value={value} onChange={(e) => onChange(e.target.value)}>{ids.map((id) => <option key={id} value={id}>{id}</option>)}</select>;
+}
+function SprinklerSel({ value, dispK, onPick }: { value: string; dispK: (v?: number) => number | undefined; onPick: (p: SprinklerProfile) => void }): JSX.Element {
+  return (
+    <select style={{ ...cellInput, width: 168 }} value={value} title="Pick a catalog sprinkler to prefill K / orientation / temp / response" onChange={(e) => { const p = catalog().find((s) => s.sin === e.target.value); if (p) onPick(p); }}>
+      <option value="">(custom)</option>
+      {catalog().map((s) => <option key={s.sin} value={s.sin}>{`${s.manufacturer} ${s.sin} K${dispK(s.kImperial)}${s.audit ? " ⚠" : ""}`}</option>)}
+    </select>
+  );
 }
 
 const str = (v: unknown, d = ""): string => (typeof v === "string" ? v : typeof v === "number" ? String(v) : d);

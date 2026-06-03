@@ -9,6 +9,7 @@ import { fmGlobal } from "./fmglobal";
 export * from "./types";
 export * from "./tables-nfpa13";
 export * from "./materials";
+export * from "./sprinklers";
 export { nfpa13, nfpa13d, nfpa13r, nfpa14, en12845, fmGlobal };
 
 const REGISTRY: Partial<Record<StandardId, StandardModule>> = {
