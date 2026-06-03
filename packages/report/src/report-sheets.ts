@@ -105,6 +105,69 @@ function coverSpec(model: ProjectModel, sol: ProjectSolution): Spec {
   return { title: "Cover", inner: el.join("") };
 }
 
+// ── riser hydraulic nameplate (NFPA 13 §27.5) ──
+function riserNameplateSpec(model: ProjectModel, sol: ProjectSolution): Spec {
+  const u = units(model);
+  const s = sol.summary;
+  const m = model.meta;
+  const db = model.designBasis as Record<string, unknown> | undefined;
+  const ws = model.waterSupply as Record<string, unknown> | undefined;
+  const ft = ws?.["flowTest"] as Record<string, unknown> | undefined;
+  const { x, w } = INNER;
+  const half = (w - mm(6)) / 2;
+  const rx = x + (w + mm(6)) / 2;
+  let y = CONTENT_TOP + mm(4);
+  const el: string[] = [sectionTitle(x, y, w, "Riser Hydraulic Nameplate")];
+  y += mm(8);
+
+  const sys = infoBox(x, y, half, "System", [
+    ["Project", String(m.name)],
+    ["Location", String(m.address ?? "—")],
+    ["Standard", String(m.standard ?? m.standardId ?? "—")],
+    ["Occupancy / hazard", String(m.hazardClass ?? "—").toUpperCase()],
+    ["System type", `${m.systemType ?? "sprinkler"} · ${m.fillType ?? "wet"}`],
+    ["Drawing / date", `${m.drawingNo ?? "—"} · ${m.date ?? "—"}`],
+  ]);
+  const demand = infoBox(x, sys.endY + mm(4), half, "Demand at base of riser", [
+    ["System (sprinkler) flow", u.qU(s.systemFlowGpm)],
+    ["Hose allowance", u.qU(s.hoseAllowanceGpm)],
+    ["Total demand", u.qU(s.totalDemandGpm)],
+    ["Required pressure", u.pU(s.sourcePressurePsi)],
+    ["Most-remote head", s.mostRemoteSprinkler ? `${s.mostRemoteSprinkler.id} @ ${u.pU(s.mostRemoteSprinkler.pressurePsi)}` : "—"],
+  ]);
+  const supply = infoBox(x, demand.endY + mm(4), half, "Water supply", [
+    ["Static", u.pU(num(ft, "staticPsi"))],
+    ["Residual", u.pU(num(ft, "residualPsi"))],
+    ["@ test flow", u.qU(num(ft, "testFlowGpm"))],
+    ["Available @ demand", u.pU(s.availablePsi)],
+    ["Safety margin", u.pU(s.marginPsi)],
+    ["Supply adequate", s.passesSupply ? "YES" : "NO"],
+  ]);
+  const basis = infoBox(rx, y, half, "Design basis", [
+    ["Method", String(db?.["method"] ?? "density/area")],
+    ["Density", db?.["densityGpmFt2"] ? `${db["densityGpmFt2"]} gpm/ft²` : "—"],
+    ["Design area", db?.["designAreaFt2"] ? `${db["designAreaFt2"]} ft²` : "—"],
+    ["Sprinkler K-factor", db?.["sprinklerKFactor"] ? String(db["sprinklerKFactor"]) : "—"],
+    ["Operating sprinklers", db?.["operatingSprinklers"] ? String(db["operatingSprinklers"]) : "—"],
+    ["Min sprinkler pressure", u.pU(s.minSprinklerPressurePsi)],
+  ]);
+  const prepared = infoBox(rx, basis.endY + mm(4), half, "Prepared by", [
+    ["Engineer", String(m.engineer ?? "—")],
+    ["Designer", String(m.designer ?? "—")],
+    ["Company", String(m.company ?? "—")],
+    ["Contractor", String(m.contractor ?? "—")],
+    ["Client", String(m.client ?? "—")],
+    ["Date", String(m.date ?? "—")],
+  ]);
+  el.push(sys.svg, demand.svg, supply.svg, basis.svg, prepared.svg);
+
+  const pass = s.passesSupply && s.meetsMinPressure;
+  const by = Math.max(supply.endY, prepared.endY) + mm(6);
+  el.push(rect(x, by, w, mm(12), { fill: pass ? "#ecfdf5" : "#fff7ed", stroke: pass ? C.good : C.warn, sw: 1, rx: mm(1.4) }));
+  el.push(T(x + mm(4), by + mm(7.5), pass ? "HYDRAULICALLY ADEQUATE — supply meets demand with margin" : "REVIEW — supply / pressure check required", { size: mm(3.2), fill: pass ? C.good : C.warn, weight: "700" }));
+  return { title: "Riser Nameplate", inner: el.join("") };
+}
+
 // ── summary ──
 function summarySpec(model: ProjectModel, sol: ProjectSolution): Spec {
   const u = units(model);
@@ -423,6 +486,7 @@ function frameAll(model: ProjectModel, specs: Spec[]): Sheet[] {
 export function reportSheets(model: ProjectModel, sol: ProjectSolution): Sheet[] {
   const specs: Spec[] = [
     coverSpec(model, sol),
+    riserNameplateSpec(model, sol),
     summarySpec(model, sol),
     graphSpec(model, sol),
     supplySpec(model, sol),

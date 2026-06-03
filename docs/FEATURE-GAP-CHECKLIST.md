@@ -38,7 +38,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 
 **Already covered:** ✅ Pipe-information table (size/ID/length/flow/velocity/friction/elevation/total loss) · ✅ Node-analysis table (elev/K/total P/normal P/velocity P/discharge) · ✅ Start/end pressure per segment · ✅ Velocity pressure · ✅ Negative elevation head · ✅ Fitting equiv + total hyd length · ✅ §27.4.5.2 summary cards · ✅ Junction balancing · ✅ Formulas/C-value/equiv-length tables · ✅ 3 pump sheets · ✅ A4 PDF + print
 
-- [ ] Riser nameplate report (area/density/flow/pressure) — required for plan review / AHJ; **high value, small effort**
+- [x] Riser nameplate report (system/design/demand/supply/prepared-by) ✅ DONE
 - [ ] Heads Summary (per-head flow / required pressure / coverage) — standard NFPA deliverable
 - [ ] Report of Utilities — BOM (pipe bill of material, fittings count, valve list) — needs catalog data
 - [ ] Calc-summary of all/selected design areas, sorted by safety margin — multi-area proof
