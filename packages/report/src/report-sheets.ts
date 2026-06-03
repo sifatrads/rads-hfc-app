@@ -7,7 +7,7 @@
  */
 import type { ProjectModel } from "@rads/model";
 import type { ProjectSolution } from "@rads/solve";
-import { getStandard, C_VALUE_MULTIPLIER, FITTING_EQUIV_LENGTH_FT, type StandardId } from "@rads/standards-engine";
+import { getStandard, C_VALUE_MULTIPLIER, FITTING_EQUIV_LENGTH_FT, pipeMaterial, type StandardId } from "@rads/standards-engine";
 import { mm } from "./paper";
 import { C, T, rect, line, frame, statCards, sectionTitle, table, INNER, CONTENT_TOP, CONTENT_BOTTOM, ROWS_PER_PAGE, PAGE, type Column, type SheetMeta } from "./report-theme";
 
@@ -287,6 +287,67 @@ function graphSpec(model: ProjectModel, sol: ProjectSolution): Spec {
   return { title: "Graph Sheet", inner: el.join("") };
 }
 
+// ── heads summary (per-sprinkler discharge) ──
+function headsSummarySpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
+  const u = units(model);
+  const cols: Column[] = [
+    { label: "Head", w: 0.12 },
+    { label: "Type", w: 0.18 },
+    { label: "K", w: 0.1, align: "r" },
+    { label: "Coverage", unit: "ft²", w: 0.16, align: "r" },
+    { label: "Elev", unit: u.U.l, w: 0.12, align: "r" },
+    { label: "Pressure", unit: u.U.p, w: 0.16, align: "r" },
+    { label: "Flow", unit: u.U.q, w: 0.16, align: "r" },
+  ];
+  const rows = model.network.nodes
+    .filter((n) => n.type === "sprinkler" && (n.kFactor ?? 0) > 0)
+    .map((n) => {
+      const r = sol.results.nodes[n.id];
+      return [n.id, String(n.sprinkler ?? "—"), n.kFactor ? String(n.kFactor) : "—", n.coverageAreaFt2 ? String(n.coverageAreaFt2) : "—", u.l(n.elevationFt ?? 0), u.p(r?.totalPressurePsi), u.q(r?.dischargeGpm)];
+    });
+  if (rows.length === 0) return [];
+  return tableSpecs("Sprinkler Heads Summary", cols, rows);
+}
+
+// ── report of utilities / bill of materials ──
+function bomSpecs(model: ProjectModel): Spec[] {
+  const u = units(model);
+  const { x, w } = INNER;
+  const pipeAgg = new Map<string, { material: string; size: string; count: number; length: number }>();
+  for (const p of model.network.pipes) {
+    const material = p.material ?? "steel-sch40";
+    const size = p.nominalSize ?? "—";
+    const key = `${material}|${size}`;
+    const a = pipeAgg.get(key) ?? { material, size, count: 0, length: 0 };
+    a.count++;
+    a.length += (p.lengthFt ?? 0) + (p.additionalLengthFt ?? 0);
+    pipeAgg.set(key, a);
+  }
+  const pipeRows = [...pipeAgg.values()]
+    .sort((a, b) => a.material.localeCompare(b.material) || a.size.localeCompare(b.size))
+    .map((a) => [pipeMaterial(a.material).label, `${a.size}"`, String(a.count), u.l(a.length)]);
+
+  const valveAgg = new Map<string, number>();
+  for (const v of model.network.valves ?? []) valveAgg.set(v.type, (valveAgg.get(v.type) ?? 0) + 1);
+  const fittingAgg = new Map<string, number>();
+  for (const p of model.network.pipes) for (const f of p.fittings ?? []) fittingAgg.set(f.type, (fittingAgg.get(f.type) ?? 0) + (f.qty ?? 1));
+  const vfRows = [
+    ...[...valveAgg.entries()].map(([t, n]) => [t, "valve", String(n)]),
+    ...[...fittingAgg.entries()].map(([t, n]) => [t, "fitting", String(n)]),
+  ];
+
+  let y = CONTENT_TOP + mm(4);
+  const el: string[] = [sectionTitle(x, y, w, "Report of Utilities — Bill of Materials")];
+  y += mm(7);
+  const t1 = table(x, y, w, [{ label: "Pipe material", w: 0.42 }, { label: "Size", w: 0.16 }, { label: "Segments", w: 0.18, align: "r" }, { label: "Total length", unit: u.U.l, w: 0.24, align: "r" }], pipeRows.length ? pipeRows : [["—", "—", "0", "0"]]);
+  el.push(t1.svg);
+  y = t1.endY + mm(8);
+  el.push(sectionTitle(x, y, w, "Valves & fittings"));
+  y += mm(7);
+  el.push(table(x, y, w, [{ label: "Item", w: 0.6 }, { label: "Kind", w: 0.2 }, { label: "Qty", w: 0.2, align: "r" }], vfRows.length ? vfRows : [["none", "—", "0"]]).svg);
+  return [{ title: "Report of Utilities", inner: el.join("") }];
+}
+
 // ── generic paginated table specs ──
 function tableSpecs(title: string, cols: Column[], rows: string[][]): Spec[] {
   const pages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
@@ -492,12 +553,14 @@ export function reportSheets(model: ProjectModel, sol: ProjectSolution): Sheet[]
     graphSpec(model, sol),
     supplySpec(model, sol),
     ...nodeSpecs(model, sol),
+    ...headsSummarySpecs(model, sol),
     ...pipeSpecs(model, sol),
     ...junctionSpecs(model, sol),
     formulasSpec(),
     cValuesSpec(model),
     equivSpec(),
     ...pumpSpecs(model, sol),
+    ...bomSpecs(model),
   ];
   return frameAll(model, specs);
 }
