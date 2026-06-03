@@ -4,6 +4,7 @@ import { en12845 } from "./en12845";
 
 export * from "./types";
 export * from "./tables-nfpa13";
+export * from "./materials";
 export { nfpa13, en12845 };
 
 const REGISTRY: Partial<Record<StandardId, StandardModule>> = {

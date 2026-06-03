@@ -134,6 +134,24 @@ describe("in-app data entry → solve", () => {
     expect(addPipeBetweenInModel(m, "2", "2", { lengthFt: 5, nominalSize: "1" }).network.pipes.length).toBe(2);
   });
 
+  it("pipe material changes the hydraulic result (copper vs steel)", () => {
+    const base = (material: string) => {
+      let m = newProject("2026-06-03T00:00:00.000Z");
+      const nodes: NetworkNode[] = [
+        m.network.nodes[0]!,
+        { id: "2", type: "sprinkler", elevationFt: 0, kFactor: 5.6, fittings: [] } as unknown as NetworkNode,
+      ];
+      const pipes: Pipe[] = [{ id: "P-1", from: "1", to: "2", role: "branch-line", nominalSize: "1", material, lengthFt: 50, fittings: [] }];
+      return withModel(m, { designBasis: { ...m.designBasis, operatingSprinklers: 1 }, network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } });
+    };
+    const steel = solveProject(base("steel-sch40"));
+    const copper = solveProject(base("copper-l"));
+    // copper's higher C (150 vs 120) dominates → lower required source pressure
+    expect(copper.summary.sourcePressurePsi).toBeLessThan(steel.summary.sourcePressurePsi);
+    // and the pipe carries the material's internal diameter into the result
+    expect(steel.results.pipes["P-1"]).toBeDefined();
+  });
+
   it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {
     const out = setNodeGeometryInModel(line3(), "3", { x: 42, y: 7, z: 10 });
     const n3 = out.network.nodes.find((n) => n.id === "3")!;

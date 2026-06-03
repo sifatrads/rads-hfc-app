@@ -17,7 +17,7 @@ import {
   type GgaResult,
 } from "@rads/calc-engine";
 import { cityCurve, pumpOnSuction, constantPressureCurve, sampleCurve, type SupplyCurve, type FlowTest, type CurvePoint } from "@rads/calc-engine";
-import { getStandard, SCH40_ID_IN, type StandardId } from "@rads/standards-engine";
+import { getStandard, internalDiameterForMaterial, defaultCFactorForMaterial, type StandardId } from "@rads/standards-engine";
 
 export interface NodeResult {
   totalPressurePsi?: number;
@@ -106,12 +106,12 @@ function supplyCurveFor(model: ProjectModel): { curve: SupplyCurve; maxFlowGpm: 
 
 function pipeCFactor(p: Pipe, std: ReturnType<typeof getStandard> | undefined): number {
   if (typeof p.cFactor === "number") return p.cFactor;
-  if (p.material && std?.cFactor) return std.cFactor(p.material) ?? 120;
+  if (p.material) return std?.cFactor?.(p.material) ?? defaultCFactorForMaterial(p.material);
   return 120;
 }
 function pipeId(p: Pipe): number {
   if (typeof p.internalDiameterIn === "number") return p.internalDiameterIn;
-  if (p.nominalSize && SCH40_ID_IN[p.nominalSize]) return SCH40_ID_IN[p.nominalSize]!;
+  if (p.nominalSize) return internalDiameterForMaterial(p.material, p.nominalSize);
   return 1.049;
 }
 function pipeEquivLen(p: Pipe): number {

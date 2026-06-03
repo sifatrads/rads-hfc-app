@@ -5,10 +5,13 @@
  * the directions to build the 3D/iso, so no drawing is needed.
  */
 import { parseProject, type ProjectModel, type NetworkNode, type Pipe, type Direction } from "@rads/model";
-import { SCH40_ID_IN } from "@rads/standards-engine";
+import { internalDiameterForMaterial, defaultCFactorForMaterial, PIPE_MATERIALS } from "@rads/standards-engine";
 
 /** Nominal pipe sizes offered in the size dropdown (Schedule-40 bore known). */
 export const NOMINAL_SIZES = ["1/2", "3/4", "1", "1-1/4", "1-1/2", "2", "2-1/2", "3", "3-1/2", "4", "5", "6", "8", "10", "12"] as const;
+
+/** Pipe material options for the data-entry dropdown (id + label). */
+export const MATERIAL_OPTIONS = PIPE_MATERIALS.map((m) => ({ id: m.id, label: m.label }));
 
 export const PIPE_ROLES = ["branch-line", "cross-main", "feed-main", "riser", "supply-main", "standpipe-riser"] as const;
 
@@ -39,7 +42,7 @@ export const DIRECTION_LABEL: Record<Direction, string> = {
 
 /** Schedule-40 internal diameter for a nominal size (fallback 1.049 = 1"). */
 export function internalDiameterFor(size: string): number {
-  return SCH40_ID_IN[size] ?? 1.049;
+  return internalDiameterForMaterial(undefined, size);
 }
 
 /**
@@ -63,12 +66,13 @@ export function renumberNetwork(nodes: NetworkNode[], pipes: Pipe[]): { nodes: N
   return { nodes: outNodes, pipes: outPipes };
 }
 
-/** Fill internalDiameterIn from the chosen nominal size + a default C-factor. */
+/** Fill internalDiameterIn from the material + nominal size, and default the
+ * C-factor from the material when not explicitly set. */
 export function normalizePipe(p: Pipe): Pipe {
   return {
     ...p,
-    internalDiameterIn: p.nominalSize ? internalDiameterFor(p.nominalSize) : p.internalDiameterIn,
-    cFactor: p.cFactor ?? 120,
+    internalDiameterIn: p.nominalSize ? internalDiameterForMaterial(p.material, p.nominalSize) : p.internalDiameterIn,
+    cFactor: p.cFactor ?? defaultCFactorForMaterial(p.material),
   };
 }
 

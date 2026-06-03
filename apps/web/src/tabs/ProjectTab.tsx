@@ -8,9 +8,10 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode, type ChangeEvent } from "react";
 import type { ProjectModel, NetworkNode, Pipe, Valve, Pump, PumpCurvePoint, Direction } from "@rads/model";
 import {
-  NOMINAL_SIZES, PIPE_ROLES, NODE_TYPES, VALVE_TYPES, PUMP_TYPES, PUMP_DRIVERS, VALVE_EQUIV_FT,
+  NOMINAL_SIZES, PIPE_ROLES, NODE_TYPES, VALVE_TYPES, PUMP_TYPES, PUMP_DRIVERS, VALVE_EQUIV_FT, MATERIAL_OPTIONS,
   DIRECTIONS, DIRECTION_LABEL, renumberNetwork, normalizePipe, withModel, splitPipeInModel,
 } from "../network-edit";
+import { defaultCFactorForMaterial } from "@rads/standards-engine";
 import { C, FONT, card, sectionTitle, field, fieldLabel, input, select, btnPrimary, btnGhost, btnDanger, th, td } from "../ui";
 
 export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange: (m: ProjectModel) => void }): JSX.Element {
@@ -248,7 +249,7 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
         </div>
         <div style={tableScroll}>
           <table style={table}>
-            <thead><tr>{["#", "From", "To", "Role", "Size", "Length (ft)", "Direction", "ΔElev (ft)", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+            <thead><tr>{["#", "From", "To", "Role", "Size", "Material", "C", "Length (ft)", "Direction", "ΔElev (ft)", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
               {pipes.map((p, i) => (
                 <tr key={i} style={i % 2 ? { background: C.zebra } : undefined}>
@@ -257,6 +258,8 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
                   <td style={td}><NodeSel ids={nodeIds} value={p.to} onChange={(v) => setPipe(i, { to: v })} /></td>
                   <td style={td}><select style={cellInput} value={p.role ?? "branch-line"} onChange={(e) => setPipe(i, { role: e.target.value })}>{PIPE_ROLES.map((o) => <option key={o} value={o}>{o}</option>)}</select></td>
                   <td style={td}><select style={{ ...cellInput, width: 64 }} value={p.nominalSize ?? "1"} onChange={(e) => setPipe(i, { nominalSize: e.target.value })}>{NOMINAL_SIZES.map((o) => <option key={o} value={o}>{o}"</option>)}</select></td>
+                  <td style={td}><select style={{ ...cellInput, width: 130 }} value={p.material ?? "steel-sch40"} onChange={(e) => setPipe(i, { material: e.target.value, cFactor: defaultCFactorForMaterial(e.target.value) })}>{MATERIAL_OPTIONS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></td>
+                  <td style={td}><NumCell value={p.cFactor} onChange={(v) => setPipe(i, { cFactor: v })} /></td>
                   <td style={td}><NumCell value={p.lengthFt} onChange={(v) => setPipe(i, { lengthFt: v ?? 0 })} /></td>
                   <td style={td}>
                     <select style={{ ...cellInput, width: 92 }} value={p.direction ?? ""} onChange={(e) => setPipe(i, { direction: (e.target.value || undefined) as Direction | undefined })}>
@@ -273,11 +276,11 @@ export function ProjectTab({ model, onChange }: { model: ProjectModel; onChange:
                   </td>
                 </tr>
               ))}
-              {pipes.length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={9}>No pipes yet — add nodes, then connect them. The first node (#1) is the supply source.</td></tr>}
+              {pipes.length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={11}>No pipes yet — add nodes, then connect them. The first node (#1) is the supply source.</td></tr>}
             </tbody>
           </table>
         </div>
-        <div style={hint}>Tip: direction codes route the schematic — E/W = ±X, N/S = ±Y, U/D = ±Z. Leave “(auto)” to route by pipe role. Internal diameter is set from the nominal size (Sch-40).</div>
+        <div style={hint}>Tip: direction codes route the schematic — E/W = ±X, N/S = ±Y, U/D = ±Z. Leave “(auto)” to route by pipe role. Internal diameter comes from the material + nominal size; C-factor defaults from the material (override per-row).</div>
       </div>
 
       {/* Valves */}
