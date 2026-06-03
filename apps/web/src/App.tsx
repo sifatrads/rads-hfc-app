@@ -12,7 +12,7 @@ import type { DxfDoc, DxfAnalysis } from "@rads/dxf-import";
 import { solveProject, type ProjectSolution } from "@rads/solve";
 import { decodeJSON, encodeJSON, isRhfc } from "@rads/container";
 import { sampleProject } from "./sample";
-import { newProject, splitPipeInModel, deleteNodeInModel, addBranchInModel, addPipeBetweenInModel } from "./network-edit";
+import { newProject, splitPipeInModel, deleteNodeInModel, addBranchInModel, addPipeBetweenInModel, setNodeGeometryInModel } from "./network-edit";
 import { ProjectTab } from "./tabs/ProjectTab";
 import { SummaryTab } from "./tabs/SummaryTab";
 import { AnalysisTab } from "./tabs/AnalysisTab";
@@ -154,6 +154,7 @@ export function App(): JSX.Element {
                 onDeleteNode={(nodeId) => { setModel((m) => (m ? deleteNodeInModel(m, nodeId) : m)); setNote("Deleted node in 3D"); }}
                 onAddBranch={(fromNodeId, opts) => { setModel((m) => (m ? addBranchInModel(m, fromNodeId, { ...opts, direction: opts.direction as Direction }) : m)); setNote("Added branch in 3D"); }}
                 onAddPipe={(fromNodeId, toNodeId, lengthFt, opts) => { setModel((m) => (m ? addPipeBetweenInModel(m, fromNodeId, toNodeId, { ...opts, lengthFt }) : m)); setNote("Connected nodes in 3D"); }}
+                onMoveNode={(nodeId, geometry) => { setModel((m) => (m ? setNodeGeometryInModel(m, nodeId, geometry) : m)); setNote("Moved node in 3D"); }}
               />
             ) : <div style={{ padding: 24, color: C.muted }}>No geometry.</div>
           ) : tab === "summary" ? (

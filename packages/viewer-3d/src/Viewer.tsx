@@ -6,18 +6,49 @@
  * lives here — it only renders an AnnotatedScene.
  */
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { MOUSE } from "three";
+import { MOUSE, DoubleSide } from "three";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Line } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
+import type { ThreeEvent } from "@react-three/fiber";
 import { colorize, type AnnotatedScene, type ColorMetric, type LabelCategory } from "@rads/scene";
-import { computeTransform, VIEW_POSITIONS } from "./transform";
+import { computeTransform, toThree, fromThree, VIEW_POSITIONS, type SceneTransform } from "./transform";
 import { Pipes, Nodes, Devices } from "./SceneObjects";
 import { LabelOverlay } from "./LabelOverlay";
 
 const METRICS: ColorMetric[] = ["size", "role", "material", "velocity", "flow", "pressure", "pressureDrop"];
 const VIEWS = ["iso", "plan", "front", "side"] as const;
 const TOGGLEABLE: LabelCategory[] = ["nodeNo", "pipeNo", "pipeSize", "valve", "elevation", "kFactor", "flow", "velocity", "pressureTotal", "source", "pump"];
+
+/** Move tool: an invisible horizontal "plan" plane at the node's elevation that
+ * follows the cursor; a green handle + guide line show the destination; clicking
+ * places the node there (commit on click). Elevation is preserved. */
+function MoveTool({ nodeId, scene, t, onPlace }: { nodeId: string; scene: AnnotatedScene; t: SceneTransform; onPlace: (p: [number, number, number]) => void }): JSX.Element | null {
+  const node = scene.nodes.find((n) => n.id === nodeId);
+  const origin = useMemo<[number, number, number]>(() => (node ? toThree(node.pos, t) : [0, 0, 0]), [node, t]);
+  const [pos, setPos] = useState<[number, number, number]>(origin);
+  useEffect(() => setPos(origin), [origin]);
+  if (!node) return null;
+  const y = origin[1];
+  return (
+    <>
+      <mesh
+        position={[0, y, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        onPointerMove={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); setPos([e.point.x, y, e.point.z]); }}
+        onClick={(e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onPlace([e.point.x, y, e.point.z]); }}
+      >
+        <planeGeometry args={[8000, 8000]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} side={DoubleSide} />
+      </mesh>
+      <Line points={[origin, pos]} color="#16a34a" lineWidth={1.5} />
+      <mesh position={pos}>
+        <sphereGeometry args={[0.34, 16, 16]} />
+        <meshBasicMaterial color="#16a34a" transparent opacity={0.85} depthTest={false} />
+      </mesh>
+    </>
+  );
+}
 
 /** Widen the line/point pick tolerance so thin pipe lines are easy to click. */
 function RaycastTuning(): null {
@@ -58,6 +89,8 @@ export interface ViewerProps {
   onAddBranch?: (fromNodeId: string, opts: { direction: string; lengthFt: number; nominalSize: string; nodeType: string }) => void;
   /** When provided, "Connect to…" lets you click two nodes to add a pipe between them. */
   onAddPipe?: (fromNodeId: string, toNodeId: string, lengthFt: number, opts: { nominalSize: string; role: string }) => void;
+  /** When provided, "Move" lets you drag a node to a new position (plan plane). */
+  onMoveNode?: (nodeId: string, geometry: { x: number; y: number; z: number }) => void;
 }
 
 const DIRS: { d: string; label: string }[] = [
@@ -69,7 +102,7 @@ type EditSel =
   | { kind: "pipe"; id: string; fraction: number; x: number; y: number }
   | { kind: "node"; id: string; x: number; y: number };
 
-export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNode, onAddBranch, onAddPipe }: ViewerProps): JSX.Element {
+export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNode, onAddBranch, onAddPipe, onMoveNode }: ViewerProps): JSX.Element {
   const t = useMemo(() => computeTransform(scene), [scene]);
   const [metric, setMetric] = useState<ColorMetric>(initialMetric);
   const [view, setView] = useState<string>("iso");
@@ -81,8 +114,10 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
   const [brSize, setBrSize] = useState("1");
   const [brType, setBrType] = useState("sprinkler");
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
+  const [moving, setMoving] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const canEdit = !!(onSplitPipe || onDeleteNode || onAddBranch || onAddPipe);
+  const canEdit = !!(onSplitPipe || onDeleteNode || onAddBranch || onAddPipe || onMoveNode);
+  const busyMode = !!connectFrom || !!moving;
   const nodePos = useMemo(() => new Map(scene.nodes.map((n) => [n.id, n.pos])), [scene]);
   const fit = () => setFitNonce((n) => n + 1);
   const rel = (cx: number, cy: number) => { const r = containerRef.current?.getBoundingClientRect(); return { x: cx - (r?.left ?? 0), y: cy - (r?.top ?? 0) }; };
@@ -101,13 +136,13 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
     setPicked({ kind: "node", id, x: p.x, y: p.y });
   };
 
-  // Esc cancels an in-progress connect.
+  // Esc cancels an in-progress connect or move.
   useEffect(() => {
-    if (!connectFrom) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setConnectFrom(null); };
+    if (!busyMode) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setConnectFrom(null); setMoving(null); } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [connectFrom]);
+  }, [busyMode]);
   const { pipeColors, legend } = useMemo(() => colorize(scene, metric), [scene, metric]);
 
   const toggle = (c: LabelCategory) =>
@@ -123,7 +158,7 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
       <Canvas
         camera={{ position: VIEW_POSITIONS.iso, fov: 45, near: 0.1, far: 6000 }}
         dpr={[1, 2]}
-        onPointerMissed={() => { setPicked(null); setConnectFrom(null); }}
+        onPointerMissed={() => { setPicked(null); setConnectFrom(null); setMoving(null); }}
       >
         <RaycastTuning />
         <color attach="background" args={["#eef2f5"]} />
@@ -131,9 +166,12 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
         <directionalLight position={[30, 50, 20]} intensity={0.7} />
         <directionalLight position={[-20, 10, -30]} intensity={0.25} />
         <gridHelper args={[120, 24, "#cfd8dc", "#e3e9ed"]} position={[0, -0.01, 0]} />
-        <Pipes scene={scene} t={t} colors={pipeColors} onPick={edit && onSplitPipe && !connectFrom ? pickPipe : undefined} />
-        <Nodes scene={scene} t={t} onPick={edit && (onDeleteNode || onAddBranch || onAddPipe) ? pickNode : undefined} />
+        <Pipes scene={scene} t={t} colors={pipeColors} onPick={edit && onSplitPipe && !busyMode ? pickPipe : undefined} />
+        <Nodes scene={scene} t={t} onPick={edit && (onDeleteNode || onAddBranch || onAddPipe || onMoveNode) && !busyMode ? pickNode : undefined} />
         <Devices scene={scene} t={t} />
+        {moving && onMoveNode && (
+          <MoveTool nodeId={moving} scene={scene} t={t} onPlace={(p) => { onMoveNode(moving, fromThree(p, t)); setMoving(null); }} />
+        )}
         <LabelOverlay scene={scene} t={t} enabled={enabled} />
         <CameraRig view={view} fitNonce={fitNonce} />
         {/* AutoCAD-style: left = orbit, middle (wheel) drag = pan, scroll = zoom. */}
@@ -141,7 +179,7 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
           makeDefault
           enablePan
           enableZoom
-          enableRotate
+          enableRotate={!moving}
           screenSpacePanning
           panSpeed={0.9}
           zoomToCursor
@@ -208,6 +246,13 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
           <button style={connectCancel} onClick={() => setConnectFrom(null)}>Esc / Cancel</button>
         </div>
       )}
+      {/* move-mode banner */}
+      {moving && (
+        <div style={connectBanner}>
+          ✥ Moving node <b>{moving}</b> — click a new spot (in plan) &nbsp;
+          <button style={connectCancel} onClick={() => setMoving(null)}>Esc / Cancel</button>
+        </div>
+      )}
 
       {/* edit action menu (anchored at the click) */}
       {picked && (
@@ -238,6 +283,7 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
                   <div style={{ fontSize: 9.5, color: "#94a3b8", margin: "2px 0 4px" }}>Add branch → pick a direction</div>
                 </div>
               )}
+              {onMoveNode && <button style={menuBtn} onClick={() => { setMoving(picked.id); setPicked(null); }}>✥ Move node…</button>}
               {onAddPipe && <button style={menuBtn} onClick={() => { setConnectFrom(picked.id); setPicked(null); }}>🔗 Connect to another node…</button>}
               {onDeleteNode && <button style={{ ...menuBtn, color: "#b91c1c" }} onClick={() => { onDeleteNode(picked.id); setPicked(null); }}>🗑 Delete node + its pipes</button>}
             </>

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { solveProject } from "@rads/solve";
 import { encodeJSON, decodeJSON } from "@rads/container";
 import { parseProject } from "@rads/model";
-import { newProject, renumberNetwork, normalizePipe, internalDiameterFor, withModel, splitPipeInModel, deleteNodeInModel, deletePipeInModel, addBranchInModel, addPipeBetweenInModel } from "./network-edit";
+import { newProject, renumberNetwork, normalizePipe, internalDiameterFor, withModel, splitPipeInModel, deleteNodeInModel, deletePipeInModel, addBranchInModel, addPipeBetweenInModel, setNodeGeometryInModel } from "./network-edit";
 import type { NetworkNode, Pipe } from "@rads/model";
 
 describe("in-app data entry → solve", () => {
@@ -132,5 +132,13 @@ describe("in-app data entry → solve", () => {
     // duplicate (already 1→2) and self-connect are no-ops
     expect(addPipeBetweenInModel(m, "1", "2", { lengthFt: 5, nominalSize: "1" }).network.pipes.length).toBe(2);
     expect(addPipeBetweenInModel(m, "2", "2", { lengthFt: 5, nominalSize: "1" }).network.pipes.length).toBe(2);
+  });
+
+  it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {
+    const out = setNodeGeometryInModel(line3(), "3", { x: 42, y: 7, z: 10 });
+    const n3 = out.network.nodes.find((n) => n.id === "3")!;
+    expect(n3.geometry).toEqual({ x: 42, y: 7, z: 10 });
+    expect(out.network.nodes.length).toBe(3); // no nodes added; ids unchanged
+    expect(out.network.pipes.length).toBe(2);
   });
 });

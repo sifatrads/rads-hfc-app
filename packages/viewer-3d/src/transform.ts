@@ -30,6 +30,11 @@ export function toThree(p: Vec3Like, t: SceneTransform): [number, number, number
   return [(p.x - t.center.x) * t.scale, (p.z - t.center.z) * t.scale, -(p.y - t.center.y) * t.scale];
 }
 
+/** three.js coordinates → model point (inverse of {@link toThree}). */
+export function fromThree(p: [number, number, number], t: SceneTransform): Vec3Like {
+  return { x: p[0] / t.scale + t.center.x, y: -p[2] / t.scale + t.center.y, z: p[1] / t.scale + t.center.z };
+}
+
 /** Visible pipe radius (three units) from nominal bore in mm. */
 export function pipeRadius(sizeMm: number): number {
   return Math.max(0.07, Math.min(0.6, 0.06 + (sizeMm || 40) * 0.0016));

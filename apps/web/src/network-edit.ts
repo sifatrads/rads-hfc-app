@@ -198,6 +198,16 @@ export function addBranchInModel(model: ProjectModel, fromNodeId: string, opts: 
 }
 
 /**
+ * Pin a node to an explicit position (model units). Auto-layout honours
+ * node.geometry as a fixed seed, so the node — and its downstream subtree —
+ * follow the new spot. Positions only; no renumber.
+ */
+export function setNodeGeometryInModel(model: ProjectModel, nodeId: string, geometry: { x: number; y: number; z: number }): ProjectModel {
+  const nodes = model.network.nodes.map((n) => (n.id === nodeId ? { ...n, geometry } : n));
+  return withModel(model, { network: { ...model.network, nodes } });
+}
+
+/**
  * Connect two existing nodes with a new pipe (close a loop / grid). No-op if the
  * ends are the same or already directly connected. Geometry comes from the two
  * nodes' existing positions, so no direction is set — only length drives the calc.
