@@ -75,3 +75,78 @@ describe("solveProject", () => {
     expect(n).toBeGreaterThan(0);
   });
 });
+
+// FM DS 8-9 storage = count-at-pressure: the N most-remote heads are held at the
+// scheme's minimum end-head pressure. A 3-branch / 6-head tree makes the
+// most-remote selection observable (the 2 nearest heads must stay dry).
+const fmStorage = parseProject({
+  schemaVersion: 2,
+  meta: { id: "FM", name: "FM ESFR storage", systemType: "sprinkler", standardId: "fmds", units: "imperial" },
+  designBasis: { method: "fm-storage", operatingSprinklers: 4, minSprinklerPressurePsi: 50, sprinklerKFactor: 16.8, hoseAllowanceGpm: 250, durationMin: 60 },
+  waterSupply: { type: "city+fire-pump", flowTest: { staticPsi: 90, residualPsi: 70, testFlowGpm: 3000 }, firePump: { ratedFlowGpm: 1500, ratedPsi: 100, churnPsi: 120 } },
+  network: {
+    nodes: [
+      { id: "SRC", type: "junction", elevationFt: 0 },
+      { id: "CM1", type: "junction", elevationFt: 0 },
+      { id: "CM2", type: "junction", elevationFt: 0 },
+      { id: "CM3", type: "junction", elevationFt: 0 },
+      { id: "A1", type: "sprinkler", elevationFt: 0, kFactor: 16.8, coverageAreaFt2: 100 },
+      { id: "A2", type: "sprinkler", elevationFt: 0, kFactor: 16.8, coverageAreaFt2: 100 },
+      { id: "B1", type: "sprinkler", elevationFt: 0, kFactor: 16.8, coverageAreaFt2: 100 },
+      { id: "B2", type: "sprinkler", elevationFt: 0, kFactor: 16.8, coverageAreaFt2: 100 },
+      { id: "C1", type: "sprinkler", elevationFt: 0, kFactor: 16.8, coverageAreaFt2: 100 },
+      { id: "C2", type: "sprinkler", elevationFt: 0, kFactor: 16.8, coverageAreaFt2: 100 },
+    ],
+    pipes: [
+      { id: "F0", from: "SRC", to: "CM1", role: "feed-main", nominalSize: "4", internalDiameterIn: 4.026, cFactor: 120, lengthFt: 20 },
+      { id: "X1", from: "CM1", to: "CM2", role: "cross-main", nominalSize: "3", internalDiameterIn: 3.068, cFactor: 120, lengthFt: 20 },
+      { id: "X2", from: "CM2", to: "CM3", role: "cross-main", nominalSize: "3", internalDiameterIn: 3.068, cFactor: 120, lengthFt: 20 },
+      { id: "A0", from: "CM1", to: "A1", role: "branch-line", nominalSize: "1-1/2", internalDiameterIn: 1.61, cFactor: 120, lengthFt: 8 },
+      { id: "AA", from: "A1", to: "A2", role: "branch-line", nominalSize: "1-1/2", internalDiameterIn: 1.61, cFactor: 120, lengthFt: 8 },
+      { id: "B0", from: "CM2", to: "B1", role: "branch-line", nominalSize: "1-1/2", internalDiameterIn: 1.61, cFactor: 120, lengthFt: 8 },
+      { id: "BB", from: "B1", to: "B2", role: "branch-line", nominalSize: "1-1/2", internalDiameterIn: 1.61, cFactor: 120, lengthFt: 8 },
+      { id: "C0", from: "CM3", to: "C1", role: "branch-line", nominalSize: "1-1/2", internalDiameterIn: 1.61, cFactor: 120, lengthFt: 8 },
+      { id: "CC", from: "C1", to: "C2", role: "branch-line", nominalSize: "1-1/2", internalDiameterIn: 1.61, cFactor: 120, lengthFt: 8 },
+    ],
+    valves: [],
+  },
+});
+
+describe("FM DS 8-9 storage (count-at-pressure)", () => {
+  it("opens the N most-remote heads and holds them at the scheme minimum pressure", () => {
+    const s = solveProject(fmStorage).summary;
+    // N = 4 design heads
+    expect(s.operatingHeads).toBe(4);
+    // most-remote design head sits at the scheme minimum (binary search target)
+    expect(s.minSprinklerPressurePsi).toBe(50);
+    expect(s.meetsMinPressure).toBe(true);
+    expect(s.mostRemoteSprinkler!.pressurePsi).toBeCloseTo(50, 0);
+    // Q = K·√P at the governing head; system flow ≥ N·K·√50 (closer heads run higher)
+    expect(s.mostRemoteSprinkler!.flowGpm).toBeCloseTo(16.8 * Math.sqrt(50), 0);
+    expect(s.systemFlowGpm).toBeGreaterThanOrEqual(4 * 16.8 * Math.sqrt(50) - 1);
+  });
+
+  it("selects the 4 farthest heads — the 2 nearest branch heads stay dry", () => {
+    const sol = solveProject(fmStorage);
+    const dry = (id: string) => (sol.results.nodes[id]?.dischargeGpm ?? 0) < 1;
+    const flowing = (id: string) => (sol.results.nodes[id]?.dischargeGpm ?? 0) > 1;
+    expect(dry("A1")).toBe(true); // nearest branch
+    expect(dry("A2")).toBe(true);
+    expect(flowing("B1") && flowing("B2") && flowing("C1") && flowing("C2")).toBe(true);
+  });
+
+  it("required stored water = total demand × duration", () => {
+    const s = solveProject(fmStorage).summary;
+    expect(s.requiredStoredGal).toBe(Math.round(s.totalDemandGpm * 60));
+    expect(s.durationMin).toBe(60);
+  });
+
+  it("a stray density does not inflate the scheme minimum pressure (method guard)", () => {
+    const withDensity = parseProject({
+      ...JSON.parse(JSON.stringify(fmStorage)),
+      designBasis: { method: "fm-storage", operatingSprinklers: 4, minSprinklerPressurePsi: 50, sprinklerKFactor: 16.8, hoseAllowanceGpm: 250, durationMin: 60, densityGpmFt2: 2.0 },
+    });
+    // density 2.0×100/16.8 → 141 psi if it leaked in; the guard keeps it at 50
+    expect(solveProject(withDensity).summary.minSprinklerPressurePsi).toBe(50);
+  });
+});

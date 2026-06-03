@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getStandard, availableStandards, designBasisForHazard } from "./index";
+import { getStandard, availableStandards, designBasisForHazard, storageSchemesFor, designBasisForScheme } from "./index";
 
 describe("standards-engine: NFPA 13", () => {
   const s = getStandard("nfpa13");
@@ -66,6 +66,28 @@ describe("standards-engine: FM Global Data Sheets", () => {
   it("design basis stays imperial (no metric conversion)", () => {
     const db = designBasisForHazard("fmds", "hc-2");
     expect(db).toEqual({ densityGpmFt2: 0.2, designAreaFt2: 2500, minPressurePsi: 7, hoseAllowanceGpm: 250 });
+  });
+
+  it("offers DS 8-9 storage count-at-pressure schemes", () => {
+    const schemes = s.storageSchemes!();
+    expect(schemes.length).toBeGreaterThan(0);
+    const flagship = schemes.find((x) => x.id === "esfr-k25.2-12-50")!;
+    expect(flagship).toMatchObject({ kFactor: 25.2, designSprinklers: 12, minPressurePsi: 50, mode: "suppression", hoseAllowanceGpm: 250, durationMin: 60 });
+    // control-mode carries the larger hose / longer duration
+    const cmsa = schemes.find((x) => x.mode === "control")!;
+    expect(cmsa.hoseAllowanceGpm).toBe(500);
+    expect(cmsa.durationMin).toBe(120);
+  });
+
+  it("resolves a storage scheme into an imperial design basis", () => {
+    const b = designBasisForScheme("fmds", "esfr-k16.8-12-35");
+    expect(b).toEqual({ operatingSprinklers: 12, minPressurePsi: 35, kFactor: 16.8, hoseAllowanceGpm: 250, durationMin: 60, method: "fm-storage", schemeLabel: "ESFR K16.8 — 12 @ 35 psi (≤30 ft ceiling)" });
+    expect(designBasisForScheme("fmds", "bogus")).toBeUndefined();
+  });
+
+  it("storage methods are FM-only — other standards expose none", () => {
+    expect(storageSchemesFor("nfpa13")).toEqual([]);
+    expect(designBasisForScheme("nfpa13", "esfr-k16.8-12-35")).toBeUndefined();
   });
 });
 

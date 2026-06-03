@@ -170,6 +170,52 @@ function riserNameplateSpec(model: ProjectModel, sol: ProjectSolution): Spec {
   return { title: "Riser Nameplate", inner: el.join("") };
 }
 
+/**
+ * FM DS 8-9 storage "count-at-pressure" scheme sheet — names the scheme (K + N
+ * design heads @ minimum end-head pressure) and proves the demand/supply.
+ * Rendered only for FM storage runs (designBasis.method === "fm-storage").
+ */
+function fmStorageSchemeSpec(model: ProjectModel, sol: ProjectSolution): Spec {
+  const u = units(model);
+  const s = sol.summary;
+  const db = model.designBasis as Record<string, unknown> | undefined;
+  const { x, w } = INNER;
+  const half = (w - mm(6)) / 2;
+  const rx = x + (w + mm(6)) / 2;
+  const y = CONTENT_TOP + mm(4);
+  const el: string[] = [sectionTitle(x, y, w, "FM Storage Design Scheme (DS 8-9)")];
+  const top = y + mm(8);
+  const kf = db?.["sprinklerKFactor"];
+
+  const scheme = infoBox(x, top, half, "Scheme (count-at-pressure)", [
+    ["Scheme", String(db?.["schemeLabel"] ?? "—")],
+    ["Method", String(db?.["method"] ?? "—")],
+    ["Sprinkler K-factor", kf ? String(kf) : "—"],
+    ["Design sprinklers (N)", String(s.operatingHeads)],
+    ["Min end-head pressure", u.pU(s.minSprinklerPressurePsi)],
+    ["Scheme line", `K${kf ?? "—"}, ${s.operatingHeads} @ ${u.p(s.minSprinklerPressurePsi)} ${u.U.p}`],
+  ]);
+  const demand = infoBox(rx, top, half, "Demand & water supply", [
+    ["System (sprinkler) flow", u.qU(s.systemFlowGpm)],
+    ["Hose allowance", u.qU(s.hoseAllowanceGpm)],
+    ["Total demand", u.qU(s.totalDemandGpm)],
+    ["Required pressure", u.pU(s.sourcePressurePsi)],
+    ["Available @ demand", u.pU(s.availablePsi)],
+    ["Stored water (req)", s.requiredStoredGal !== undefined ? `${s.requiredStoredGal.toLocaleString()} gal @ ${s.durationMin}m` : "—"],
+    ["Supply adequate", s.passesSupply ? "YES" : "NO"],
+  ]);
+  el.push(scheme.svg, demand.svg);
+
+  const pass = s.passesSupply && s.meetsMinPressure;
+  const by = Math.max(scheme.endY, demand.endY) + mm(6);
+  el.push(rect(x, by, w, mm(12), { fill: pass ? "#ecfdf5" : "#fff7ed", stroke: pass ? C.good : C.warn, sw: 1, rx: mm(1.4) }));
+  el.push(T(x + mm(4), by + mm(7.5), pass ? "SCHEME ADEQUATE — the N most-remote heads hold the scheme minimum pressure" : "REVIEW — supply / pressure check required", { size: mm(3.2), fill: pass ? C.good : C.warn, weight: "700" }));
+  el.push(T(x + mm(4), by + mm(16.5), "⚠ Representative FM DS 8-9 data — verify the exact table cell + edition; preliminary sizing, not an approved design.", { size: mm(2.5), fill: C.muted }));
+  el.push(T(x + mm(4), by + mm(20.5), "Ceiling sprinklers only — does NOT design in-rack sprinklers (DS 8-9 may require them); head set = N most-remote by pipe length", { size: mm(2.5), fill: C.muted }));
+  el.push(T(x + mm(4), by + mm(24.5), "(an approximation of FM's most-demanding contiguous design rectangle). Validity assumes the listed commodity, height, aisle width and flue spaces.", { size: mm(2.5), fill: C.muted }));
+  return { title: "FM Storage Scheme", inner: el.join("") };
+}
+
 // ── summary ──
 function summarySpec(model: ProjectModel, sol: ProjectSolution): Spec {
   const u = units(model);
@@ -572,6 +618,7 @@ export function reportSheets(model: ProjectModel, sol: ProjectSolution): Sheet[]
   const specs: Spec[] = [
     coverSpec(model, sol),
     riserNameplateSpec(model, sol),
+    ...(((model.designBasis as Record<string, unknown> | undefined)?.["method"] === "fm-storage") ? [fmStorageSchemeSpec(model, sol)] : []),
     summarySpec(model, sol),
     graphSpec(model, sol),
     supplySpec(model, sol),

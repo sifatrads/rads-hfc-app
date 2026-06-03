@@ -45,6 +45,38 @@ describe("NFPA §27.4 report sheets", () => {
     expect(sheets.some((s) => s.title === "Riser Nameplate")).toBe(true);
   });
 
+  it("adds an FM Storage Scheme sheet only for FM storage (count-at-pressure) runs", () => {
+    // non-FM density model → no FM storage sheet
+    const plain = reportSheets(model, solveProject(model));
+    expect(plain.some((s) => s.title === "FM Storage Scheme")).toBe(false);
+
+    // FM storage model → the scheme sheet appears, naming the scheme line
+    const fm = parseProject({
+      schemaVersion: 2,
+      meta: { id: "FMR", name: "FM ESFR storage", systemType: "sprinkler", standardId: "fmds", units: "imperial" },
+      designBasis: { method: "fm-storage", schemeLabel: "ESFR K16.8 — 12 @ 35 psi", operatingSprinklers: 12, minSprinklerPressurePsi: 35, sprinklerKFactor: 16.8, hoseAllowanceGpm: 250, durationMin: 60 },
+      waterSupply: { type: "city+fire-pump", flowTest: { staticPsi: 90, residualPsi: 70, testFlowGpm: 3000 }, firePump: { ratedFlowGpm: 1500, ratedPsi: 100, churnPsi: 120 } },
+      network: {
+        nodes: [
+          { id: "SRC", type: "junction", elevationFt: 0 },
+          { id: "CM", type: "junction", elevationFt: 0 },
+          { id: "H1", type: "sprinkler", elevationFt: 0, kFactor: 16.8, coverageAreaFt2: 100 },
+          { id: "H2", type: "sprinkler", elevationFt: 0, kFactor: 16.8, coverageAreaFt2: 100 },
+        ],
+        pipes: [
+          { id: "P0", from: "SRC", to: "CM", role: "feed-main", nominalSize: "4", internalDiameterIn: 4.026, cFactor: 120, lengthFt: 20 },
+          { id: "P1", from: "CM", to: "H1", role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor: 120, lengthFt: 10 },
+          { id: "P2", from: "H1", to: "H2", role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor: 120, lengthFt: 10 },
+        ],
+        valves: [],
+      },
+    });
+    const sheet = reportSheets(fm, solveProject(fm)).find((s) => s.title === "FM Storage Scheme");
+    expect(sheet).toBeDefined();
+    expect(sheet!.svg).toContain("FM Storage Design Scheme");
+    expect(sheet!.svg).toContain("16.8");
+  });
+
   it("renders computed flows/pressures into the worksheet", () => {
     const sol = solveProject(model);
     const pages = pipeWorksheetSheets(model, sol);

@@ -307,6 +307,10 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   const sprinklers = model.network.nodes.filter((n) => n.type === "sprinkler" && typeof n.kFactor === "number" && n.kFactor > 0);
   // Design area: explicit operating-head count → most-remote N; else NFPA
   // area-density Auto-Peak (accumulate coverage to the design area); else all.
+  // Explicit operating-head count → most-remote N. FM DS 8-9 / ESFR storage
+  // (designBasis.method === "fm-storage") is exactly this: applyScheme writes
+  // operatingSprinklers = N, so it flows through here; the only storage-specific
+  // solver behaviour is the density-suppression guard below.
   const explicitCount = num(model.designBasis, "operatingSprinklers");
   const residentialCount = residentialDesignCount(model.meta.standardId);
   // NFPA 15 deluge / water-spray: open nozzles, every head flows at once.
@@ -342,7 +346,10 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   const dsK = num(model.designBasis, "sprinklerKFactor");
   let densityPressurePsi = 0;
   let requiredHeadFlowGpm: number | undefined;
-  if (!standpipeMode && density) {
+  // FM storage (count-at-pressure) governs by the scheme's minimum end-head
+  // pressure, never by a density — so a leftover densityGpmFt2 must not inflate it.
+  const fmStorage = (model.designBasis as Record<string, unknown> | undefined)?.["method"] === "fm-storage";
+  if (!standpipeMode && density && !fmStorage) {
     for (const n of openSprinklers) {
       const flow = density * (n.coverageAreaFt2 ?? 130);
       const k = n.kFactor ?? dsK ?? 5.6;

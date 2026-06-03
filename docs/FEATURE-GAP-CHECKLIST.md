@@ -60,7 +60,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Darcy-Weisbach method (flow-dependent f, Swamee-Jain, per-material roughness) ✅ DONE
 - [ ] NFPA 750 water mist (D-W trigger, viscosity/density) — niche
 - [x] EN 12845 (hazard classes, metric densities, C=100, Table 23 equiv-lengths, four-most-unfavourable report, metric data entry) ✅ DONE
-- [x] FM Global Data Sheets (HC-1/2/3 non-storage density/area per DS 3-26, C=120, hose demand) ✅ DONE — storage count-at-pressure schemes are a follow-up
+- [x] FM Global Data Sheets — non-storage HC-1/2/3 density/area (DS 3-26) + STORAGE count-at-pressure schemes (DS 8-9: ESFR/CMSA K+N@Pmin, scheme picker, FM Storage report sheet) ✅ DONE
 - [ ] BS 9251 / EN 16925 residential — UK/EU; large
 - [ ] Glazing / exposure-protection sprinkler sizing — niche
 - [ ] Other intl (CEA 4001, UNI 10779, AS 2118, MS 1910, CP 52) + per-standard libraries — long-tail

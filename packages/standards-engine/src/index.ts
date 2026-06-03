@@ -1,4 +1,4 @@
-import type { StandardId, StandardModule } from "./types";
+import type { StandardId, StandardModule, StorageScheme, StorageDesignBasis } from "./types";
 import { nfpa13 } from "./nfpa13";
 import { nfpa13d } from "./nfpa13d";
 import { nfpa13r } from "./nfpa13r";
@@ -41,6 +41,16 @@ export function hazardClassesFor(standardId: string): { id: string; label: strin
 /** True if the standard's native units are metric (EN 12845). */
 export function standardIsMetric(standardId: string): boolean {
   try { return getStandard(standardId as StandardId).units === "metric"; } catch { return false; }
+}
+
+/** Storage count-at-pressure schemes a standard offers (empty if none / not implemented). */
+export function storageSchemesFor(standardId: string): StorageScheme[] {
+  try { return getStandard(standardId as StandardId).storageSchemes?.() ?? []; } catch { return []; }
+}
+
+/** Imperial design basis for a storage scheme id, or undefined. */
+export function designBasisForScheme(standardId: string, schemeId: string): StorageDesignBasis | undefined {
+  try { return getStandard(standardId as StandardId).designByScheme?.(schemeId); } catch { return undefined; }
 }
 
 /**

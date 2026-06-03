@@ -20,6 +20,38 @@ export interface DesignDensityPoint {
   area: number;
 }
 
+/**
+ * A storage "count-at-pressure" ceiling-protection scheme (FM DS 8-9 / ESFR):
+ * a specific sprinkler operating a fixed number of design heads at a stated
+ * minimum end-head pressure, plus fixed hose + duration — NOT density/area.
+ */
+export interface StorageScheme {
+  id: string;
+  label: string;
+  /** suppression (ESFR/storage-mode) vs control (CMSA/CMDA). */
+  mode: "suppression" | "control";
+  kFactor: number;
+  designSprinklers: number;
+  minPressurePsi: number;
+  hoseAllowanceGpm: number;
+  durationMin: number;
+  commodity?: string;
+  maxStorageHeightFt?: number;
+  maxCeilingHeightFt?: number;
+  note?: string;
+}
+
+/** Design-basis values a storage scheme writes into the (imperial) design basis. */
+export interface StorageDesignBasis {
+  operatingSprinklers: number;
+  minPressurePsi: number;
+  kFactor: number;
+  hoseAllowanceGpm: number;
+  durationMin: number;
+  method: "fm-storage";
+  schemeLabel: string;
+}
+
 export interface StandardModule {
   readonly id: StandardId;
   readonly name: string;
@@ -56,4 +88,12 @@ export interface StandardModule {
 
   /** Equivalent pipe length (ft/m) for a fitting/valve at a nominal size (Table 27.2.3.1.1). */
   fittingEquivalentLength?(fitting: string, nominalSize: string, opts?: { cFactor?: number; actualIdIn?: number }): number | undefined;
+
+  // ── storage "count-at-pressure" schemes (optional; FM DS 8-9 / ESFR) ──
+
+  /** Storage ceiling-protection schemes (K + N design heads @ minimum pressure). */
+  storageSchemes?(): StorageScheme[];
+
+  /** Resolve a storage scheme id into an imperial design basis, or undefined. */
+  designByScheme?(schemeId: string): StorageDesignBasis | undefined;
 }

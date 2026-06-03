@@ -11,7 +11,7 @@ import {
   NOMINAL_SIZES, PIPE_ROLES, NODE_TYPES, VALVE_TYPES, PUMP_TYPES, PUMP_DRIVERS, VALVE_EQUIV_FT, MATERIAL_OPTIONS,
   DIRECTIONS, DIRECTION_LABEL, renumberNetwork, normalizePipe, withModel, splitPipeInModel, cleanupModel,
 } from "../network-edit";
-import { defaultCFactorForMaterial, pipeMaterial, parseFittingCodes, hazardClassesFor, designBasisForHazard, standardIsMetric } from "@rads/standards-engine";
+import { defaultCFactorForMaterial, pipeMaterial, parseFittingCodes, hazardClassesFor, designBasisForHazard, standardIsMetric, storageSchemesFor, designBasisForScheme } from "@rads/standards-engine";
 import { C, FONT, card, sectionTitle, field, fieldLabel, input, select, btnPrimary, btnGhost, btnDanger, th, td } from "../ui";
 import type { Issue } from "../network-validate";
 
@@ -60,9 +60,26 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
   const applyDensity = () => {
     const db = designBasisForHazard(standardId, str(model.meta.hazardClass, hazardOpts[0]));
     if (!db) return;
+    // Leaving a storage scheme → also drop its scheme-written K + duration so a
+    // density design isn't computed/printed against a stale storage K-factor or
+    // storage water-supply duration. (Preserve user-entered K/duration otherwise.)
+    const fromStorage = ds["method"] === "fm-storage";
     onChange(withModel(model, {
-      designBasis: { ...ds, densityGpmFt2: db.densityGpmFt2, designAreaFt2: db.designAreaFt2, minSprinklerPressurePsi: db.minPressurePsi, hoseAllowanceGpm: db.hoseAllowanceGpm, operatingSprinklers: undefined },
+      designBasis: { ...ds, densityGpmFt2: db.densityGpmFt2, designAreaFt2: db.designAreaFt2, minSprinklerPressurePsi: db.minPressurePsi, hoseAllowanceGpm: db.hoseAllowanceGpm, operatingSprinklers: undefined, method: undefined, schemeLabel: undefined, ...(fromStorage ? { sprinklerKFactor: undefined, durationMin: undefined } : {}) },
       ...(standardIsMetric(standardId) ? { meta: { ...model.meta, units: "metric" } } : {}),
+    }));
+  };
+  // FM DS 8-9 storage: count-at-pressure schemes (K + N design heads @ min psi).
+  const storageSchemes = storageSchemesFor(standardId);
+  const storageSchemeId = str(model.meta.storageSchemeId, storageSchemes[0]?.id ?? "");
+  const pickedScheme = storageSchemes.find((s) => s.id === storageSchemeId);
+  const applyScheme = () => {
+    const b = designBasisForScheme(standardId, storageSchemeId);
+    if (!b) return;
+    // Mirror of applyDensity: write count+pressure+K, clear density/area so the
+    // solver runs pure count-at-pressure. FM is imperial — no units flip.
+    onChange(withModel(model, {
+      designBasis: { ...ds, operatingSprinklers: b.operatingSprinklers, minSprinklerPressurePsi: b.minPressurePsi, sprinklerKFactor: b.kFactor, hoseAllowanceGpm: b.hoseAllowanceGpm, durationMin: b.durationMin, method: b.method, schemeLabel: b.schemeLabel, densityGpmFt2: undefined, designAreaFt2: undefined },
     }));
   };
   const [find, setFind] = useState("");
@@ -181,7 +198,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             <Txt label="Project no." value={str(model.meta.id)} onChange={(v) => setMeta("id", v)} />
           </Row>
           <Row>
-            <Sel label="Code" value={str(model.meta.standardId, "nfpa13")} options={["nfpa13", "nfpa13d", "nfpa13r", "nfpa14", "en12845", "fmds"]} onChange={(v) => setMeta("standardId", v)} />
+            <Sel label="Code" value={str(model.meta.standardId, "nfpa13")} options={["nfpa13", "nfpa13d", "nfpa13r", "nfpa14", "en12845", "fmds"]} onChange={(v) => onChange(withModel(model, { meta: { ...model.meta, standardId: v, units: standardIsMetric(v) ? "metric" : "imperial" } }))} />
             <Sel label="System" value={str(model.meta.systemType, "sprinkler")} options={["sprinkler", "standpipe"]} onChange={(v) => setMeta("systemType", v)} />
             <Sel label="Fill type" value={str(model.meta.fillType, "wet")} options={["wet", "dry", "preaction", "deluge"]} onChange={(v) => setMeta("fillType", v)} />
             <Sel label="Hazard" value={str(model.meta.hazardClass, hazardOpts[0])} options={hazardOpts} onChange={(v) => setMeta("hazardClass", v)} />
@@ -214,6 +231,26 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
           {designBasisForHazard(standardId, str(model.meta.hazardClass, hazardOpts[0])) && (
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -4 }}>
               <button style={btnGhost} onClick={applyDensity} title="Fill density/area/pressure from the selected code + hazard class">↧ Apply {standardId.toUpperCase()} {str(model.meta.hazardClass, "").toUpperCase()} density</button>
+            </div>
+          )}
+          {storageSchemes.length > 0 && (
+            <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: "10px 12px", background: C.band, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+                <label style={{ ...field, flex: 1 }}>
+                  <span style={fieldLabel}>FM storage scheme (DS 8‑9 — count‑at‑pressure)</span>
+                  <select style={select} value={storageSchemeId} onChange={(e) => setMeta("storageSchemeId", e.target.value)}>
+                    {storageSchemes.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                  </select>
+                </label>
+                <button style={btnGhost} onClick={applyScheme} title="Fill operating heads / min pressure / K from the chosen FM storage scheme">↧ Apply scheme</button>
+              </div>
+              {pickedScheme && (
+                <div style={hint}>
+                  {pickedScheme.mode === "suppression" ? "Suppression (ESFR)" : "Control mode"} · {pickedScheme.designSprinklers} heads @ {pickedScheme.minPressurePsi} psi · K{pickedScheme.kFactor} · hose {pickedScheme.hoseAllowanceGpm} gpm / {pickedScheme.durationMin} min{pickedScheme.commodity ? ` · ${pickedScheme.commodity}` : ""}.
+                  {pickedScheme.note ? <><br />Note: {pickedScheme.note}</> : null}
+                  <br />⚠ Representative FM DS 8‑9 data — verify the exact table cell + edition. <strong>Ceiling sprinklers only</strong> — does NOT design in‑rack sprinklers (which DS 8‑9 may require), and assumes the listed commodity, storage/ceiling height, aisle width, flue spaces and storage arrangement. Preliminary sizing, not an approved design.
+                </div>
+              )}
             </div>
           )}
           <Row>
