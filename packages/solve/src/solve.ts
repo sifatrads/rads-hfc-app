@@ -292,13 +292,17 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   // area-density Auto-Peak (accumulate coverage to the design area); else all.
   const explicitCount = num(model.designBasis, "operatingSprinklers");
   const residentialCount = residentialDesignCount(model.meta.standardId);
+  // NFPA 15 deluge / water-spray: open nozzles, every head flows at once.
+  const delugeMode = model.meta.fillType === "deluge" || model.meta.systemType === "deluge";
   const open =
     opts.designArea ??
-    (explicitCount !== undefined
-      ? designAreaSet(model, source.id, explicitCount)
-      : residentialCount !== undefined
-        ? designAreaSet(model, source.id, residentialCount)
-        : autoPeakAreaSet(model, source.id) ?? designAreaSet(model, source.id, sprinklers.length));
+    (delugeMode
+      ? new Set(sprinklers.map((s) => s.id))
+      : explicitCount !== undefined
+        ? designAreaSet(model, source.id, explicitCount)
+        : residentialCount !== undefined
+          ? designAreaSet(model, source.id, residentialCount)
+          : autoPeakAreaSet(model, source.id) ?? designAreaSet(model, source.id, sprinklers.length));
   const openSprinklers = sprinklers.filter((n) => open.has(n.id));
 
   // Standpipe (NFPA 14) vs sprinkler (NFPA 13) design mode.

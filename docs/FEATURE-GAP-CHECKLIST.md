@@ -56,7 +56,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] NFPA 13R automation (four most-remote heads) ✅ DONE
 - [x] Compliance-path selector (Code picker: NFPA 13/13D/13R/14/EN) ✅ DONE
 - [x] NFPA 20 suction-velocity check (≤15 ft/s at 150% flow) ✅ DONE
-- [ ] NFPA 15 water-spray / deluge (uniform density, spray-nozzle discharge) — specialty
+- [x] NFPA 15 deluge / water-spray (all nozzles flow at design density) ✅ DONE
 - [ ] Darcy-Weisbach method (full) — prerequisite for mist + Europe
 - [ ] NFPA 750 water mist (D-W trigger, viscosity/density) — niche
 - [ ] EN 12845 (Table 23 equiv lengths, 4 weakest) — European commercial; large

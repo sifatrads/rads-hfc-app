@@ -308,6 +308,24 @@ describe("in-app data entry → solve", () => {
     expect(solveProject(build("nfpa13r")).summary.operatingHeads).toBe(4);
   });
 
+  it("NFPA 15 deluge flows every nozzle (no remote area)", () => {
+    const build = (deluge: boolean) => {
+      const m = newProject("2026-06-03T00:00:00.000Z");
+      const nodes: NetworkNode[] = [m.network.nodes[0]!];
+      const pipes: Pipe[] = [];
+      let prev = "1";
+      for (let i = 2; i <= 9; i++) {
+        nodes.push({ id: String(i), type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 100, fittings: [] } as unknown as NetworkNode);
+        pipes.push({ id: `P-${i}`, from: prev, to: String(i), role: "branch-line", nominalSize: "1", lengthFt: 8, fittings: [] });
+        prev = String(i);
+      }
+      // designAreaFt2 200 with 100-ft² heads → Auto-Peak would pick 2; deluge picks all 8
+      return withModel(m, { meta: { ...m.meta, ...(deluge ? { fillType: "deluge" } : {}) }, designBasis: { densityGpmFt2: 0.2, designAreaFt2: 200, sprinklerKFactor: 5.6 }, network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } });
+    };
+    expect(solveProject(build(false)).summary.operatingHeads).toBe(2); // area-density subset
+    expect(solveProject(build(true)).summary.operatingHeads).toBe(8); // all nozzles
+  });
+
   it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {
     const out = setNodeGeometryInModel(line3(), "3", { x: 42, y: 7, z: 10 });
     const n3 = out.network.nodes.find((n) => n.id === "3")!;
