@@ -38,6 +38,10 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
     return dryFill && pipeMaterial(p.material).family === "steel" ? Math.min(c, 100) : c;
   };
   const [bulkRole, setBulkRole] = useState("");
+  const [find, setFind] = useState("");
+  const fq = find.toLowerCase().trim();
+  const nodeMatch = (n: NetworkNode) => !fq || `${n.id} ${n.type} ${n.note ?? ""}`.toLowerCase().includes(fq);
+  const pipeMatch = (p: Pipe) => !fq || `${p.id} ${p.from} ${p.to} ${p.role ?? ""} ${p.material ?? ""} ${p.nominalSize ?? ""}`.toLowerCase().includes(fq);
 
   // ---- committers ------------------------------------------------------
   const setMeta = (k: string, v: unknown) => onChange(withModel(model, { meta: { ...model.meta, [k]: v } }));
@@ -131,6 +135,10 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
 
   return (
     <div style={page}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input style={{ ...input, maxWidth: 340 }} placeholder="🔎 Find node / pipe — id, role, material, note…" value={find} onChange={(e) => setFind(e.target.value)} />
+        {find && <button style={btnGhost} onClick={() => setFind("")}>Clear</button>}
+      </div>
       {issues && issues.length > 0 && (
         <div style={validBanner}>
           <div style={{ fontWeight: 700, color: C.ink, marginBottom: 4 }}>⚠ Model check — {issues.filter((i) => i.severity === "error").length} error(s), {issues.filter((i) => i.severity === "warning").length} warning(s)</div>
@@ -266,6 +274,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             <thead><tr>{["#", "Type", "Elevation (ft)", "K-factor", "Coverage (ft²)", "Fixed flow (gpm)", "Note", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
               {nodes.map((n, i) => {
+                if (!nodeMatch(n)) return null;
                 const spk = n.type === "sprinkler";
                 return (
                   <tr key={i} style={i % 2 ? { background: C.zebra } : undefined}>
@@ -310,7 +319,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
           <table style={table}>
             <thead><tr>{["#", "From", "To", "Role", "Size", "Material", "C", "ID (in)", "Length (ft)", "Add'l (ft)", "Fittings", "Direction", "ΔElev (ft)", "Fixed ΔP", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
-              {pipes.map((p, i) => (
+              {pipes.map((p, i) => pipeMatch(p) ? (
                 <tr key={i} style={i % 2 ? { background: C.zebra } : undefined}>
                   <td style={{ ...td, fontWeight: 700, color: C.accent }}>{p.id}</td>
                   <td style={td}><NodeSel ids={nodeIds} value={p.from} onChange={(v) => setPipe(i, { from: v })} /></td>
@@ -338,7 +347,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : null)}
               {pipes.length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={15}>No pipes yet — add nodes, then connect them. The first node (#1) is the supply source.</td></tr>}
             </tbody>
           </table>

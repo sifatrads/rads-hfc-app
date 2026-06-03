@@ -52,7 +52,21 @@ export function App(): JSX.Element {
   const [pending, setPending] = useState<Pending | null>(null);
   const [cloudOpen, setCloudOpen] = useState(false);
 
-  useEffect(() => { resetModel(sampleProject()); }, [resetModel]);
+  // Restore the last working draft from localStorage so a reload never loses
+  // work; fall back to the built-in sample.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("rads-draft");
+      if (raw) { resetModel(parseProject(JSON.parse(raw))); setNote("Restored your last draft"); return; }
+    } catch { /* corrupt draft → sample */ }
+    resetModel(sampleProject());
+  }, [resetModel]);
+  // Debounced auto-save of the working model to localStorage.
+  useEffect(() => {
+    if (!model) return;
+    const h = setTimeout(() => { try { localStorage.setItem("rads-draft", JSON.stringify(model)); } catch { /* quota */ } }, 1000);
+    return () => clearTimeout(h);
+  }, [model]);
   // Auto-mount the cloud bar (loads firebase) only for users who were signed in
   // last time — everyone else pays nothing until they click "Cloud".
   useEffect(() => { if (cloudConfigured && localStorage.getItem("rads-cloud") === "1") setCloudOpen(true); }, []);
