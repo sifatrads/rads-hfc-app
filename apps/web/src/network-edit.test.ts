@@ -268,6 +268,28 @@ describe("in-app data entry → solve", () => {
     expect(c.ok).toBe(false);
   });
 
+  it("NFPA 14 standpipe mode sizes for residual at the most-remote hose connection", () => {
+    let m = newProject("2026-06-03T00:00:00.000Z");
+    m = withModel(m, { meta: { ...m.meta, systemType: "standpipe", standpipeClass: "I" } });
+    const nodes: NetworkNode[] = [
+      m.network.nodes[0]!,
+      { id: "2", type: "junction", elevationFt: 0, fittings: [] } as unknown as NetworkNode,
+      { id: "3", type: "hose-station", elevationFt: 100, fittings: [] } as unknown as NetworkNode, // most-remote (tall riser)
+      { id: "4", type: "hose-station", elevationFt: 50, fittings: [] } as unknown as NetworkNode,
+    ];
+    const pipes: Pipe[] = [
+      { id: "P-1", from: "1", to: "2", role: "feed-main", nominalSize: "6", lengthFt: 10, fittings: [] },
+      { id: "P-2", from: "2", to: "3", role: "standpipe-riser", nominalSize: "4", lengthFt: 100, elevationChangeFt: 100, direction: "U", fittings: [] },
+      { id: "P-3", from: "2", to: "4", role: "standpipe-riser", nominalSize: "4", lengthFt: 50, elevationChangeFt: 50, direction: "U", fittings: [] },
+    ];
+    const sol = solveProject(withModel(m, { network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } }));
+    expect(sol.summary.operatingHeads).toBe(2); // two hose connections
+    expect(sol.summary.systemFlowGpm).toBeCloseTo(750, 0); // 500 (most-remote) + 250
+    expect(sol.summary.minSprinklerPressurePsi).toBe(100); // Class I residual
+    expect(sol.summary.converged).toBe(true);
+    expect(sol.summary.mostRemoteSprinkler!.pressurePsi).toBeGreaterThan(99); // held at ~100 psi
+  });
+
   it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {
     const out = setNodeGeometryInModel(line3(), "3", { x: 42, y: 7, z: 10 });
     const n3 = out.network.nodes.find((n) => n.id === "3")!;

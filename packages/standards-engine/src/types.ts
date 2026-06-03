@@ -4,7 +4,7 @@
  * The calc engine stays standard-agnostic and reads parameters from the active module.
  */
 
-export type StandardId = "nfpa13" | "nfpa13r" | "nfpa13d" | "en12845" | "fmds" | "iso";
+export type StandardId = "nfpa13" | "nfpa13r" | "nfpa13d" | "nfpa14" | "en12845" | "fmds" | "iso";
 export type Units = "imperial" | "metric";
 
 export interface HazardClass {

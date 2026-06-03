@@ -1,14 +1,16 @@
 import type { StandardId, StandardModule } from "./types";
 import { nfpa13 } from "./nfpa13";
+import { nfpa14 } from "./nfpa14";
 import { en12845 } from "./en12845";
 
 export * from "./types";
 export * from "./tables-nfpa13";
 export * from "./materials";
-export { nfpa13, en12845 };
+export { nfpa13, nfpa14, en12845 };
 
 const REGISTRY: Partial<Record<StandardId, StandardModule>> = {
   nfpa13,
+  nfpa14,
   en12845,
   // nfpa13r, nfpa13d, fmds, iso — scaffolded next (plan: all standards from day 1)
 };

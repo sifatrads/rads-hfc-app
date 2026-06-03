@@ -147,6 +147,12 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             <Sel label="Hazard" value={str(model.meta.hazardClass, "oh2")} options={["lh", "oh1", "oh2", "eh1", "eh2"]} onChange={(v) => setMeta("hazardClass", v)} />
             <Sel label="Units" value={str(model.meta.units, "imperial")} options={["imperial", "metric"]} onChange={(v) => setMeta("units", v)} />
           </Row>
+          {model.meta.systemType === "standpipe" && (
+            <Row>
+              <Sel label="Standpipe class" value={str(model.meta.standpipeClass, "I")} options={["I", "II", "III"]} onChange={(v) => setMeta("standpipeClass", v)} />
+              <div style={{ flex: 1, alignSelf: "end", fontSize: 11.5, color: C.muted, paddingBottom: 6 }}>Class I/III: 100 psi @ most-remote 2½″, 500+250 gpm/standpipe. Hose connections = “hose-station” nodes.</div>
+            </Row>
+          )}
           <Row>
             <Txt label="Standard" value={str(model.meta.standard, "NFPA 13 (2019)")} onChange={(v) => setMeta("standard", v)} />
             <Txt label="Engineer" value={str(model.meta.engineer)} onChange={(v) => setMeta("engineer", v)} />

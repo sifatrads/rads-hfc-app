@@ -51,7 +51,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 **Already covered:** ✅ NFPA 13 (Sch40 ID, C-value, fitting/valve equiv-len, H-W C, equiv-len modifier) · ✅ Hazen-Williams · ✅ Gridded/looped/tree solver · ✅ Design-area = N most-remote · ✅ Pv / Pn=Pt−Pv · ✅ Pump + 150% overload (graph) · ✅ Required-pressure search
 
 - [x] Auto-Peak: derives operating heads from design area + density-driven min pressure ✅ DONE
-- [ ] NFPA 14 standpipe auto-sizing (riser demand, residual at top hose conn, per-standpipe flow) — **standpipe market**
+- [x] NFPA 14 standpipe auto-sizing (residual at most-remote outlet, per-standpipe flow) ✅ DONE
 - [ ] NFPA 13D automation (weakest head / 2 most-remote in a room + safety margin) — residential
 - [ ] NFPA 13R automation — low-rise residential
 - [ ] Compliance-path selector (route project to a code framework) — top-level UX that unlocks the rest

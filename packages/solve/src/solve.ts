@@ -184,8 +184,34 @@ function autoPeakAreaSet(model: ProjectModel, sourceId: string): Set<string> | u
   return set;
 }
 
+interface StandpipeParams { minResidual: number; firstFlow: number; addFlow: number; maxTotal: number }
+
+/** NFPA 14 §7.10 design parameters by standpipe class. Class I/III: 100 psi at
+ * the most-remote 2½" outlet, 500 gpm first standpipe + 250 each additional,
+ * cap 1000 gpm. Class II: 65 psi, 100 gpm. */
+function standpipeClassParams(cls: string | undefined): StandpipeParams {
+  const c = (cls ?? "I").toUpperCase().replace(/CLASS\s*/i, "").trim();
+  if (c === "II") return { minResidual: 65, firstFlow: 100, addFlow: 0, maxTotal: 100 };
+  return { minResidual: 100, firstFlow: 500, addFlow: 250, maxTotal: 1000 };
+}
+
+/** Assign NFPA 14 demand to each hose connection: the most-remote gets the first-
+ * standpipe flow, the rest the additional-standpipe flow, capped at the total. */
+function standpipeDemands(model: ProjectModel, sourceId: string, params: StandpipeParams): Map<string, number> {
+  const dist = pathDistances(model, sourceId);
+  const hose = model.network.nodes.filter((n) => n.type === "hose-station");
+  hose.sort((a, b) => (dist.get(b.id) ?? 0) - (dist.get(a.id) ?? 0));
+  const demands = new Map<string, number>();
+  let total = 0;
+  hose.forEach((n, i) => {
+    const give = Math.max(0, Math.min(i === 0 ? params.firstFlow : params.addFlow, params.maxTotal - total));
+    if (give > 0) { demands.set(n.id, give); total += give; }
+  });
+  return demands;
+}
+
 /** Build a GGA network with the source fixed at `sourceHeadPsi` (total head). Only sprinklers in `open` discharge. */
-function buildGga(model: ProjectModel, source: { id: string; elevationFt: number }, sourceHeadPsi: number, std: ReturnType<typeof getStandard> | undefined, open: Set<string>): GgaNetwork {
+function buildGga(model: ProjectModel, source: { id: string; elevationFt: number }, sourceHeadPsi: number, std: ReturnType<typeof getStandard> | undefined, open: Set<string>, demandOverride?: Map<string, number>): GgaNetwork {
   const nodes: GgaNode[] = [];
   const links: GgaLink[] = [];
   const byId = new Map(model.network.nodes.map((n) => [n.id, n]));
@@ -201,7 +227,7 @@ function buildGga(model: ProjectModel, source: { id: string; elevationFt: number
 
   for (const n of model.network.nodes) {
     if (n.id === source.id) nodes.push({ id: n.id, fixed: true, headPsi: sourceHeadPsi, elevationFt: n.elevationFt ?? 0 });
-    else nodes.push({ id: n.id, elevationFt: n.elevationFt ?? 0, demandGpm: n.flowGpm && n.type !== "sprinkler" ? n.flowGpm : 0 });
+    else nodes.push({ id: n.id, elevationFt: n.elevationFt ?? 0, demandGpm: demandOverride?.get(n.id) ?? (n.flowGpm && n.type !== "sprinkler" ? n.flowGpm : 0) });
   }
 
   const dry = model.meta.fillType === "dry" || model.meta.fillType === "preaction";
@@ -264,19 +290,28 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
       ? designAreaSet(model, source.id, explicitCount)
       : autoPeakAreaSet(model, source.id) ?? designAreaSet(model, source.id, sprinklers.length));
   const openSprinklers = sprinklers.filter((n) => open.has(n.id));
+
+  // Standpipe (NFPA 14) vs sprinkler (NFPA 13) design mode.
+  const standpipeMode = model.meta.systemType === "standpipe" && model.network.nodes.some((n) => n.type === "hose-station");
+  const spParams = standpipeMode ? standpipeClassParams(model.meta.standpipeClass) : undefined;
+  const demandOverride = standpipeMode ? standpipeDemands(model, source.id, spParams!) : undefined;
+
   const emitterFlow = (g: GgaResult): number =>
     Object.values(g.links).reduce((s, l) => (l.id.endsWith("#em") ? s + Math.abs(l.flowGpm) : s), 0);
-  const remotePressure = (g: GgaResult): number =>
-    openSprinklers.reduce((min, n) => Math.min(min, g.nodes[n.id]?.pressurePsi ?? Infinity), Infinity);
 
-  // Minimum head pressure: the greater of the listed minimum and the pressure
-  // needed to deliver the design density at any operating head (NFPA area-density).
+  // Design points: open sprinklers (sprinkler mode) or hose connections (standpipe).
+  const designNodeIds = standpipeMode ? [...(demandOverride?.keys() ?? [])] : openSprinklers.map((n) => n.id);
+  const remotePressure = (g: GgaResult): number =>
+    designNodeIds.reduce((min, id) => Math.min(min, g.nodes[id]?.pressurePsi ?? Infinity), Infinity);
+
+  // Minimum design pressure: NFPA 14 residual (standpipe), else the greater of
+  // the listed minimum and the area-density pressure (sprinkler).
   const listedMin = num(model.designBasis, "minSprinklerPressurePsi") ?? std?.minResidualPressure?.() ?? 7;
   const density = num(model.designBasis, "densityGpmFt2");
   const dsK = num(model.designBasis, "sprinklerKFactor");
   let densityPressurePsi = 0;
   let requiredHeadFlowGpm: number | undefined;
-  if (density) {
+  if (!standpipeMode && density) {
     for (const n of openSprinklers) {
       const flow = density * (n.coverageAreaFt2 ?? 130);
       const k = n.kFactor ?? dsK ?? 5.6;
@@ -284,16 +319,16 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
       densityPressurePsi = Math.max(densityPressurePsi, Math.pow(flow / k, 2));
     }
   }
-  const minSprinklerPressurePsi = Math.max(listedMin, densityPressurePsi);
+  const minSprinklerPressurePsi = standpipeMode ? spParams!.minResidual : Math.max(listedMin, densityPressurePsi);
   const elevHead = 0.433 * source.elevationFt;
-  const solveAt = (sourceGaugePsi: number) => solveGga(buildGga(model, source, sourceGaugePsi + elevHead, std, open));
+  const solveAt = (sourceGaugePsi: number) =>
+    solveGga(buildGga(model, source, sourceGaugePsi + elevHead, std, standpipeMode ? new Set<string>() : open, demandOverride));
 
-  // Find the required source gauge pressure so the most-remote head sits at its
-  // minimum design pressure (the standard "required pressure" design output).
-  // remotePressure increases with sourceP → binary search.
+  // Binary-search the source gauge pressure so the most-remote design point sits
+  // at its minimum (sprinkler min pressure / standpipe residual).
   let sourceP: number;
   let gga: GgaResult;
-  if (openSprinklers.length === 0) {
+  if (designNodeIds.length === 0) {
     sourceP = supply(0);
     gga = solveAt(sourceP);
   } else {
@@ -309,7 +344,7 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     gga = solveAt(sourceP);
   }
 
-  const systemFlowGpm = emitterFlow(gga);
+  const systemFlowGpm = standpipeMode ? [...(demandOverride?.values() ?? [])].reduce((s, v) => s + v, 0) : emitterFlow(gga);
 
   // results for the scene / sheets
   const results: SceneResults = { nodes: {}, pipes: {} };
@@ -333,13 +368,13 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     };
   }
 
-  // most-remote sprinkler (within the design area) = lowest gauge pressure
+  // most-remote design point (sprinkler or hose connection) = lowest gauge pressure
   let remote: { id: string; pressurePsi: number; flowGpm: number } | undefined;
-  for (const n of openSprinklers) {
-    const p = gga.nodes[n.id]?.pressurePsi;
-    const q = gga.nodes[n.id]?.dischargeGpm ?? 0;
+  for (const id of designNodeIds) {
+    const p = gga.nodes[id]?.pressurePsi;
     if (p === undefined) continue;
-    if (!remote || p < remote.pressurePsi) remote = { id: n.id, pressurePsi: p, flowGpm: q };
+    const q = standpipeMode ? demandOverride?.get(id) ?? 0 : gga.nodes[id]?.dischargeGpm ?? 0;
+    if (!remote || p < remote.pressurePsi) remote = { id, pressurePsi: p, flowGpm: q };
   }
 
   const hazard = model.meta.hazardClass ?? "oh2";
@@ -370,13 +405,13 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     marginPsi,
     passesSupply: marginPsi >= -1e-6,
     ...(remote ? { mostRemoteSprinkler: remote } : {}),
-    operatingHeads: openSprinklers.length,
+    operatingHeads: designNodeIds.length,
     ...(num(model.designBasis, "designAreaFt2") !== undefined ? { designAreaFt2: num(model.designBasis, "designAreaFt2") } : {}),
     ...(requiredHeadFlowGpm !== undefined ? { requiredHeadFlowGpm } : {}),
     minSprinklerPressurePsi,
     meetsMinPressure: remote ? remote.pressurePsi >= minSprinklerPressurePsi - 0.5 : true,
-    lowPressureNodes: openSprinklers
-      .map((n) => ({ id: n.id, pressurePsi: gga.nodes[n.id]?.pressurePsi ?? 0 }))
+    lowPressureNodes: designNodeIds
+      .map((id) => ({ id, pressurePsi: gga.nodes[id]?.pressurePsi ?? 0 }))
       .filter((x) => x.pressurePsi < minSprinklerPressurePsi - 0.5)
       .sort((a, b) => a.pressurePsi - b.pressurePsi),
     maxJunctionImbalanceGpm: gga.maxImbalanceGpm,
