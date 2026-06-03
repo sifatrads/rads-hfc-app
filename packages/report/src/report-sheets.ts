@@ -129,11 +129,12 @@ function riserNameplateSpec(model: ProjectModel, sol: ProjectSolution): Spec {
     ["Drawing / date", `${m.drawingNo ?? "—"} · ${m.date ?? "—"}`],
   ]);
   const demand = infoBox(x, sys.endY + mm(4), half, "Demand at base of riser", [
+    ["Operating heads", `${s.operatingHeads}${s.designAreaFt2 ? ` / ${s.designAreaFt2} ft²` : ""}`],
+    ["Density flow / head", s.requiredHeadFlowGpm !== undefined ? u.qU(s.requiredHeadFlowGpm) : "—"],
     ["System (sprinkler) flow", u.qU(s.systemFlowGpm)],
     ["Hose allowance", u.qU(s.hoseAllowanceGpm)],
     ["Total demand", u.qU(s.totalDemandGpm)],
     ["Required pressure", u.pU(s.sourcePressurePsi)],
-    ["Most-remote head", s.mostRemoteSprinkler ? `${s.mostRemoteSprinkler.id} @ ${u.pU(s.mostRemoteSprinkler.pressurePsi)}` : "—"],
   ]);
   const supply = infoBox(x, demand.endY + mm(4), half, "Water supply", [
     ["Static", u.pU(num(ft, "staticPsi"))],
@@ -148,7 +149,7 @@ function riserNameplateSpec(model: ProjectModel, sol: ProjectSolution): Spec {
     ["Density", db?.["densityGpmFt2"] ? `${db["densityGpmFt2"]} gpm/ft²` : "—"],
     ["Design area", db?.["designAreaFt2"] ? `${db["designAreaFt2"]} ft²` : "—"],
     ["Sprinkler K-factor", db?.["sprinklerKFactor"] ? String(db["sprinklerKFactor"]) : "—"],
-    ["Operating sprinklers", db?.["operatingSprinklers"] ? String(db["operatingSprinklers"]) : "—"],
+    ["Operating sprinklers", db?.["operatingSprinklers"] ? `${db["operatingSprinklers"]} (set)` : `${s.operatingHeads} (auto-peak)`],
     ["Min sprinkler pressure", u.pU(s.minSprinklerPressurePsi)],
   ]);
   const prepared = infoBox(rx, basis.endY + mm(4), half, "Prepared by", [

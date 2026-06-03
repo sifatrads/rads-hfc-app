@@ -210,6 +210,24 @@ describe("in-app data entry → solve", () => {
     expect(solveProject(build(250)).summary.sourcePressurePsi).toBeGreaterThan(solveProject(build()).summary.sourcePressurePsi);
   });
 
+  it("Auto-Peak derives the operating-head count + density flow from the design area", () => {
+    const m = newProject("2026-06-03T00:00:00.000Z");
+    const nodes: NetworkNode[] = [m.network.nodes[0]!];
+    const pipes: Pipe[] = [];
+    let prev = "1";
+    for (let i = 2; i <= 21; i++) {
+      nodes.push({ id: String(i), type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 100, fittings: [] } as unknown as NetworkNode);
+      pipes.push({ id: `P-${i}`, from: prev, to: String(i), role: "branch-line", nominalSize: "1", lengthFt: 10, fittings: [] });
+      prev = String(i);
+    }
+    // 20 heads × 100 ft²; design area 1500 ft² and NO operatingSprinklers → Auto-Peak picks 15.
+    const model = withModel(m, { designBasis: { densityGpmFt2: 0.1, designAreaFt2: 1500, sprinklerKFactor: 5.6, minSprinklerPressurePsi: 7 }, network: { ...m.network, nodes, pipes: pipes.map(normalizePipe) } });
+    const sol = solveProject(model);
+    expect(sol.summary.operatingHeads).toBe(15);
+    expect(sol.summary.requiredHeadFlowGpm).toBeCloseTo(10, 3); // 0.1 gpm/ft² × 100 ft²
+    expect(sol.summary.designAreaFt2).toBe(1500);
+  });
+
   it("setNodeGeometryInModel pins a node so auto-layout honours it", () => {
     const out = setNodeGeometryInModel(line3(), "3", { x: 42, y: 7, z: 10 });
     const n3 = out.network.nodes.find((n) => n.id === "3")!;

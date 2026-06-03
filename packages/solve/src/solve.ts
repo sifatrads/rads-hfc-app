@@ -51,6 +51,12 @@ export interface SolveSummary {
   passesSupply: boolean;
   /** Most-remote (lowest-pressure) sprinkler. */
   mostRemoteSprinkler?: { id: string; pressurePsi: number; flowGpm: number };
+  /** Operating sprinklers in the design area (count). */
+  operatingHeads: number;
+  /** Design area (ft²) when area-density based. */
+  designAreaFt2?: number;
+  /** Required discharge per head to meet the design density (gpm). */
+  requiredHeadFlowGpm?: number;
   minSprinklerPressurePsi: number;
   meetsMinPressure: boolean;
   /** Design-area sprinklers whose pressure falls below the minimum (id + psi). */
@@ -151,6 +157,31 @@ function designAreaSet(model: ProjectModel, sourceId: string, count: number): Se
   return new Set(spk.slice(0, Math.max(1, count)).map((s) => s.id));
 }
 
+/**
+ * NFPA 13 Auto-Peak: select the most-remote heads (by path length) and add them
+ * until their summed coverage area reaches the design area — so the operating-
+ * head count is derived from the area/density basis rather than entered. Returns
+ * undefined when no design area is set (caller falls back to the explicit count).
+ * (Schematic proxy for "most-demanding remote rectangle"; true geometric remote
+ * area needs dimensioned layout.)
+ */
+function autoPeakAreaSet(model: ProjectModel, sourceId: string): Set<string> | undefined {
+  const designArea = num(model.designBasis, "designAreaFt2");
+  if (!designArea) return undefined;
+  const dist = pathDistances(model, sourceId);
+  const spk = model.network.nodes.filter((n) => n.type === "sprinkler" && typeof n.kFactor === "number" && n.kFactor > 0);
+  if (spk.length === 0) return undefined;
+  spk.sort((a, b) => (dist.get(b.id) ?? 0) - (dist.get(a.id) ?? 0));
+  const set = new Set<string>();
+  let area = 0;
+  for (const n of spk) {
+    set.add(n.id);
+    area += n.coverageAreaFt2 ?? 130;
+    if (area >= designArea) break;
+  }
+  return set;
+}
+
 /** Build a GGA network with the source fixed at `sourceHeadPsi` (total head). Only sprinklers in `open` discharge. */
 function buildGga(model: ProjectModel, source: { id: string; elevationFt: number }, sourceHeadPsi: number, std: ReturnType<typeof getStandard> | undefined, open: Set<string>): GgaNetwork {
   const nodes: GgaNode[] = [];
@@ -211,16 +242,36 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   const supply = opts.supply ?? derivedCurve;
 
   const sprinklers = model.network.nodes.filter((n) => n.type === "sprinkler" && typeof n.kFactor === "number" && n.kFactor > 0);
-  // design area = the N most-remote sprinklers (N from designBasis, else all)
-  const areaCount = num(model.designBasis, "operatingSprinklers") ?? sprinklers.length;
-  const open = opts.designArea ?? designAreaSet(model, source.id, areaCount);
+  // Design area: explicit operating-head count → most-remote N; else NFPA
+  // area-density Auto-Peak (accumulate coverage to the design area); else all.
+  const explicitCount = num(model.designBasis, "operatingSprinklers");
+  const open =
+    opts.designArea ??
+    (explicitCount !== undefined
+      ? designAreaSet(model, source.id, explicitCount)
+      : autoPeakAreaSet(model, source.id) ?? designAreaSet(model, source.id, sprinklers.length));
   const openSprinklers = sprinklers.filter((n) => open.has(n.id));
   const emitterFlow = (g: GgaResult): number =>
     Object.values(g.links).reduce((s, l) => (l.id.endsWith("#em") ? s + Math.abs(l.flowGpm) : s), 0);
   const remotePressure = (g: GgaResult): number =>
     openSprinklers.reduce((min, n) => Math.min(min, g.nodes[n.id]?.pressurePsi ?? Infinity), Infinity);
 
-  const minSprinklerPressurePsi = num(model.designBasis, "minSprinklerPressurePsi") ?? std?.minResidualPressure?.() ?? 7;
+  // Minimum head pressure: the greater of the listed minimum and the pressure
+  // needed to deliver the design density at any operating head (NFPA area-density).
+  const listedMin = num(model.designBasis, "minSprinklerPressurePsi") ?? std?.minResidualPressure?.() ?? 7;
+  const density = num(model.designBasis, "densityGpmFt2");
+  const dsK = num(model.designBasis, "sprinklerKFactor");
+  let densityPressurePsi = 0;
+  let requiredHeadFlowGpm: number | undefined;
+  if (density) {
+    for (const n of openSprinklers) {
+      const flow = density * (n.coverageAreaFt2 ?? 130);
+      const k = n.kFactor ?? dsK ?? 5.6;
+      requiredHeadFlowGpm = Math.max(requiredHeadFlowGpm ?? 0, flow);
+      densityPressurePsi = Math.max(densityPressurePsi, Math.pow(flow / k, 2));
+    }
+  }
+  const minSprinklerPressurePsi = Math.max(listedMin, densityPressurePsi);
   const elevHead = 0.433 * source.elevationFt;
   const solveAt = (sourceGaugePsi: number) => solveGga(buildGga(model, source, sourceGaugePsi + elevHead, std, open));
 
@@ -295,6 +346,9 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     marginPsi,
     passesSupply: marginPsi >= -1e-6,
     ...(remote ? { mostRemoteSprinkler: remote } : {}),
+    operatingHeads: openSprinklers.length,
+    ...(num(model.designBasis, "designAreaFt2") !== undefined ? { designAreaFt2: num(model.designBasis, "designAreaFt2") } : {}),
+    ...(requiredHeadFlowGpm !== undefined ? { requiredHeadFlowGpm } : {}),
     minSprinklerPressurePsi,
     meetsMinPressure: remote ? remote.pressurePsi >= minSprinklerPressurePsi - 0.5 : true,
     lowPressureNodes: openSprinklers

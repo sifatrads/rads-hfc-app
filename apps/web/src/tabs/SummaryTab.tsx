@@ -18,6 +18,8 @@ export function SummaryTab({ model, solution, error }: { model: ProjectModel; so
 
   const rows: [string, string, ("good" | "warn" | "bad")?][] = [
     ["System flow (design area)", `${Math.round(s.systemFlowGpm)} gpm`],
+    ["Operating heads (design area)", `${s.operatingHeads}${s.designAreaFt2 ? ` over ${s.designAreaFt2} ft²` : ""}`],
+    ...(s.requiredHeadFlowGpm !== undefined ? [["Required flow per head (density)", `${s.requiredHeadFlowGpm.toFixed(1)} gpm`]] as [string, string][] : []),
     ["Hose allowance", `${Math.round(s.hoseAllowanceGpm)} gpm`],
     ["Total demand", `${Math.round(s.totalDemandGpm)} gpm`],
     ["Required source pressure", `${s.sourcePressurePsi.toFixed(1)} psi`],
