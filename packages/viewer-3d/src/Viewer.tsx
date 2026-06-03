@@ -54,13 +54,20 @@ export interface ViewerProps {
   onSplitPipe?: (pipeId: string, fraction: number) => void;
   /** When provided, an Edit toggle appears: click a node to delete it. */
   onDeleteNode?: (nodeId: string) => void;
+  /** When provided, clicking a node offers "Add branch" in a direction. */
+  onAddBranch?: (fromNodeId: string, opts: { direction: string; lengthFt: number; nominalSize: string; nodeType: string }) => void;
 }
+
+const DIRS: { d: string; label: string }[] = [
+  { d: "N", label: "N" }, { d: "S", label: "S" }, { d: "E", label: "E" }, { d: "W", label: "W" }, { d: "U", label: "↑U" }, { d: "D", label: "↓D" },
+];
+const BRANCH_SIZES = ["1", "1-1/4", "1-1/2", "2", "2-1/2", "3", "4", "6", "8"];
 
 type EditSel =
   | { kind: "pipe"; id: string; fraction: number; x: number; y: number }
   | { kind: "node"; id: string; x: number; y: number };
 
-export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNode }: ViewerProps): JSX.Element {
+export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNode, onAddBranch }: ViewerProps): JSX.Element {
   const t = useMemo(() => computeTransform(scene), [scene]);
   const [metric, setMetric] = useState<ColorMetric>(initialMetric);
   const [view, setView] = useState<string>("iso");
@@ -68,8 +75,11 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
   const [enabled, setEnabled] = useState<Set<LabelCategory>>(new Set<LabelCategory>(["nodeNo", "pipeSize", "valve"]));
   const [edit, setEdit] = useState(false);
   const [picked, setPicked] = useState<EditSel | null>(null);
+  const [brLen, setBrLen] = useState(10);
+  const [brSize, setBrSize] = useState("1");
+  const [brType, setBrType] = useState("sprinkler");
   const containerRef = useRef<HTMLDivElement>(null);
-  const canEdit = !!(onSplitPipe || onDeleteNode);
+  const canEdit = !!(onSplitPipe || onDeleteNode || onAddBranch);
   const fit = () => setFitNonce((n) => n + 1);
   const rel = (cx: number, cy: number) => { const r = containerRef.current?.getBoundingClientRect(); return { x: cx - (r?.left ?? 0), y: cy - (r?.top ?? 0) }; };
   const pickPipe = (id: string, fraction: number, cx: number, cy: number) => { const p = rel(cx, cy); setPicked({ kind: "pipe", id, fraction, x: p.x, y: p.y }); };
@@ -98,7 +108,7 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
         <directionalLight position={[-20, 10, -30]} intensity={0.25} />
         <gridHelper args={[120, 24, "#cfd8dc", "#e3e9ed"]} position={[0, -0.01, 0]} />
         <Pipes scene={scene} t={t} colors={pipeColors} onPick={edit && onSplitPipe ? pickPipe : undefined} />
-        <Nodes scene={scene} t={t} onPick={edit && onDeleteNode ? pickNode : undefined} />
+        <Nodes scene={scene} t={t} onPick={edit && (onDeleteNode || onAddBranch) ? pickNode : undefined} />
         <Devices scene={scene} t={t} />
         <LabelOverlay scene={scene} t={t} enabled={enabled} />
         <CameraRig view={view} fitNonce={fitNonce} />
@@ -178,7 +188,25 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
           ) : (
             <>
               <div style={menuTitle}>Node {picked.id}</div>
-              <button style={{ ...menuBtn, color: "#b91c1c" }} onClick={() => { onDeleteNode?.(picked.id); setPicked(null); }}>🗑 Delete node + its pipes</button>
+              {onAddBranch && (
+                <div style={branchForm}>
+                  <div style={{ display: "flex", gap: 5 }}>
+                    <input type="number" value={brLen} min={1} onChange={(e) => setBrLen(Number(e.target.value) || 1)} style={miniInput} title="Length (ft)" />
+                    <select value={brSize} onChange={(e) => setBrSize(e.target.value)} style={miniInput} title="Size">{BRANCH_SIZES.map((s) => <option key={s} value={s}>{s}"</option>)}</select>
+                    <select value={brType} onChange={(e) => setBrType(e.target.value)} style={miniInput} title="New node">
+                      <option value="sprinkler">head</option>
+                      <option value="junction">node</option>
+                    </select>
+                  </div>
+                  <div style={dirGrid}>
+                    {DIRS.map((d) => (
+                      <button key={d.d} style={dirBtn} title={`Add branch ${d.d}`} onClick={() => { onAddBranch(picked.id, { direction: d.d, lengthFt: brLen, nominalSize: brSize, nodeType: brType }); setPicked(null); }}>{d.label}</button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 9.5, color: "#94a3b8", margin: "2px 0 4px" }}>Add branch → pick a direction</div>
+                </div>
+              )}
+              {onDeleteNode && <button style={{ ...menuBtn, color: "#b91c1c" }} onClick={() => { onDeleteNode(picked.id); setPicked(null); }}>🗑 Delete node + its pipes</button>}
             </>
           )}
           <button style={menuCancel} onClick={() => setPicked(null)}>Cancel</button>
@@ -208,3 +236,7 @@ const menu: CSSProperties = { position: "absolute", zIndex: 30, minWidth: 160, b
 const menuTitle: CSSProperties = { fontSize: 11, fontWeight: 700, color: "#64748b", padding: "3px 8px 6px" };
 const menuBtn: CSSProperties = { display: "block", width: "100%", textAlign: "left", fontSize: 12.5, fontWeight: 600, color: "#0b3d91", background: "transparent", border: "none", borderRadius: 6, padding: "7px 8px", cursor: "pointer" };
 const menuCancel: CSSProperties = { display: "block", width: "100%", textAlign: "left", fontSize: 11.5, color: "#94a3b8", background: "transparent", border: "none", borderRadius: 6, padding: "5px 8px", cursor: "pointer" };
+const branchForm: CSSProperties = { padding: "2px 6px 4px", borderBottom: "1px solid #eef2f7", marginBottom: 4 };
+const miniInput: CSSProperties = { flex: 1, minWidth: 0, fontSize: 11.5, padding: "3px 4px", border: "1px solid #d7dee6", borderRadius: 5, color: "#16243a", fontFamily: FONT };
+const dirGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, marginTop: 5 };
+const dirBtn: CSSProperties = { fontSize: 12, fontWeight: 700, color: "#0b3d91", background: "#eef3fb", border: "1px solid #cfdcee", borderRadius: 6, padding: "5px 0", cursor: "pointer" };

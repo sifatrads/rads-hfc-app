@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { solveProject } from "@rads/solve";
 import { encodeJSON, decodeJSON } from "@rads/container";
 import { parseProject } from "@rads/model";
-import { newProject, renumberNetwork, normalizePipe, internalDiameterFor, withModel, splitPipeInModel, deleteNodeInModel, deletePipeInModel } from "./network-edit";
+import { newProject, renumberNetwork, normalizePipe, internalDiameterFor, withModel, splitPipeInModel, deleteNodeInModel, deletePipeInModel, addBranchInModel } from "./network-edit";
 import type { NetworkNode, Pipe } from "@rads/model";
 
 describe("in-app data entry → solve", () => {
@@ -106,5 +106,19 @@ describe("in-app data entry → solve", () => {
     const out = deletePipeInModel(line3(), "P-2");
     expect(out.network.pipes.map((p) => p.id)).toEqual(["P-1"]);
     expect(out.network.nodes.length).toBe(3);
+  });
+
+  it("addBranchInModel extends a node with a new head + pipe (U sets elevation)", () => {
+    const m = line3(); // node 3 at elev 10
+    const up = addBranchInModel(m, "3", { direction: "U", lengthFt: 8, nominalSize: "1", nodeType: "sprinkler" });
+    expect(up.network.nodes.length).toBe(4);
+    expect(up.network.pipes.length).toBe(3);
+    const added = up.network.nodes[up.network.nodes.length - 1]!;
+    expect(added.type).toBe("sprinkler");
+    expect(added.elevationFt).toBe(18); // 10 + 8 up
+    const pipe = up.network.pipes[up.network.pipes.length - 1]!;
+    expect(pipe.direction).toBe("U");
+    expect(pipe.elevationChangeFt).toBe(8);
+    expect(pipe.nominalSize).toBe("1");
   });
 });

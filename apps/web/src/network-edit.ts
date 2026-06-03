@@ -153,3 +153,46 @@ export function deleteNodeInModel(model: ProjectModel, nodeId: string): ProjectM
 export function deletePipeInModel(model: ProjectModel, pipeId: string): ProjectModel {
   return commitNetwork(model, model.network.nodes, model.network.pipes.filter((p) => p.id !== pipeId));
 }
+
+export interface AddBranchOpts {
+  direction: Direction;
+  lengthFt: number;
+  nominalSize: string;
+  /** "sprinkler" adds a head (K from design basis); anything else adds a junction. */
+  nodeType: string;
+  role?: string;
+  kFactor?: number;
+}
+
+/**
+ * Extend the network from an existing node: add a new node a `lengthFt` run away
+ * in `direction`, connected by a new pipe. Up/Down set the new node's elevation
+ * and the pipe's elevation change. Used by "Add branch" in the 3D view.
+ */
+export function addBranchInModel(model: ProjectModel, fromNodeId: string, opts: AddBranchOpts): ProjectModel {
+  const from = model.network.nodes.find((n) => n.id === fromNodeId);
+  const fromElev = from?.elevationFt ?? 0;
+  const dz = opts.direction === "U" ? opts.lengthFt : opts.direction === "D" ? -opts.lengthFt : 0;
+  const isSpk = opts.nodeType === "sprinkler";
+  const dbK = (model.designBasis as Record<string, unknown> | undefined)?.["sprinklerKFactor"];
+  const k = opts.kFactor ?? (typeof dbK === "number" ? dbK : 5.6);
+  const newNode = {
+    id: "tmp-new",
+    type: isSpk ? "sprinkler" : "junction",
+    elevationFt: fromElev + dz,
+    ...(isSpk ? { kFactor: k, coverageAreaFt2: 100 } : {}),
+    fittings: [],
+  } as NetworkNode;
+  const newPipe: Pipe = {
+    id: "tmp-newpipe",
+    from: fromNodeId,
+    to: "tmp-new",
+    role: opts.role ?? (isSpk ? "branch-line" : "cross-main"),
+    nominalSize: opts.nominalSize,
+    lengthFt: opts.lengthFt,
+    direction: opts.direction,
+    fittings: [],
+    ...(dz !== 0 ? { elevationChangeFt: dz } : {}),
+  };
+  return commitNetwork(model, [...model.network.nodes, newNode], [...model.network.pipes, newPipe]);
+}

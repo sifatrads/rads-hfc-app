@@ -13,7 +13,8 @@ import { parseDxf, analyzeDxf, type DxfDoc, type DxfAnalysis } from "@rads/dxf-i
 import { solveProject, type ProjectSolution } from "@rads/solve";
 import { decodeJSON, encodeJSON, isRhfc } from "@rads/container";
 import { sampleProject } from "./sample";
-import { newProject, splitPipeInModel, deleteNodeInModel } from "./network-edit";
+import { newProject, splitPipeInModel, deleteNodeInModel, addBranchInModel } from "./network-edit";
+import type { Direction } from "@rads/model";
 import { ImportDialog } from "./ImportDialog";
 import { CloudBar } from "./CloudBar";
 import { ProjectTab } from "./tabs/ProjectTab";
@@ -144,6 +145,7 @@ export function App(): JSX.Element {
                 scene={scene}
                 onSplitPipe={(pipeId, fraction) => { setModel((m) => (m ? splitPipeInModel(m, pipeId, fraction) : m)); setNote("Split pipe in 3D"); }}
                 onDeleteNode={(nodeId) => { setModel((m) => (m ? deleteNodeInModel(m, nodeId) : m)); setNote("Deleted node in 3D"); }}
+                onAddBranch={(fromNodeId, opts) => { setModel((m) => (m ? addBranchInModel(m, fromNodeId, { ...opts, direction: opts.direction as Direction }) : m)); setNote("Added branch in 3D"); }}
               />
             ) : <div style={{ padding: 24, color: C.muted }}>No geometry.</div>
           ) : tab === "summary" ? (
