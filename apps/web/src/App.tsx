@@ -18,6 +18,7 @@ import { checkModel, issueCounts } from "./network-validate";
 import { ProjectTab } from "./tabs/ProjectTab";
 import { SummaryTab } from "./tabs/SummaryTab";
 import { AnalysisTab } from "./tabs/AnalysisTab";
+import { SizingTab } from "./tabs/SizingTab";
 import { GraphTab } from "./tabs/GraphTab";
 import { C, FONT } from "./ui";
 
@@ -29,12 +30,13 @@ const CloudBar = lazy(() => import("./CloudBar").then((m) => ({ default: m.Cloud
 const ReportTab = lazy(() => import("./tabs/ReportTab").then((m) => ({ default: m.ReportTab })));
 const ImportDialog = lazy(() => import("./ImportDialog").then((m) => ({ default: m.ImportDialog })));
 
-type TabId = "project" | "view" | "summary" | "analysis" | "graph" | "report";
+type TabId = "project" | "view" | "summary" | "analysis" | "sizing" | "graph" | "report";
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: "project", label: "Project", icon: "📋" },
   { id: "view", label: "3D View", icon: "🧊" },
   { id: "summary", label: "Summary", icon: "📊" },
   { id: "analysis", label: "Analysis", icon: "🔬" },
+  { id: "sizing", label: "Sizing", icon: "📐" },
   { id: "graph", label: "Graph", icon: "📈" },
   { id: "report", label: "Report", icon: "📄" },
 ];
@@ -235,6 +237,8 @@ export function App(): JSX.Element {
             <SummaryTab model={model} solution={sol} error={solveError} />
           ) : tab === "analysis" ? (
             <AnalysisTab model={model} solution={sol} error={solveError} />
+          ) : tab === "sizing" ? (
+            <SizingTab model={model} solution={sol} error={solveError} onChange={(m) => { setModel(m); setNote("Resized"); }} />
           ) : tab === "graph" ? (
             <GraphTab model={model} solution={sol} error={solveError} />
           ) : (
