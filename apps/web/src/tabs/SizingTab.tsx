@@ -6,7 +6,7 @@ import { useState, type CSSProperties } from "react";
 import type { ProjectModel, Pipe } from "@rads/model";
 import type { ProjectSolution } from "@rads/solve";
 import { MATERIAL_OPTIONS, NOMINAL_SIZES, withModel } from "../network-edit";
-import { autoSizeVelocity } from "../auto-size";
+import { autoSizeVelocity, autoSizeToPass } from "../auto-size";
 import { units } from "../units";
 import { C, FONT, card, sectionTitle, select, th, td, tdNum, toneColor } from "../ui";
 
@@ -42,6 +42,16 @@ export function SizingTab({ model, solution, error, onChange }: { model: Project
     );
     setTimeout(() => setAutoMsg(""), 5000);
   };
+  const doAutoPass = () => {
+    const { model: sized, changed, passed } = autoSizeToPass(model);
+    if (changed > 0) onChange(sized);
+    setAutoMsg(
+      changed === 0
+        ? passed ? "Already passing — supply meets demand" : "Couldn't reduce required pressure — supply may be inadequate (add a pump / larger supply)"
+        : passed ? `Upsized ${changed} pipe${changed === 1 ? "" : "s"} → now passing` : `Upsized ${changed} pipe${changed === 1 ? "" : "s"} but still short — supply may be inadequate`,
+    );
+    setTimeout(() => setAutoMsg(""), 6000);
+  };
 
   const rows = pipes
     .map((p) => ({ p, r: pr[p.id], v: pr[p.id]?.velocityFps ?? 0 }))
@@ -67,6 +77,7 @@ export function SizingTab({ model, solution, error, onChange }: { model: Project
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 8 }}>
           <span style={sectionTitle}>Pipe sizing · {pipes.length}</span>
           <button style={autoBtn} onClick={doAutoSize} title="Upsize every pipe over the velocity limit, one nominal step at a time, until all are within it (undoable)">⚡ Auto-size velocity</button>
+          <button style={{ ...autoBtn, background: C.good }} onClick={doAutoPass} title="Upsize the highest-friction pipes until the supply margin passes (undoable)">⚡ Auto-size to pass</button>
           {autoMsg && <span style={{ fontSize: 12, fontWeight: 700, color: C.good }}>✓ {autoMsg}</span>}
           <span style={{ flex: 1 }} />
           <label style={chk}><input type="checkbox" checked={worstFirst} onChange={(e) => setWorstFirst(e.target.checked)} /> Worst velocity first</label>

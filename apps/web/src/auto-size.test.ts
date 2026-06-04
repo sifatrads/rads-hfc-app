@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parseProject } from "@rads/model";
 import { solveProject } from "@rads/solve";
-import { autoSizeVelocity } from "./auto-size";
+import { autoSizeVelocity, autoSizeToPass } from "./auto-size";
 
 // A 1" feed-main carrying a 200 gpm fixed demand → ~74 ft/s, well over the limit.
 const undersized = parseProject({
@@ -44,5 +44,48 @@ describe("autoSizeVelocity", () => {
     expect(res.changed).toBe(0);
     expect(res.remaining).toBe(0);
     expect(res.model.network.pipes[0]!.nominalSize).toBe("6");
+  });
+});
+
+// A weak supply through a long, thin (1") main → required pressure exceeds what
+// the supply can deliver, so the system fails until the main is upsized.
+const failing = parseProject({
+  schemaVersion: 2,
+  meta: { id: "AP", name: "Auto-pass test", standardId: "nfpa13", hazardClass: "oh2" },
+  designBasis: { minSprinklerPressurePsi: 7, operatingSprinklers: 1, hoseAllowanceGpm: 100 },
+  waterSupply: { type: "city", flowTest: { staticPsi: 22, residualPsi: 19, testFlowGpm: 500 } },
+  network: {
+    nodes: [
+      { id: "SRC", type: "junction", elevationFt: 0 },
+      { id: "CM", type: "junction", elevationFt: 0 },
+      { id: "S1", type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 100 },
+    ],
+    pipes: [
+      { id: "P0", from: "SRC", to: "CM", role: "feed-main", nominalSize: "1", material: "steel-sch40", cFactor: 120, lengthFt: 220 },
+      { id: "P1", from: "CM", to: "S1", role: "branch-line", nominalSize: "1", material: "steel-sch40", cFactor: 120, lengthFt: 10 },
+    ],
+    valves: [],
+  },
+});
+
+describe("autoSizeToPass", () => {
+  it("upsizes the highest-friction pipes until the system passes", () => {
+    const before = solveProject(failing).summary;
+    expect(before.passesSupply).toBe(false); // starts short
+
+    const res = autoSizeToPass(failing);
+    expect(res.changed).toBeGreaterThanOrEqual(1);
+    expect(res.passed).toBe(true);
+
+    const after = solveProject(res.model).summary;
+    expect(after.passesSupply).toBe(true);
+    expect(after.sourcePressurePsi).toBeLessThan(before.sourcePressurePsi); // required dropped
+  });
+
+  it("is a no-op when the system already passes", () => {
+    const res = autoSizeToPass(failing);
+    const again = autoSizeToPass(res.model); // already adequate now
+    expect(again.changed).toBe(0);
+    expect(again.passed).toBe(true);
   });
 });
