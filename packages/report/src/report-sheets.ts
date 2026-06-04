@@ -24,8 +24,9 @@ interface Spec {
 // ── unit-aware numeric formatting (value only; unit goes in the column header) ──
 function units(model: ProjectModel) {
   const metric = model.meta.units === "metric";
-  const k = { p: metric ? 0.0689476 : 1, q: metric ? 3.785412 : 1, l: metric ? 0.3048 : 1, v: metric ? 0.3048 : 1 };
-  const U = { p: metric ? "bar" : "psi", q: metric ? "L/min" : "gpm", l: metric ? "m" : "ft", v: metric ? "m/s" : "ft/s" };
+  // density: 1 gpm/ft² = 40.746 mm/min (L·min⁻¹·m⁻²); area: 1 ft² = 0.092903 m².
+  const k = { p: metric ? 0.0689476 : 1, q: metric ? 3.785412 : 1, l: metric ? 0.3048 : 1, v: metric ? 0.3048 : 1, dens: metric ? 40.7458 : 1, area: metric ? 0.092903 : 1 };
+  const U = { p: metric ? "bar" : "psi", q: metric ? "L/min" : "gpm", l: metric ? "m" : "ft", v: metric ? "m/s" : "ft/s", dens: metric ? "mm/min" : "gpm/ft²", area: metric ? "m²" : "ft²" };
   const fmt = (val: number | undefined, factor: number, d: number) => (val === undefined || !Number.isFinite(val) ? "—" : (val * factor).toFixed(d));
   return {
     U,
@@ -33,8 +34,11 @@ function units(model: ProjectModel) {
     q: (v?: number, d = metric ? 0 : 1) => fmt(v, k.q, d),
     l: (v?: number, d = 1) => fmt(v, k.l, d),
     v: (v?: number, d = 1) => fmt(v, k.v, d),
+    area: (v?: number, d?: number) => fmt(v, k.area, d ?? (metric ? 1 : 0)),
     pU: (v?: number, d?: number) => `${fmt(v, k.p, d ?? (metric ? 2 : 1))} ${U.p}`,
     qU: (v?: number, d?: number) => `${fmt(v, k.q, d ?? (metric ? 0 : 1))} ${U.q}`,
+    densU: (v?: number, d?: number) => `${fmt(v, k.dens, d ?? (metric ? 1 : 3))} ${U.dens}`,
+    areaU: (v?: number, d?: number) => `${fmt(v, k.area, d ?? (metric ? 1 : 0))} ${U.area}`,
   };
 }
 
@@ -87,8 +91,8 @@ function coverSpec(model: ProjectModel, sol: ProjectSolution): Spec {
   const remote = s.mostRemoteSprinkler;
   const a = infoBox(x, y, (w - mm(6)) / 2, "Design basis", [
     ["Method", String(db?.["method"] ?? "density/area")],
-    ["Density", db?.["densityGpmFt2"] ? `${db["densityGpmFt2"]} gpm/ft²` : "—"],
-    ["Design area", db?.["designAreaFt2"] ? `${db["designAreaFt2"]} ft²` : "—"],
+    ["Density", num(db, "densityGpmFt2") !== undefined ? u.densU(num(db, "densityGpmFt2")) : "—"],
+    ["Design area", num(db, "designAreaFt2") !== undefined ? u.areaU(num(db, "designAreaFt2")) : "—"],
     ["K-factor", db?.["sprinklerKFactor"] ? String(db["sprinklerKFactor"]) : "—"],
     ["Operating sprinklers", db?.["operatingSprinklers"] ? String(db["operatingSprinklers"]) : "—"],
     ["Min sprinkler pressure", u.pU(s.minSprinklerPressurePsi)],
@@ -129,7 +133,7 @@ function riserNameplateSpec(model: ProjectModel, sol: ProjectSolution): Spec {
     ["Drawing / date", `${m.drawingNo ?? "—"} · ${m.date ?? "—"}`],
   ]);
   const demand = infoBox(x, sys.endY + mm(4), half, "Demand at base of riser", [
-    ["Operating heads", `${s.operatingHeads}${s.designAreaFt2 ? ` / ${s.designAreaFt2} ft²` : ""}`],
+    ["Operating heads", `${s.operatingHeads}${s.designAreaFt2 ? ` / ${u.areaU(s.designAreaFt2)}` : ""}`],
     ["Density flow / head", s.requiredHeadFlowGpm !== undefined ? u.qU(s.requiredHeadFlowGpm) : "—"],
     ["System (sprinkler) flow", u.qU(s.systemFlowGpm)],
     ["Hose allowance", u.qU(s.hoseAllowanceGpm)],
@@ -147,8 +151,8 @@ function riserNameplateSpec(model: ProjectModel, sol: ProjectSolution): Spec {
   ]);
   const basis = infoBox(rx, y, half, "Design basis", [
     ["Method", String(db?.["method"] ?? "density/area")],
-    ["Density", db?.["densityGpmFt2"] ? `${db["densityGpmFt2"]} gpm/ft²` : "—"],
-    ["Design area", db?.["designAreaFt2"] ? `${db["designAreaFt2"]} ft²` : "—"],
+    ["Density", num(db, "densityGpmFt2") !== undefined ? u.densU(num(db, "densityGpmFt2")) : "—"],
+    ["Design area", num(db, "designAreaFt2") !== undefined ? u.areaU(num(db, "designAreaFt2")) : "—"],
     ["Sprinkler K-factor", db?.["sprinklerKFactor"] ? String(db["sprinklerKFactor"]) : "—"],
     ["Operating sprinklers", db?.["operatingSprinklers"] ? `${db["operatingSprinklers"]} (set)` : `${s.operatingHeads} (auto-peak)`],
     ["Min sprinkler pressure", u.pU(s.minSprinklerPressurePsi)],
@@ -210,9 +214,10 @@ function fmStorageSchemeSpec(model: ProjectModel, sol: ProjectSolution): Spec {
   const by = Math.max(scheme.endY, demand.endY) + mm(6);
   el.push(rect(x, by, w, mm(12), { fill: pass ? "#ecfdf5" : "#fff7ed", stroke: pass ? C.good : C.warn, sw: 1, rx: mm(1.4) }));
   el.push(T(x + mm(4), by + mm(7.5), pass ? "SCHEME ADEQUATE — the N most-remote heads hold the scheme minimum pressure" : "REVIEW — supply / pressure check required", { size: mm(3.2), fill: pass ? C.good : C.warn, weight: "700" }));
-  el.push(T(x + mm(4), by + mm(16.5), "⚠ Representative FM DS 8-9 data — verify the exact table cell + edition; preliminary sizing, not an approved design.", { size: mm(2.5), fill: C.muted }));
-  el.push(T(x + mm(4), by + mm(20.5), "Ceiling sprinklers only — does NOT design in-rack sprinklers (DS 8-9 may require them); head set = N most-remote by pipe length", { size: mm(2.5), fill: C.muted }));
-  el.push(T(x + mm(4), by + mm(24.5), "(an approximation of FM's most-demanding contiguous design rectangle). Validity assumes the listed commodity, height, aisle width and flue spaces.", { size: mm(2.5), fill: C.muted }));
+  el.push(T(x + mm(4), by + mm(16), "⚠ Representative FM DS 8-9 data — verify the exact table cell + edition; not an approved design.", { size: mm(2.5), fill: C.muted }));
+  el.push(T(x + mm(4), by + mm(19.5), "Ceiling sprinklers only — does NOT design in-rack sprinklers (DS 8-9 may require them).", { size: mm(2.5), fill: C.muted }));
+  el.push(T(x + mm(4), by + mm(23), "Head set = N most-remote by pipe length (≈ FM's most-demanding contiguous rectangle); verify vs the layout.", { size: mm(2.5), fill: C.muted }));
+  el.push(T(x + mm(4), by + mm(26.5), "Validity assumes the listed commodity, storage/ceiling height, aisle width and flue spaces.", { size: mm(2.5), fill: C.muted }));
   return { title: "FM Storage Scheme", inner: el.join("") };
 }
 
@@ -250,14 +255,14 @@ function summarySpec(model: ProjectModel, sol: ProjectSolution): Spec {
     ["Available @ demand", u.pU(s.availablePsi)],
     ["Supply margin", u.pU(s.marginPsi)],
     ["Supply adequate", s.passesSupply ? "YES" : "NO"],
-    ["Max junction imbalance", `${s.maxJunctionImbalanceGpm.toFixed(3)} gpm`],
+    ["Max junction imbalance", `${u.q(s.maxJunctionImbalanceGpm, 3)} ${u.U.q}`],
   ]);
   el.push(left.svg, right.svg);
   y = Math.max(left.endY, right.endY) + mm(8);
   const box = infoBox(x, y, w, "Basis", [
     ["Standard", String(model.meta.standard ?? model.meta.standardId ?? "—")],
     ["Hazard class", String(model.meta.hazardClass ?? "—")],
-    ["Density × area", `${db?.["densityGpmFt2"] ?? "—"} gpm/ft² × ${db?.["designAreaFt2"] ?? "—"} ft²`],
+    ["Density × area", num(db, "densityGpmFt2") !== undefined ? `${u.densU(num(db, "densityGpmFt2"))} × ${u.areaU(num(db, "designAreaFt2"))}` : "—"],
     ["K-factor", String(db?.["sprinklerKFactor"] ?? "—")],
   ]);
   el.push(box.svg);
@@ -341,7 +346,7 @@ function headsSummarySpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
     { label: "Head", w: 0.12 },
     { label: "Type", w: 0.18 },
     { label: "K", w: 0.1, align: "r" },
-    { label: "Coverage", unit: "ft²", w: 0.16, align: "r" },
+    { label: "Coverage", unit: u.U.area, w: 0.16, align: "r" },
     { label: "Elev", unit: u.U.l, w: 0.12, align: "r" },
     { label: "Pressure", unit: u.U.p, w: 0.16, align: "r" },
     { label: "Flow", unit: u.U.q, w: 0.16, align: "r" },
@@ -350,7 +355,7 @@ function headsSummarySpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
     .filter((n) => n.type === "sprinkler" && (n.kFactor ?? 0) > 0)
     .map((n) => {
       const r = sol.results.nodes[n.id];
-      return [n.id, String(n.sprinkler ?? "—"), n.kFactor ? String(n.kFactor) : "—", n.coverageAreaFt2 ? String(n.coverageAreaFt2) : "—", u.l(n.elevationFt ?? 0), u.p(r?.totalPressurePsi), u.q(r?.dischargeGpm)];
+      return [n.id, String(n.sprinkler ?? "—"), n.kFactor ? String(n.kFactor) : "—", n.coverageAreaFt2 !== undefined ? u.area(n.coverageAreaFt2) : "—", u.l(n.elevationFt ?? 0), u.p(r?.totalPressurePsi), u.q(r?.dischargeGpm)];
     });
   if (rows.length === 0) return [];
   return tableSpecs("Sprinkler Heads Summary", cols, rows);
@@ -405,9 +410,9 @@ function fourWeakestSpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
     { label: "Head", w: 0.2 },
     { label: "Pressure", unit: u.U.p, w: 0.22, align: "r" },
     { label: "Flow", unit: u.U.q, w: 0.22, align: "r" },
-    { label: "Coverage", unit: "ft²", w: 0.24, align: "r" },
+    { label: "Coverage", unit: u.U.area, w: 0.24, align: "r" },
   ];
-  const rows = ranked.map((x, i) => [`${i + 1}`, x.n.id, u.p(x.p), u.q(x.q), x.n.coverageAreaFt2 ? String(x.n.coverageAreaFt2) : "—"]);
+  const rows = ranked.map((x, i) => [`${i + 1}`, x.n.id, u.p(x.p), u.q(x.q), x.n.coverageAreaFt2 !== undefined ? u.area(x.n.coverageAreaFt2) : "—"]);
   return tableSpecs("Four Most-Unfavourable Sprinklers", cols, rows);
 }
 
@@ -505,10 +510,11 @@ function pipeSpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
 }
 
 function junctionSpecs(model: ProjectModel, sol: ProjectSolution): Spec[] {
+  const u = units(model);
   const rows = Object.entries(sol.gga.nodeImbalanceGpm)
-    .map(([id, v]) => [id, v.toFixed(4)] as [string, string])
-    .sort((a, b) => Math.abs(Number(b[1])) - Math.abs(Number(a[1])));
-  return tableSpecs(`Hydraulic Junction Points — balance ≤ 0.5 psi (§27.2.2.4.1) · max ${sol.summary.maxJunctionImbalanceGpm.toFixed(4)} gpm`, [{ label: "Junction node", w: 0.6 }, { label: "Flow imbalance", unit: "gpm", w: 0.4, align: "r" }], rows);
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+    .map(([id, v]) => [id, u.q(v, 4)] as [string, string]);
+  return tableSpecs(`Hydraulic Junction Points — balance ≤ 0.5 psi (§27.2.2.4.1) · max ${u.q(sol.summary.maxJunctionImbalanceGpm, 4)} ${u.U.q}`, [{ label: "Junction node", w: 0.6 }, { label: "Flow imbalance", unit: u.U.q, w: 0.4, align: "r" }], rows);
 }
 
 // ── reference sheets ──

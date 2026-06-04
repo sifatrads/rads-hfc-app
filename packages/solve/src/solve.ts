@@ -233,7 +233,6 @@ function standpipeDemands(model: ProjectModel, sourceId: string, params: Standpi
 function buildGga(model: ProjectModel, source: { id: string; elevationFt: number }, sourceHeadPsi: number, std: ReturnType<typeof getStandard> | undefined, open: Set<string>, demandOverride?: Map<string, number>): GgaNetwork {
   const nodes: GgaNode[] = [];
   const links: GgaLink[] = [];
-  const byId = new Map(model.network.nodes.map((n) => [n.id, n]));
 
   // valve equivalent length → first pipe of the matching role
   const extraEquiv = new Map<string, number>();
@@ -288,7 +287,6 @@ function buildGga(model: ProjectModel, source: { id: string; elevationFt: number
       links.push(emitterLink(`${n.id}#em`, n.id, sink, n.kFactor));
     }
   }
-  void byId;
   return { nodes, links };
 }
 
@@ -319,10 +317,12 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     opts.designArea ??
     (delugeMode
       ? new Set(sprinklers.map((s) => s.id))
-      : explicitCount !== undefined
-        ? designAreaSet(model, source.id, explicitCount)
-        : residentialCount !== undefined
-          ? designAreaSet(model, source.id, residentialCount)
+      : // residential (13D=2 / 13R=4) is standard-mandated → it wins over a stale
+        // operatingSprinklers seed; otherwise an explicit count, else Auto-Peak.
+        residentialCount !== undefined
+        ? designAreaSet(model, source.id, residentialCount)
+        : explicitCount !== undefined
+          ? designAreaSet(model, source.id, explicitCount)
           : autoPeakAreaSet(model, source.id) ?? designAreaSet(model, source.id, sprinklers.length));
   const openSprinklers = sprinklers.filter((n) => open.has(n.id));
 

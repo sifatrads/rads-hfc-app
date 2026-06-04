@@ -6,7 +6,7 @@
  * produce wrong calcs.
  */
 import type { ProjectModel } from "@rads/model";
-import { sprinklerBySin } from "@rads/standards-engine";
+import { sprinklerBySin, standardIsMetric } from "@rads/standards-engine";
 
 export type IssueSeverity = "error" | "warning";
 export interface Issue {
@@ -80,6 +80,22 @@ export function checkModel(model: ProjectModel): Issue[] {
     if (typeof n.tempRatingF === "number" && !p.tempRatingsF.includes(n.tempRatingF))
       issues.push({ severity: "warning", message: `Node ${n.id}: temp ${n.tempRatingF}°F not a listed rating for ${n.sin} (${p.tempRatingsF.join("/")}).` });
   }
+
+  // standpipe (NFPA 14) ↔ hose-station consistency — a standpipe with no hose
+  // station silently sizes to a default residual with zero demand.
+  const hasHose = nodes.some((n) => n.type === "hose-station");
+  const isStandpipe = model.meta.systemType === "standpipe" || model.meta.standardId === "nfpa14";
+  if (isStandpipe && !hasHose) issues.push({ severity: "error", message: "Standpipe system (NFPA 14) has no hose-station node — no standpipe demand is applied." });
+  if (!isStandpipe && hasHose) issues.push({ severity: "warning", message: "Hose-station nodes present but the system isn't a standpipe — set System = standpipe (or Code = NFPA 14) to size them." });
+
+  // design-basis sanity
+  const db = model.designBasis as Record<string, unknown> | undefined;
+  const standardId = model.meta.standardId;
+  if (db?.["method"] === "fm-storage") {
+    if (standardId !== "fmds") issues.push({ severity: "warning", message: `Design method is FM storage but the Code is "${standardId ?? "—"}" (expected fmds).` });
+    if (typeof db["densityGpmFt2"] === "number") issues.push({ severity: "warning", message: "Both an FM storage scheme and a density are set — count-at-pressure ignores density; clear one." });
+  }
+  if (standardIsMetric(standardId ?? "") && model.meta.units !== "metric") issues.push({ severity: "warning", message: `${standardId} is a metric standard but project units are "${model.meta.units ?? "imperial"}".` });
 
   return issues;
 }

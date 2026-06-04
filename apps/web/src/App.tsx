@@ -93,6 +93,7 @@ export function App(): JSX.Element {
     if (!sol) return note + (solveError ? " · (not solved)" : "");
     let s = `${note} · ${Math.round(sol.summary.systemFlowGpm)} gpm · req ${sol.summary.sourcePressurePsi.toFixed(0)} psi`;
     if (!sol.summary.passesSupply) s += " ⚠ supply short";
+    if (!sol.summary.meetsMinPressure) s += " ⚠ under min pressure";
     return s;
   }, [note, sol, solveError]);
 
@@ -177,7 +178,7 @@ export function App(): JSX.Element {
           <input type="file" accept=".dxf,.rhfc,.json" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void openFile(f); e.target.value = ""; }} />
         </label>
         <button style={{ ...iconBtn, ...(canUndo ? {} : disabledBtn) }} disabled={!canUndo} title="Undo (Ctrl+Z)" onClick={() => { undo(); setNote("Undo"); }}>↶</button>
-        <button style={{ ...iconBtn, ...(canRedo ? {} : disabledBtn) }} disabled={!canRedo} title="Redo (Ctrl+Y)" onClick={() => { redo(); setNote("Redo"); }}>↷</button>
+        <button style={{ ...iconBtn, ...(canRedo ? {} : disabledBtn) }} disabled={!canRedo} title="Redo (Ctrl+Y / Ctrl+Shift+Z)" onClick={() => { redo(); setNote("Redo"); }}>↷</button>
         <label style={{ ...fileBtn, ...(model ? {} : disabledBtn) }} title="Merge another .rhfc/.json network into this project">
           ⊕ Merge
           <input type="file" accept=".rhfc,.json" style={{ display: "none" }} disabled={!model} onChange={(e) => { const f = e.target.files?.[0]; if (f) void mergeFile(f); e.target.value = ""; }} />
