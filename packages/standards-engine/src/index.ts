@@ -5,12 +5,13 @@ import { nfpa13r } from "./nfpa13r";
 import { nfpa14 } from "./nfpa14";
 import { en12845 } from "./en12845";
 import { fmGlobal } from "./fmglobal";
+import { as2118 } from "./as2118";
 
 export * from "./types";
 export * from "./tables-nfpa13";
 export * from "./materials";
 export * from "./sprinklers";
-export { nfpa13, nfpa13d, nfpa13r, nfpa14, en12845, fmGlobal };
+export { nfpa13, nfpa13d, nfpa13r, nfpa14, en12845, fmGlobal, as2118 };
 
 const REGISTRY: Partial<Record<StandardId, StandardModule>> = {
   nfpa13,
@@ -19,6 +20,7 @@ const REGISTRY: Partial<Record<StandardId, StandardModule>> = {
   nfpa14,
   en12845,
   fmds: fmGlobal,
+  as2118,
   // iso — scaffolded next
 };
 

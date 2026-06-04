@@ -108,3 +108,29 @@ describe("standards-engine: EN 12845", () => {
     expect(s.standardKFactors()).toContain(80); // metric K80 ≈ NFPA K5.6
   });
 });
+
+describe("standards-engine: AS 2118 (Australia)", () => {
+  const s = getStandard("as2118");
+
+  it("is registered, metric, with AS/EN hazard classes", () => {
+    expect(availableStandards()).toContain("as2118");
+    expect(s.units).toBe("metric");
+    expect(s.hazardClasses().map((h) => h.id)).toEqual(["elh", "lh", "oh1", "oh2", "oh3", "hh"]);
+  });
+
+  it("exposes metric density over AMAO + material-based C-factor", () => {
+    expect(s.designDensity("oh2")).toEqual({ hazardClassId: "oh2", density: 5.0, area: 144 });
+    expect(s.designDensity("lh")?.density).toBe(2.25);
+    expect(s.cFactor("black-steel")).toBe(120);
+    expect(s.cFactor("copper")).toBe(150);
+    expect(s.minResidualPressure()).toBe(0.5); // bar
+  });
+
+  it("converts to an imperial design basis for the solver", () => {
+    const basis = designBasisForHazard("as2118", "oh1");
+    // 5.0 mm/min → ~0.123 gpm/ft²; 72 m² → ~775 ft²; 0.5 bar → ~7.25 psi
+    expect(basis!.densityGpmFt2).toBeCloseTo(0.1227, 3);
+    expect(basis!.designAreaFt2).toBe(775);
+    expect(basis!.minPressurePsi).toBeCloseTo(7.3, 1);
+  });
+});

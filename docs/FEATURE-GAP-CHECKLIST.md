@@ -63,7 +63,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] FM Global Data Sheets — non-storage HC-1/2/3 density/area (DS 3-26) + STORAGE count-at-pressure schemes (DS 8-9: ESFR/CMSA K+N@Pmin, scheme picker, FM Storage report sheet) ✅ DONE
 - [ ] BS 9251 / EN 16925 residential — UK/EU; large
 - [ ] Glazing / exposure-protection sprinkler sizing — niche
-- [ ] Other intl (CEA 4001, UNI 10779, AS 2118, MS 1910, CP 52) + per-standard libraries — long-tail
+- [~] Other intl — AS 2118 (Australia) ✅ DONE (metric density/area module via the EN 12845 pattern); CEA 4001 / UNI 10779 / MS 1910 / CP 52 still pending
 
 ## Views & 3D
 
