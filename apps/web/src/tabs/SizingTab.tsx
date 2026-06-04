@@ -6,7 +6,7 @@ import { useState, type CSSProperties } from "react";
 import type { ProjectModel, Pipe } from "@rads/model";
 import type { ProjectSolution } from "@rads/solve";
 import { MATERIAL_OPTIONS, NOMINAL_SIZES, withModel } from "../network-edit";
-import { autoSizeVelocity, autoSizeToPass } from "../auto-size";
+import { autoSizeVelocity, autoSizeToPass, economizeSizes } from "../auto-size";
 import { units } from "../units";
 import { C, FONT, card, sectionTitle, select, th, td, tdNum, toneColor } from "../ui";
 
@@ -52,6 +52,12 @@ export function SizingTab({ model, solution, error, onChange }: { model: Project
     );
     setTimeout(() => setAutoMsg(""), 6000);
   };
+  const doEconomize = () => {
+    const { model: sized, changed } = economizeSizes(model, VLIMIT);
+    if (changed > 0) onChange(sized);
+    setAutoMsg(changed === 0 ? "Nothing to trim — design isn't passing or is already minimal" : `Economized ${changed} pipe${changed === 1 ? "" : "s"} to the smallest size that still passes`);
+    setTimeout(() => setAutoMsg(""), 6000);
+  };
 
   const rows = pipes
     .map((p) => ({ p, r: pr[p.id], v: pr[p.id]?.velocityFps ?? 0 }))
@@ -78,6 +84,7 @@ export function SizingTab({ model, solution, error, onChange }: { model: Project
           <span style={sectionTitle}>Pipe sizing · {pipes.length}</span>
           <button style={autoBtn} onClick={doAutoSize} title="Upsize every pipe over the velocity limit, one nominal step at a time, until all are within it (undoable)">⚡ Auto-size velocity</button>
           <button style={{ ...autoBtn, background: C.good }} onClick={doAutoPass} title="Upsize the highest-friction pipes until the supply margin passes (undoable)">⚡ Auto-size to pass</button>
+          <button style={{ ...autoBtn, background: C.muted }} onClick={doEconomize} title="Downsize each pipe to the smallest size that still passes velocity + supply (least-cost; undoable)">⚖ Economize</button>
           {autoMsg && <span style={{ fontSize: 12, fontWeight: 700, color: C.good }}>✓ {autoMsg}</span>}
           <span style={{ flex: 1 }} />
           <label style={chk}><input type="checkbox" checked={worstFirst} onChange={(e) => setWorstFirst(e.target.checked)} /> Worst velocity first</label>

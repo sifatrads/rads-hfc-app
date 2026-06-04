@@ -73,3 +73,41 @@ export function autoSizeToPass(model: ProjectModel): { model: ProjectModel; chan
   } catch { /* leave passed = false */ }
   return { model: m, changed: changedIds.size, passed };
 }
+
+/** Does the model pass supply + min-pressure with every pipe within the velocity limit? */
+function passesAll(m: ProjectModel, limitFps: number): boolean {
+  try {
+    const s = solveProject(m);
+    return s.summary.passesSupply && s.summary.meetsMinPressure && m.network.pipes.every((p) => (s.results.pipes[p.id]?.velocityFps ?? 0) <= limitFps);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Least-cost sizing: trim an already-passing design by downsizing each pipe to
+ * the smallest nominal size that keeps the whole system passing (supply margin,
+ * min pressure, and the velocity limit). Greedy — repeatedly try dropping each
+ * pipe one step, keeping the change only if it still passes, until no pipe can
+ * shrink. No-op (changed 0) if the design doesn't already pass.
+ */
+export function economizeSizes(model: ProjectModel, limitFps = 20): { model: ProjectModel; changed: number } {
+  if (!passesAll(model, limitFps)) return { model, changed: 0 };
+  let m = model;
+  const changedIds = new Set<string>();
+  for (let pass = 0; pass < 30; pass++) {
+    let any = false;
+    for (const p of m.network.pipes) {
+      const i = NOMINAL_SIZES.indexOf((p.nominalSize ?? "1") as (typeof NOMINAL_SIZES)[number]);
+      if (i <= 0) continue; // already the smallest size
+      const trial = parseProject({ ...m, network: { ...m.network, pipes: m.network.pipes.map((q) => (q.id === p.id ? { ...q, nominalSize: NOMINAL_SIZES[i - 1], idOverride: false, internalDiameterIn: undefined } : q)) } });
+      if (passesAll(trial, limitFps)) {
+        m = trial;
+        changedIds.add(p.id);
+        any = true;
+      }
+    }
+    if (!any) break;
+  }
+  return { model: m, changed: changedIds.size };
+}

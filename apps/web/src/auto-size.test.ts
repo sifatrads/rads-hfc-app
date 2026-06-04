@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parseProject } from "@rads/model";
 import { solveProject } from "@rads/solve";
-import { autoSizeVelocity, autoSizeToPass } from "./auto-size";
+import { autoSizeVelocity, autoSizeToPass, economizeSizes } from "./auto-size";
 
 // A 1" feed-main carrying a 200 gpm fixed demand → ~74 ft/s, well over the limit.
 const undersized = parseProject({
@@ -87,5 +87,41 @@ describe("autoSizeToPass", () => {
     const again = autoSizeToPass(res.model); // already adequate now
     expect(again.changed).toBe(0);
     expect(again.passed).toBe(true);
+  });
+});
+
+// Strong supply + oversized (6") pipes carrying a light demand → passes with a
+// huge margin, so the pipes can be trimmed down.
+const oversized = parseProject({
+  schemaVersion: 2,
+  meta: { id: "EC", name: "Economize test", standardId: "nfpa13", hazardClass: "oh2" },
+  designBasis: { minSprinklerPressurePsi: 7, operatingSprinklers: 1, hoseAllowanceGpm: 100 },
+  waterSupply: { type: "city", flowTest: { staticPsi: 100, residualPsi: 90, testFlowGpm: 2000 } },
+  network: {
+    nodes: [
+      { id: "SRC", type: "junction", elevationFt: 0 },
+      { id: "CM", type: "junction", elevationFt: 0 },
+      { id: "S1", type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 100 },
+    ],
+    pipes: [
+      { id: "P0", from: "SRC", to: "CM", role: "feed-main", nominalSize: "6", material: "steel-sch40", cFactor: 120, lengthFt: 30 },
+      { id: "P1", from: "CM", to: "S1", role: "branch-line", nominalSize: "6", material: "steel-sch40", cFactor: 120, lengthFt: 10 },
+    ],
+    valves: [],
+  },
+});
+
+describe("economizeSizes", () => {
+  it("downsizes an oversized passing design while keeping it passing", () => {
+    expect(solveProject(oversized).summary.passesSupply).toBe(true); // starts passing, oversized
+    const res = economizeSizes(oversized, 20);
+    expect(res.changed).toBeGreaterThanOrEqual(1);
+    expect(res.model.network.pipes.some((p) => p.nominalSize !== "6")).toBe(true); // shrank
+    const s = solveProject(res.model).summary;
+    expect(s.passesSupply && s.meetsMinPressure).toBe(true); // still passes
+  });
+
+  it("is a no-op on a non-passing design (only trims a passing system)", () => {
+    expect(economizeSizes(failing).changed).toBe(0);
   });
 });
