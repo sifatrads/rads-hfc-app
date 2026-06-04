@@ -1,0 +1,48 @@
+import { describe, it, expect } from "vitest";
+import { parseProject } from "@rads/model";
+import { solveProject } from "@rads/solve";
+import { autoSizeVelocity } from "./auto-size";
+
+// A 1" feed-main carrying a 200 gpm fixed demand → ~74 ft/s, well over the limit.
+const undersized = parseProject({
+  schemaVersion: 2,
+  meta: { id: "AS", name: "Auto-size test" },
+  waterSupply: { type: "city", flowTest: { staticPsi: 80, residualPsi: 60, testFlowGpm: 2000 } },
+  network: {
+    nodes: [
+      { id: "SRC", type: "junction", elevationFt: 0 },
+      { id: "N1", type: "junction", elevationFt: 0, flowGpm: 200 },
+    ],
+    pipes: [{ id: "P1", from: "SRC", to: "N1", role: "feed-main", nominalSize: "1", material: "steel-sch40", cFactor: 120, lengthFt: 50 }],
+    valves: [],
+  },
+});
+
+describe("autoSizeVelocity", () => {
+  it("upsizes pipes until velocity is within the limit", () => {
+    expect(solveProject(undersized).results.pipes["P1"]!.velocityFps!).toBeGreaterThan(20); // starts over
+
+    const res = autoSizeVelocity(undersized, 20);
+    expect(res.changed).toBeGreaterThanOrEqual(1);
+    expect(res.remaining).toBe(0);
+    expect(res.model.network.pipes[0]!.nominalSize).not.toBe("1"); // grew
+
+    const v = solveProject(res.model).results.pipes["P1"]!.velocityFps!;
+    expect(v).toBeLessThanOrEqual(20);
+  });
+
+  it("is a no-op when every pipe is already within the limit", () => {
+    const ok = parseProject({
+      ...JSON.parse(JSON.stringify(undersized)),
+      network: {
+        nodes: undersized.network.nodes,
+        pipes: [{ id: "P1", from: "SRC", to: "N1", role: "feed-main", nominalSize: "6", material: "steel-sch40", cFactor: 120, lengthFt: 50 }],
+        valves: [],
+      },
+    });
+    const res = autoSizeVelocity(ok, 20);
+    expect(res.changed).toBe(0);
+    expect(res.remaining).toBe(0);
+    expect(res.model.network.pipes[0]!.nominalSize).toBe("6");
+  });
+});

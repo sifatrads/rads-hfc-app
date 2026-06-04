@@ -6,6 +6,7 @@ import { useState, type CSSProperties } from "react";
 import type { ProjectModel, Pipe } from "@rads/model";
 import type { ProjectSolution } from "@rads/solve";
 import { MATERIAL_OPTIONS, NOMINAL_SIZES, withModel } from "../network-edit";
+import { autoSizeVelocity } from "../auto-size";
 import { units } from "../units";
 import { C, FONT, card, sectionTitle, select, th, td, tdNum, toneColor } from "../ui";
 
@@ -14,6 +15,7 @@ const VLIMIT = 20; // ft/s — NFPA 13 velocity guidance
 export function SizingTab({ model, solution, error, onChange }: { model: ProjectModel; solution: ProjectSolution | null; error?: string; onChange: (m: ProjectModel) => void }): JSX.Element {
   const [worstFirst, setWorstFirst] = useState(false);
   const [hotOnly, setHotOnly] = useState(false);
+  const [autoMsg, setAutoMsg] = useState("");
   if (!solution) return <div style={{ ...page, alignItems: "center", justifyContent: "center", color: C.muted }}>{error ? error : "Add nodes, pipes and a water supply to size the system."}</div>;
   const u = units(model);
   const s = solution.summary;
@@ -29,6 +31,16 @@ export function SizingTab({ model, solution, error, onChange }: { model: Project
     const i = NOMINAL_SIZES.indexOf((p.nominalSize ?? "1") as (typeof NOMINAL_SIZES)[number]);
     const ni = Math.min(NOMINAL_SIZES.length - 1, Math.max(0, (i < 0 ? 2 : i) + dir));
     resize(id, NOMINAL_SIZES[ni]!);
+  };
+  const doAutoSize = () => {
+    const { model: sized, changed, remaining } = autoSizeVelocity(model, VLIMIT);
+    if (changed > 0) onChange(sized);
+    setAutoMsg(
+      changed === 0
+        ? remaining ? `${remaining} pipe(s) at the largest size, still over the limit` : "All pipes already within the velocity limit"
+        : `Auto-sized ${changed} pipe${changed === 1 ? "" : "s"}${remaining ? ` · ${remaining} still over (maxed)` : " · all within the limit"}`,
+    );
+    setTimeout(() => setAutoMsg(""), 5000);
   };
 
   const rows = pipes
@@ -54,6 +66,8 @@ export function SizingTab({ model, solution, error, onChange }: { model: Project
       <div style={{ ...card, padding: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 8 }}>
           <span style={sectionTitle}>Pipe sizing · {pipes.length}</span>
+          <button style={autoBtn} onClick={doAutoSize} title="Upsize every pipe over the velocity limit, one nominal step at a time, until all are within it (undoable)">⚡ Auto-size velocity</button>
+          {autoMsg && <span style={{ fontSize: 12, fontWeight: 700, color: C.good }}>✓ {autoMsg}</span>}
           <span style={{ flex: 1 }} />
           <label style={chk}><input type="checkbox" checked={worstFirst} onChange={(e) => setWorstFirst(e.target.checked)} /> Worst velocity first</label>
           <label style={chk}><input type="checkbox" checked={hotOnly} onChange={(e) => setHotOnly(e.target.checked)} /> Only over {u.v(VLIMIT)} {u.U.v}</label>
@@ -108,3 +122,4 @@ const chk: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 
 const hint: CSSProperties = { fontSize: 11.5, color: C.muted, lineHeight: 1.5 };
 const badge: CSSProperties = { color: "#fff", fontWeight: 800, fontSize: 14, letterSpacing: 1, padding: "6px 16px", borderRadius: 7 };
 const mini: CSSProperties = { fontSize: 11, fontWeight: 700, color: C.accent, background: "#eef3fb", border: `1px solid ${C.line}`, borderRadius: 5, padding: "2px 6px", cursor: "pointer" };
+const autoBtn: CSSProperties = { fontSize: 12, fontWeight: 700, color: "#fff", background: C.accent, border: "none", borderRadius: 7, padding: "6px 12px", cursor: "pointer" };
