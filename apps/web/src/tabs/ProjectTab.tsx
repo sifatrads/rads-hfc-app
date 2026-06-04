@@ -53,7 +53,13 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
   const storFlow = (v?: number) => (v === undefined ? undefined : metric ? v / 3.78541 : v);
   const dispId = (v?: number) => (v === undefined ? undefined : metric ? rnd(v * 25.4, 1) : v); // in→mm
   const storId = (v?: number) => (v === undefined ? undefined : metric ? v / 25.4 : v);
-  const U = { len: metric ? "m" : "ft", area: metric ? "m²" : "ft²", k: metric ? "metric" : "imp", flow: metric ? "L/min" : "gpm", id: metric ? "mm" : "in" };
+  const dispPsi = (v?: number) => (v === undefined ? undefined : metric ? rnd(v * 0.0689476, 2) : v); // psi→bar
+  const storPsi = (v?: number) => (v === undefined ? undefined : metric ? v / 0.0689476 : v);
+  const dispGal = (v?: number) => (v === undefined ? undefined : metric ? Math.round(v * 3.785412) : v); // gal→L
+  const storGal = (v?: number) => (v === undefined ? undefined : metric ? v / 3.785412 : v);
+  const dispDens = (v?: number) => (v === undefined ? undefined : metric ? rnd(v * 40.7458, 1) : v); // gpm/ft²→mm/min
+  const storDens = (v?: number) => (v === undefined ? undefined : metric ? v / 40.7458 : v);
+  const U = { len: metric ? "m" : "ft", area: metric ? "m²" : "ft²", k: metric ? "metric" : "imp", flow: metric ? "L/min" : "gpm", id: metric ? "mm" : "in", p: metric ? "bar" : "psi", dens: metric ? "mm/min" : "gpm/ft²", gal: metric ? "L" : "gal" };
   // Hazard classes + density preset from the active code (EN 12845 is metric).
   const standardId = str(model.meta.standardId, "nfpa13");
   const hzClasses = hazardClassesFor(standardId);
@@ -269,16 +275,16 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
           </Row>
           <div style={hint}>Picking a catalog sprinkler (here or per‑head in the Nodes table) prefills K / orientation / temperature / response. ⚠ = SIN inferred from family convention. Catalog values are representative — confirm SIN, K‑factor, temperature ratings and listings against the current manufacturer datasheet/edition before approval.</div>
           <Row>
-            <Num label="Density (gpm/ft²)" value={num(ds["densityGpmFt2"])} step={0.01} onChange={(v) => setBasis("densityGpmFt2", v)} />
-            <Num label="Design area (ft²)" value={num(ds["designAreaFt2"])} step={50} onChange={(v) => setBasis("designAreaFt2", v)} />
+            <Num label={`Density (${U.dens})`} value={dispDens(num(ds["densityGpmFt2"]))} step={metric ? 0.5 : 0.01} onChange={(v) => setBasis("densityGpmFt2", storDens(v))} />
+            <Num label={`Design area (${U.area})`} value={dispArea(num(ds["designAreaFt2"]))} step={metric ? 5 : 50} onChange={(v) => setBasis("designAreaFt2", storArea(v))} />
           </Row>
           <Row>
-            <Num label="Sprinkler K" value={num(ds["sprinklerKFactor"])} step={0.1} onChange={(v) => setBasis("sprinklerKFactor", v)} />
+            <Num label={`Sprinkler K (${U.k})`} value={dispK(num(ds["sprinklerKFactor"]))} step={metric ? 1 : 0.1} onChange={(v) => setBasis("sprinklerKFactor", storK(v))} />
             <Num label="Operating heads" value={num(ds["operatingSprinklers"])} step={1} onChange={(v) => setBasis("operatingSprinklers", v)} />
           </Row>
           <Row>
-            <Num label="Min head pressure (psi)" value={num(ds["minSprinklerPressurePsi"])} step={1} onChange={(v) => setBasis("minSprinklerPressurePsi", v)} />
-            <Num label="Hose allowance (gpm)" value={num(ds["hoseAllowanceGpm"])} step={50} onChange={(v) => setBasis("hoseAllowanceGpm", v)} />
+            <Num label={`Min head pressure (${U.p})`} value={dispPsi(num(ds["minSprinklerPressurePsi"]))} step={metric ? 0.1 : 1} onChange={(v) => setBasis("minSprinklerPressurePsi", storPsi(v))} />
+            <Num label={`Hose allowance (${U.flow})`} value={dispFlow(num(ds["hoseAllowanceGpm"]))} step={metric ? 100 : 50} onChange={(v) => setBasis("hoseAllowanceGpm", storFlow(v))} />
             <Num label="Supply duration (min)" value={num(ds["durationMin"])} step={10} onChange={(v) => setBasis("durationMin", v)} />
           </Row>
           <Row>
@@ -295,9 +301,9 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
         {/* Water supply */}
         <Section title="Water supply (city flow test)">
           <Row>
-            <Num label="Static (psi)" value={num(ft["staticPsi"])} step={1} onChange={(v) => setFlow("staticPsi", v)} />
-            <Num label="Residual (psi)" value={num(ft["residualPsi"])} step={1} onChange={(v) => setFlow("residualPsi", v)} />
-            <Num label="Test flow (gpm)" value={num(ft["testFlowGpm"])} step={50} onChange={(v) => setFlow("testFlowGpm", v)} />
+            <Num label={`Static (${U.p})`} value={dispPsi(num(ft["staticPsi"]))} step={metric ? 0.1 : 1} onChange={(v) => setFlow("staticPsi", storPsi(v))} />
+            <Num label={`Residual (${U.p})`} value={dispPsi(num(ft["residualPsi"]))} step={metric ? 0.1 : 1} onChange={(v) => setFlow("residualPsi", storPsi(v))} />
+            <Num label={`Test flow (${U.flow})`} value={dispFlow(num(ft["testFlowGpm"]))} step={metric ? 100 : 50} onChange={(v) => setFlow("testFlowGpm", storFlow(v))} />
           </Row>
           <div style={hint}>Add a fire pump in the Fire Pump section below — it feeds this supply curve.</div>
         </Section>
@@ -311,12 +317,12 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
           {!!model.network.suction && (
             <>
               <Row>
-                <Num label="Size (in)" value={num(suc["sizeIn"])} step={1} onChange={(v) => setSuc("sizeIn", v)} />
-                <Num label="Length (ft)" value={num(suc["lengthFt"])} step={5} onChange={(v) => setSuc("lengthFt", v)} />
+                <Num label={`Size (${U.id})`} value={dispId(num(suc["sizeIn"]))} step={metric ? 10 : 1} onChange={(v) => setSuc("sizeIn", storId(v))} />
+                <Num label={`Length (${U.len})`} value={dispLen(num(suc["lengthFt"]))} step={metric ? 1 : 5} onChange={(v) => setSuc("lengthFt", storLen(v))} />
                 <Num label="C-factor" value={num(suc["cFactor"])} step={5} onChange={(v) => setSuc("cFactor", v)} />
               </Row>
               <Row>
-                <Num label="Lift (ft, − = flooded)" value={num(suc["liftFt"])} step={1} onChange={(v) => setSuc("liftFt", v)} />
+                <Num label={`Lift (${U.len}, − = flooded)`} value={dispLen(num(suc["liftFt"]))} step={metric ? 0.5 : 1} onChange={(v) => setSuc("liftFt", storLen(v))} />
                 <Sel label="To pump node" value={str(suc["toPumpNode"], nodeIds[0] ?? "")} options={nodeIds} onChange={(v) => setSuc("toPumpNode", v)} />
               </Row>
             </>
@@ -333,15 +339,15 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             <>
               <Row>
                 <Sel label="Kind" value={str(res["kind"], "ground-tank")} options={["ground-tank", "elevated-tank", "reservoir", "break-tank"]} onChange={(v) => setRes("kind", v)} />
-                <Num label="Capacity (gal)" value={num(res["capacityGal"])} step={1000} onChange={(v) => setRes("capacityGal", v)} />
+                <Num label={`Capacity (${U.gal})`} value={dispGal(num(res["capacityGal"]))} step={metric ? 5000 : 1000} onChange={(v) => setRes("capacityGal", storGal(v))} />
               </Row>
               <Row>
-                <Num label="Height (ft)" value={num(res["heightFt"])} step={1} onChange={(v) => setRes("heightFt", v)} />
-                <Num label="Length (ft)" value={num(res["lengthFt"])} step={1} onChange={(v) => setRes("lengthFt", v)} />
-                <Num label="Width (ft)" value={num(res["widthFt"])} step={1} onChange={(v) => setRes("widthFt", v)} />
+                <Num label={`Height (${U.len})`} value={dispLen(num(res["heightFt"]))} step={metric ? 0.5 : 1} onChange={(v) => setRes("heightFt", storLen(v))} />
+                <Num label={`Length (${U.len})`} value={dispLen(num(res["lengthFt"]))} step={metric ? 0.5 : 1} onChange={(v) => setRes("lengthFt", storLen(v))} />
+                <Num label={`Width (${U.len})`} value={dispLen(num(res["widthFt"]))} step={metric ? 0.5 : 1} onChange={(v) => setRes("widthFt", storLen(v))} />
               </Row>
               <Row>
-                <Num label="Base elevation (ft)" value={num(res["baseElevationFt"])} step={1} onChange={(v) => setRes("baseElevationFt", v)} />
+                <Num label={`Base elevation (${U.len})`} value={dispLen(num(res["baseElevationFt"]))} step={metric ? 0.5 : 1} onChange={(v) => setRes("baseElevationFt", storLen(v))} />
                 <Sel label="Connected node" value={str(res["connectedNode"], nodeIds[0] ?? "")} options={nodeIds} onChange={(v) => setRes("connectedNode", v)} />
               </Row>
             </>
@@ -352,7 +358,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
       {/* Nodes */}
       <div style={{ ...card, padding: 14 }}>
         <div style={tableHead}>
-          <span style={sectionTitle}>Nodes · {nodes.length}</span>
+          <span style={sectionTitle}>Nodes · {nodes.length}{fq ? ` · ${nodes.filter(nodeMatch).length} match` : ""}</span>
           <span style={{ flex: 1 }} />
           <button style={btnGhost} onClick={() => onChange(cleanupModel(model))} title="Remove nodes connected to no pipe">Cleanup</button>
           <button style={btnGhost} onClick={renumber} title="Renumber nodes 1…N and pipes P-1…">Renumber 1…N</button>
@@ -379,6 +385,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
                   </tr>
                 );
               })}
+              {fq && nodes.length > 0 && nodes.filter(nodeMatch).length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={9}>No nodes match “{find}”.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -387,7 +394,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
       {/* Pipes */}
       <div style={{ ...card, padding: 14 }}>
         <div style={tableHead}>
-          <span style={sectionTitle}>Pipes · {pipes.length}</span>
+          <span style={sectionTitle}>Pipes · {pipes.length}{fq ? ` · ${pipes.filter(pipeMatch).length} match` : ""}</span>
           <span style={{ flex: 1 }} />
           <label style={{ ...checkRow, marginRight: 10 }} title="Show material, C-factor, ID override, added length, fitting codes, ΔElevation and fixed ΔP columns">
             <input type="checkbox" checked={showAdv} onChange={(e) => setShowAdv(e.target.checked)} />
@@ -449,6 +456,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
                 </tr>
               ) : null)}
               {pipes.length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={showAdv ? 15 : 8}>No pipes yet — add nodes, then connect them. The first node (#1) is the supply source.</td></tr>}
+              {fq && pipes.length > 0 && pipes.filter(pipeMatch).length === 0 && <tr><td style={{ ...td, color: C.muted }} colSpan={showAdv ? 15 : 8}>No pipes match “{find}”.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -501,17 +509,17 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
               <Sel label="Driver" value={str(pds["driver"], "electric")} options={PUMP_DRIVERS} onChange={(v) => setDs("driver", v)} />
             </Row>
             <Row>
-              <Num label="Rated flow (gpm)" value={num(pds["ratedFlowGpm"])} step={50} onChange={(v) => setDs("ratedFlowGpm", v)} />
-              <Num label="Rated pressure (psi)" value={num(pds["ratedPsi"])} step={5} onChange={(v) => setDs("ratedPsi", v)} />
-              <Num label="Churn / shutoff (psi)" value={num(pds["churnPsi"])} step={5} onChange={(v) => setDs("churnPsi", v)} />
+              <Num label={`Rated flow (${U.flow})`} value={dispFlow(num(pds["ratedFlowGpm"]))} step={metric ? 100 : 50} onChange={(v) => setDs("ratedFlowGpm", storFlow(v))} />
+              <Num label={`Rated pressure (${U.p})`} value={dispPsi(num(pds["ratedPsi"]))} step={metric ? 0.5 : 5} onChange={(v) => setDs("ratedPsi", storPsi(v))} />
+              <Num label={`Churn / shutoff (${U.p})`} value={dispPsi(num(pds["churnPsi"]))} step={metric ? 0.5 : 5} onChange={(v) => setDs("churnPsi", storPsi(v))} />
             </Row>
             <Row>
-              <Num label="150% flow (gpm)" value={num(pds["overloadFlowGpm"])} step={50} onChange={(v) => setDs("overloadFlowGpm", v)} />
-              <Num label="150% pressure (psi)" value={num(pds["overloadPsi"])} step={5} onChange={(v) => setDs("overloadPsi", v)} />
+              <Num label={`150% flow (${U.flow})`} value={dispFlow(num(pds["overloadFlowGpm"]))} step={metric ? 100 : 50} onChange={(v) => setDs("overloadFlowGpm", storFlow(v))} />
+              <Num label={`150% pressure (${U.p})`} value={dispPsi(num(pds["overloadPsi"]))} step={metric ? 0.5 : 5} onChange={(v) => setDs("overloadPsi", storPsi(v))} />
               <Num label="RPM" value={num(pds["rpm"])} step={100} onChange={(v) => setDs("rpm", v)} />
             </Row>
             <Row>
-              <Num label="Impeller (in)" value={num(pds["impellerIn"])} step={0.1} onChange={(v) => setDs("impellerIn", v)} />
+              <Num label={`Impeller (${U.id})`} value={dispId(num(pds["impellerIn"]))} step={metric ? 1 : 0.1} onChange={(v) => setDs("impellerIn", storId(v))} />
               <Num label="Motor (hp)" value={num(pds["motorHp"])} step={5} onChange={(v) => setDs("motorHp", v)} />
               <Sel label="At node" value={str(pump.atNode, nodeIds[0] ?? "")} options={nodeIds} onChange={(v) => onChange(withModel(model, { network: { ...model.network, pump: { ...pump, atNode: v } } }))} />
             </Row>
