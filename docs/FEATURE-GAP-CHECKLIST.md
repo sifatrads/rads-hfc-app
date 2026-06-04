@@ -70,7 +70,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 **Already covered:** ✅ 3D viewer (line pipes) · ✅ Plan/Front/Side/Iso · ✅ Elevation · ✅ Color-by-metric flow diagram + legend · ✅ Direction/flow display · ✅ NFPA-170 symbols + glyphs · ✅ Label layers + auto-place + leaders + zoom LOD · ✅ AutoCAD nav · ✅ 3D click-edit (split/delete/branch/connect/drag) · ✅ Undo/redo · ✅ Supply/demand graph · ✅ Pump-verification chart · ✅ Working-plan iso/plan/elev drawings
 
 - [x] NFPA 13 log-grid graph (Q^1.85 X-axis) — in-app Graph now uses the Q^1.85 scale ✅ DONE
-- [ ] Interactive sizing report editor (report ↔ 3D live diameter sync) — power-user; large
+- [x] Interactive sizing editor ✅ DONE (Sizing tab: edit size/material inline → live re-solve → flow/velocity/loss + margin update; velocity-flag, worst-first sort, ⬆⬇ bump; metric-aware) — ↔ 3D live sync is a follow-up
 - [ ] 3D object viewer (right-click localized assembly preview) — medium
 - [ ] Sprinkler-spacing verification vs ceiling grid (plan) — needs ceiling data; medium
 - [ ] Vertical-offset / clash checking (elevation) — coordination; medium
