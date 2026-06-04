@@ -50,6 +50,7 @@ const cloudConfigured = !!import.meta.env.VITE_FIREBASE_API_KEY;
 export function App(): JSX.Element {
   const { model, set: setModel, reset: resetModel, undo, redo, canUndo, canRedo } = useModelHistory();
   const [tab, setTab] = useState<TabId>("project");
+  const [selectedPipe, setSelectedPipe] = useState<string | null>(null); // cross-tab pipe selection (Sizing ↔ 3D)
   const [note, setNote] = useState("Built-in sample");
   const [pending, setPending] = useState<Pending | null>(null);
   const [cloudOpen, setCloudOpen] = useState(false);
@@ -231,6 +232,8 @@ export function App(): JSX.Element {
                 onAddBranch={(fromNodeId, opts) => { setModel((m) => (m ? addBranchInModel(m, fromNodeId, { ...opts, direction: opts.direction as Direction }) : m)); setNote("Added branch in 3D"); }}
                 onAddPipe={(fromNodeId, toNodeId, lengthFt, opts) => { setModel((m) => (m ? addPipeBetweenInModel(m, fromNodeId, toNodeId, { ...opts, lengthFt }) : m)); setNote("Connected nodes in 3D"); }}
                 onMoveNode={(nodeId, geometry) => { setModel((m) => (m ? setNodeGeometryInModel(m, nodeId, geometry) : m)); setNote("Moved node in 3D"); }}
+                highlightPipeId={selectedPipe ?? undefined}
+                onSelectPipe={setSelectedPipe}
               />
             ) : <div style={{ padding: 24, color: C.muted }}>No geometry.</div>
           ) : tab === "summary" ? (
@@ -238,7 +241,7 @@ export function App(): JSX.Element {
           ) : tab === "analysis" ? (
             <AnalysisTab model={model} solution={sol} error={solveError} />
           ) : tab === "sizing" ? (
-            <SizingTab model={model} solution={sol} error={solveError} onChange={(m) => { setModel(m); setNote("Resized"); }} />
+            <SizingTab model={model} solution={sol} error={solveError} onChange={(m) => { setModel(m); setNote("Resized"); }} selectedPipe={selectedPipe} onSelectPipe={setSelectedPipe} />
           ) : tab === "graph" ? (
             <GraphTab model={model} solution={sol} error={solveError} />
           ) : (

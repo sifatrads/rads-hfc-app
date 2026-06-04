@@ -91,6 +91,10 @@ export interface ViewerProps {
   onAddPipe?: (fromNodeId: string, toNodeId: string, lengthFt: number, opts: { nominalSize: string; role: string }) => void;
   /** When provided, "Move" lets you drag a node to a new position (plan plane). */
   onMoveNode?: (nodeId: string, geometry: { x: number; y: number; z: number }) => void;
+  /** Pipe id to highlight (cross-tab selection sync, e.g. from the Sizing tab). */
+  highlightPipeId?: string;
+  /** Called when a pipe is clicked — emits its id for cross-tab selection. */
+  onSelectPipe?: (pipeId: string) => void;
 }
 
 const DIRS: { d: string; label: string }[] = [
@@ -102,7 +106,7 @@ type EditSel =
   | { kind: "pipe"; id: string; fraction: number; x: number; y: number }
   | { kind: "node"; id: string; x: number; y: number };
 
-export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNode, onAddBranch, onAddPipe, onMoveNode }: ViewerProps): JSX.Element {
+export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNode, onAddBranch, onAddPipe, onMoveNode, highlightPipeId, onSelectPipe }: ViewerProps): JSX.Element {
   const t = useMemo(() => computeTransform(scene), [scene]);
   const [metric, setMetric] = useState<ColorMetric>(initialMetric);
   const [view, setView] = useState<string>("iso");
@@ -122,6 +126,11 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
   const fit = () => setFitNonce((n) => n + 1);
   const rel = (cx: number, cy: number) => { const r = containerRef.current?.getBoundingClientRect(); return { x: cx - (r?.left ?? 0), y: cy - (r?.top ?? 0) }; };
   const pickPipe = (id: string, fraction: number, cx: number, cy: number) => { const p = rel(cx, cy); setPicked({ kind: "pipe", id, fraction, x: p.x, y: p.y }); };
+  // Clicking a pipe selects it (cross-tab) and, while editing, opens the split menu.
+  const handlePipePick = (id: string, fraction: number, cx: number, cy: number) => {
+    onSelectPipe?.(id);
+    if (edit && onSplitPipe) pickPipe(id, fraction, cx, cy);
+  };
   const pickNode = (id: string, cx: number, cy: number) => {
     if (connectFrom) {
       if (connectFrom !== id && onAddPipe) {
@@ -144,6 +153,13 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
     return () => window.removeEventListener("keydown", onKey);
   }, [busyMode]);
   const { pipeColors, legend } = useMemo(() => colorize(scene, metric), [scene, metric]);
+  // Override the selected pipe's colour so it stands out (cross-tab highlight).
+  const shownColors = useMemo(() => {
+    if (!highlightPipeId || !pipeColors.has(highlightPipeId)) return pipeColors;
+    const m = new Map(pipeColors);
+    m.set(highlightPipeId, "#e11d48");
+    return m;
+  }, [pipeColors, highlightPipeId]);
 
   const toggle = (c: LabelCategory) =>
     setEnabled((prev) => {
@@ -166,7 +182,7 @@ export function Viewer({ scene, initialMetric = "size", onSplitPipe, onDeleteNod
         <directionalLight position={[30, 50, 20]} intensity={0.7} />
         <directionalLight position={[-20, 10, -30]} intensity={0.25} />
         <gridHelper args={[120, 24, "#cfd8dc", "#e3e9ed"]} position={[0, -0.01, 0]} />
-        <Pipes scene={scene} t={t} colors={pipeColors} onPick={edit && onSplitPipe && !busyMode ? pickPipe : undefined} />
+        <Pipes scene={scene} t={t} colors={shownColors} onPick={!busyMode && (onSelectPipe || (edit && onSplitPipe)) ? handlePipePick : undefined} />
         <Nodes scene={scene} t={t} onPick={edit && (onDeleteNode || onAddBranch || onAddPipe || onMoveNode) && !busyMode ? pickNode : undefined} />
         <Devices scene={scene} t={t} />
         {moving && onMoveNode && (

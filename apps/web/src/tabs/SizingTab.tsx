@@ -2,7 +2,7 @@
  * or material inline and watch flow / velocity / loss and the supply margin
  * re-solve live (the App re-solves on every model change). Velocity over the
  * NFPA-13 guidance is flagged so you can upsize the bottlenecks first. */
-import { useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { ProjectModel, Pipe } from "@rads/model";
 import type { ProjectSolution } from "@rads/solve";
 import { MATERIAL_OPTIONS, NOMINAL_SIZES, withModel } from "../network-edit";
@@ -12,10 +12,13 @@ import { C, FONT, card, sectionTitle, select, th, td, tdNum, toneColor } from ".
 
 const VLIMIT = 20; // ft/s — NFPA 13 velocity guidance
 
-export function SizingTab({ model, solution, error, onChange }: { model: ProjectModel; solution: ProjectSolution | null; error?: string; onChange: (m: ProjectModel) => void }): JSX.Element {
+export function SizingTab({ model, solution, error, onChange, selectedPipe, onSelectPipe }: { model: ProjectModel; solution: ProjectSolution | null; error?: string; onChange: (m: ProjectModel) => void; selectedPipe?: string | null; onSelectPipe?: (id: string) => void }): JSX.Element {
   const [worstFirst, setWorstFirst] = useState(false);
   const [hotOnly, setHotOnly] = useState(false);
   const [autoMsg, setAutoMsg] = useState("");
+  const selRef = useRef<HTMLTableRowElement>(null);
+  // Scroll the selected pipe's row into view when selection arrives (e.g. from 3D).
+  useEffect(() => { if (selectedPipe) selRef.current?.scrollIntoView({ block: "nearest" }); }, [selectedPipe]);
   if (!solution) return <div style={{ ...page, alignItems: "center", justifyContent: "center", color: C.muted }}>{error ? error : "Add nodes, pipes and a water supply to size the system."}</div>;
   const u = units(model);
   const s = solution.summary;
@@ -90,15 +93,16 @@ export function SizingTab({ model, solution, error, onChange }: { model: Project
           <label style={chk}><input type="checkbox" checked={worstFirst} onChange={(e) => setWorstFirst(e.target.checked)} /> Worst velocity first</label>
           <label style={chk}><input type="checkbox" checked={hotOnly} onChange={(e) => setHotOnly(e.target.checked)} /> Only over {u.v(VLIMIT)} {u.U.v}</label>
         </div>
-        <div style={hint}>Change a size or material and the whole system re-solves instantly. Velocity over {u.v(VLIMIT)} {u.U.v} is flagged red (NFPA 13 guidance) — upsize those first. ⬆ / ⬇ bump one nominal size.</div>
+        <div style={hint}>Change a size or material and the whole system re-solves instantly. Velocity over {u.v(VLIMIT)} {u.U.v} is flagged red (NFPA 13 guidance) — upsize those first. ⬆ / ⬇ bump one nominal size. Click a row to highlight that pipe in the 3D View (and a pipe clicked in 3D scrolls to its row here).</div>
         <div style={scroll}>
           <table style={tbl}>
             <thead><tr>{["#", "From → To", "Role", "Size", "Material", `Flow (${u.U.q})`, `Velocity (${u.U.v})`, `Friction (${u.U.p})`, `Total loss (${u.U.p})`, ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
               {rows.map(({ p, r, v }) => {
                 const vHot = v > VLIMIT;
+                const sel = p.id === selectedPipe;
                 return (
-                  <tr key={p.id} style={vHot ? { background: "#fff1f0" } : undefined}>
+                  <tr key={p.id} ref={sel ? selRef : undefined} onClick={() => onSelectPipe?.(p.id)} style={{ ...(onSelectPipe ? { cursor: "pointer" } : {}), ...(sel ? { background: "#dbeafe", boxShadow: `inset 3px 0 0 ${C.accent}` } : vHot ? { background: "#fff1f0" } : {}) }}>
                     <td style={{ ...td, fontWeight: 700, color: C.accent }}>{p.id}</td>
                     <td style={td}>{p.from} → {p.to}</td>
                     <td style={td}>{p.role ?? "—"}</td>
