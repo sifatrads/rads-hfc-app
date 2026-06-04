@@ -195,6 +195,7 @@ export const ProjectMetaSchema = z
     standardId: z.string().optional(), // engine id, e.g. "nfpa13"
     hazardClass: z.string().optional(),
     standpipeClass: z.string().optional(),
+    storageSchemeId: z.string().optional(), // selected FM DS 8-9 storage scheme
     /** Pipe-fill type: "wet" | "dry" | "preaction" | "deluge" — dry/preaction
      * derate steel C-factor (100 vs 120) and appear on the nameplate. */
     fillType: z.string().optional(),

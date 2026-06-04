@@ -39,6 +39,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
   };
   const [bulkRole, setBulkRole] = useState("");
   const [showAdv, setShowAdv] = useState(false); // pipe-table advanced columns (material/C/ID/add'l/fittings/ΔElev/ΔP)
+  const [bulkNote, setBulkNote] = useState(""); // transient "Updated N pipes" confirmation
   // Metric data entry: when units=metric, table cells show/accept metric and
   // convert to the model's imperial storage (the solver is imperial-internal).
   const metric = model.meta.units === "metric";
@@ -60,6 +61,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
   const dispDens = (v?: number) => (v === undefined ? undefined : metric ? rnd(v * 40.7458, 1) : v); // gpm/ft²→mm/min
   const storDens = (v?: number) => (v === undefined ? undefined : metric ? v / 40.7458 : v);
   const U = { len: metric ? "m" : "ft", area: metric ? "m²" : "ft²", k: metric ? "metric" : "imp", flow: metric ? "L/min" : "gpm", id: metric ? "mm" : "in", p: metric ? "bar" : "psi", dens: metric ? "mm/min" : "gpm/ft²", gal: metric ? "L" : "gal" };
+  const curveConv = { dispF: dispFlow, storF: storFlow, dispP: dispPsi, storP: storPsi, uFlow: U.flow, uP: U.p };
   // Hazard classes + density preset from the active code (EN 12845 is metric).
   const standardId = str(model.meta.standardId, "nfpa13");
   const hzClasses = hazardClassesFor(standardId);
@@ -184,7 +186,13 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
   const splitPipe = (i: number) => onChange(splitPipeInModel(model, pipes[i]!.id, 0.5));
   // Bulk edit: apply a patch to every pipe matching the role filter ("" = all).
   const bulkMatch = (p: Pipe) => !bulkRole || (p.role ?? "") === bulkRole;
-  const bulkApply = (patch: Partial<Pipe>) => commit(nodes, pipes.map((p) => (bulkMatch(p) ? { ...p, ...patch } : p)));
+  const bulkApply = (patch: Partial<Pipe>) => {
+    const n = pipes.filter(bulkMatch).length;
+    commit(nodes, pipes.map((p) => (bulkMatch(p) ? { ...p, ...patch } : p)));
+    const what = patch.material ? "material (C reset to default)" : patch.nominalSize ? "size" : patch.role ? "role" : "field";
+    setBulkNote(`Updated ${what} on ${n} pipe${n === 1 ? "" : "s"}`);
+    setTimeout(() => setBulkNote(""), 3000);
+  };
 
   const renumber = () => commitStructural(nodes, pipes);
 
@@ -414,6 +422,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             <select style={{ ...cellInput, width: 64 }} value="" onChange={(e) => { if (e.target.value) bulkApply({ nominalSize: e.target.value }); }}><option value="">size…</option>{NOMINAL_SIZES.map((s) => <option key={s} value={s}>{s}"</option>)}</select>
             <select style={{ ...cellInput, width: 110 }} value="" onChange={(e) => { if (e.target.value) bulkApply({ role: e.target.value }); }}><option value="">role…</option>{PIPE_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>
             <span style={{ color: C.muted }}>({pipes.filter(bulkMatch).length} match)</span>
+            {bulkNote && <span style={{ color: C.good, fontWeight: 700 }}>✓ {bulkNote}</span>}
           </div>
         )}
         <div style={tableScroll}>
@@ -537,8 +546,8 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
               )}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
-              <CurveTable title="Rated curve (datasheet)" rpm={false} pts={ratedCurve} onChange={(p) => setCurve("ratedCurve", p)} />
-              <CurveTable title="Shop test (field/factory)" rpm pts={shopTest} onChange={(p) => setCurve("shopTest", p)} />
+              <CurveTable title="Rated curve (datasheet)" rpm={false} pts={ratedCurve} onChange={(p) => setCurve("ratedCurve", p)} u={curveConv} />
+              <CurveTable title="Shop test (field/factory)" rpm pts={shopTest} onChange={(p) => setCurve("shopTest", p)} u={curveConv} />
             </div>
             <div style={hint}>The rated flow/pressure/churn here feed the supply curve in the calc. Curves drive the three pump report sheets (datasheet · hydraulic · shop-test).</div>
           </div>
@@ -548,7 +557,8 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
   );
 }
 
-function CurveTable({ title, pts, rpm, onChange }: { title: string; pts: PumpCurvePoint[]; rpm: boolean; onChange: (p: PumpCurvePoint[]) => void }): JSX.Element {
+type CurveConv = { dispF: (v?: number) => number | undefined; storF: (v?: number) => number | undefined; dispP: (v?: number) => number | undefined; storP: (v?: number) => number | undefined; uFlow: string; uP: string };
+function CurveTable({ title, pts, rpm, onChange, u }: { title: string; pts: PumpCurvePoint[]; rpm: boolean; onChange: (p: PumpCurvePoint[]) => void; u: CurveConv }): JSX.Element {
   const set = (i: number, patch: Partial<PumpCurvePoint>) => { const p = pts.slice(); p[i] = { ...p[i]!, ...patch }; onChange(p); };
   const add = () => onChange([...pts, { flowGpm: 0, psi: 0 }]);
   const del = (i: number) => onChange(pts.filter((_, j) => j !== i));
@@ -560,12 +570,12 @@ function CurveTable({ title, pts, rpm, onChange }: { title: string; pts: PumpCur
         <button style={btnGhost} onClick={add}>+ Point</button>
       </div>
       <table style={table}>
-        <thead><tr>{["Flow (gpm)", "Pressure (psi)", ...(rpm ? ["RPM"] : []), ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+        <thead><tr>{[`Flow (${u.uFlow})`, `Pressure (${u.uP})`, ...(rpm ? ["RPM"] : []), ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
         <tbody>
           {pts.map((pt, i) => (
             <tr key={i}>
-              <td style={td}><NumCell value={pt.flowGpm} onChange={(v) => set(i, { flowGpm: v ?? 0 })} /></td>
-              <td style={td}><NumCell value={pt.psi} onChange={(v) => set(i, { psi: v ?? 0 })} /></td>
+              <td style={td}><NumCell value={u.dispF(pt.flowGpm)} onChange={(v) => set(i, { flowGpm: u.storF(v) ?? 0 })} /></td>
+              <td style={td}><NumCell value={u.dispP(pt.psi)} onChange={(v) => set(i, { psi: u.storP(v) ?? 0 })} /></td>
               {rpm && <td style={td}><NumCell value={pt.rpm} onChange={(v) => set(i, { rpm: v })} /></td>}
               <td style={td}><button style={btnDanger} onClick={() => del(i)} title="Delete point">✕</button></td>
             </tr>
