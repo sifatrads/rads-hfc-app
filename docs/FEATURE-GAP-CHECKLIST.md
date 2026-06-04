@@ -95,7 +95,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 
 - [x] Min operating pressure + low-pressure node flagging ✅ DONE
 - [x] Friction-equation selector (Hazen-Williams / Darcy-Weisbach) ✅ DONE
-- [ ] Fluid properties (type/temp/antifreeze/viscosity/density) — for D-W & antifreeze
+- [x] Fluid properties (water / propylene- / ethylene-glycol · temp · concentration → auto viscosity for D-W) ✅ DONE
 - [ ] Demand-sizing modes (satisfy-min / below-available / %-below-available) — flexible targets
 - [ ] Default equivalent-lengths (PDT) editor by type/size — tune fitting tables
 - [ ] Precision / tolerance + decimal places — convergence + display control

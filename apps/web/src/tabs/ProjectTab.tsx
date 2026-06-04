@@ -11,7 +11,7 @@ import {
   NOMINAL_SIZES, PIPE_ROLES, NODE_TYPES, VALVE_TYPES, PUMP_TYPES, PUMP_DRIVERS, VALVE_EQUIV_FT, MATERIAL_OPTIONS,
   DIRECTIONS, DIRECTION_LABEL, renumberNetwork, normalizePipe, withModel, splitPipeInModel, cleanupModel,
 } from "../network-edit";
-import { defaultCFactorForMaterial, pipeMaterial, parseFittingCodes, hazardClassesFor, designBasisForHazard, standardIsMetric, storageSchemesFor, designBasisForScheme, catalog, sprinklerBySin, type SprinklerProfile } from "@rads/standards-engine";
+import { defaultCFactorForMaterial, pipeMaterial, parseFittingCodes, hazardClassesFor, designBasisForHazard, standardIsMetric, storageSchemesFor, designBasisForScheme, catalog, sprinklerBySin, type SprinklerProfile, fluidViscosityCst, type FluidType } from "@rads/standards-engine";
 import { C, FONT, card, sectionTitle, field, fieldLabel, input, select, btnPrimary, btnGhost, btnDanger, th, td } from "../ui";
 import type { Issue } from "../network-validate";
 
@@ -60,7 +60,9 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
   const storGal = (v?: number) => (v === undefined ? undefined : metric ? v / 3.785412 : v);
   const dispDens = (v?: number) => (v === undefined ? undefined : metric ? rnd(v * 40.7458, 1) : v); // gpm/ft²→mm/min
   const storDens = (v?: number) => (v === undefined ? undefined : metric ? v / 40.7458 : v);
-  const U = { len: metric ? "m" : "ft", area: metric ? "m²" : "ft²", k: metric ? "metric" : "imp", flow: metric ? "L/min" : "gpm", id: metric ? "mm" : "in", p: metric ? "bar" : "psi", dens: metric ? "mm/min" : "gpm/ft²", gal: metric ? "L" : "gal" };
+  const dispTemp = (v?: number) => (v === undefined ? undefined : metric ? rnd((v - 32) / 1.8, 1) : v); // °F→°C
+  const storTemp = (v?: number) => (v === undefined ? undefined : metric ? v * 1.8 + 32 : v);
+  const U = { len: metric ? "m" : "ft", area: metric ? "m²" : "ft²", k: metric ? "metric" : "imp", flow: metric ? "L/min" : "gpm", id: metric ? "mm" : "in", p: metric ? "bar" : "psi", dens: metric ? "mm/min" : "gpm/ft²", gal: metric ? "L" : "gal", temp: metric ? "°C" : "°F" };
   const curveConv = { dispF: dispFlow, storF: storFlow, dispP: dispPsi, storP: storPsi, uFlow: U.flow, uP: U.p };
   // Hazard classes + density preset from the active code (EN 12845 is metric).
   const standardId = str(model.meta.standardId, "nfpa13");
@@ -99,6 +101,15 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
   // ---- committers ------------------------------------------------------
   const setMeta = (k: string, v: unknown) => onChange(withModel(model, { meta: { ...model.meta, [k]: v } }));
   const setBasis = (k: string, v: unknown) => onChange(withModel(model, { designBasis: { ...ds, [k]: v } }));
+  // Fluid model → recompute the Darcy-Weisbach kinematic viscosity and commit it
+  // along with the fluid params (the solver reads designBasis.fluidViscosityCst).
+  const applyFluid = (patch: { fluidType?: string; fluidTempF?: number; fluidConcPct?: number }) => {
+    const type = (patch.fluidType ?? str(ds["fluidType"], "water")) as FluidType;
+    const tempF = patch.fluidTempF ?? num(ds["fluidTempF"]) ?? 68;
+    const conc = patch.fluidConcPct ?? num(ds["fluidConcPct"]) ?? 0;
+    const cst = fluidViscosityCst(type, tempF, type === "water" ? 0 : conc);
+    onChange(withModel(model, { designBasis: { ...ds, fluidType: type, fluidTempF: tempF, fluidConcPct: conc, fluidViscosityCst: cst } }));
+  };
   const setSupply = (k: string, v: unknown) => onChange(withModel(model, { waterSupply: { ...ws, [k]: v } }));
   const setFlow = (k: string, v: unknown) => onChange(withModel(model, { waterSupply: { ...ws, flowTest: { ...ft, [k]: v } } }));
   const setRes = (k: string, v: unknown) => onChange(withModel(model, { network: { ...model.network, reservoir: { ...res, [k]: v } } }));
@@ -297,8 +308,23 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
           </Row>
           <Row>
             <Sel label="Friction method" value={str(ds["frictionMethod"], "hazen-williams")} options={["hazen-williams", "darcy-weisbach"]} onChange={(v) => setBasis("frictionMethod", v)} />
-            {ds["frictionMethod"] === "darcy-weisbach" && <Num label="Fluid viscosity (cSt, water≈1.1)" value={num(ds["fluidViscosityCst"])} step={0.1} onChange={(v) => setBasis("fluidViscosityCst", v)} />}
           </Row>
+          {ds["frictionMethod"] === "darcy-weisbach" && (() => {
+            const ft = str(ds["fluidType"], "water") as FluidType;
+            const tempF = num(ds["fluidTempF"]) ?? 68;
+            const conc = num(ds["fluidConcPct"]) ?? 0;
+            const cst = num(ds["fluidViscosityCst"]) ?? fluidViscosityCst(ft, tempF, ft === "water" ? 0 : conc);
+            return (
+              <>
+                <Row>
+                  <Sel label="Fluid" value={ft} options={["water", "propylene-glycol", "ethylene-glycol"]} onChange={(v) => applyFluid({ fluidType: v })} />
+                  <Num label={`Temperature (${U.temp})`} value={dispTemp(tempF)} step={metric ? 1 : 2} onChange={(v) => applyFluid({ fluidTempF: storTemp(v) ?? 68 })} />
+                  {ft !== "water" && <Num label="Antifreeze conc. (% vol)" value={conc} step={5} onChange={(v) => applyFluid({ fluidConcPct: v ?? 0 })} />}
+                </Row>
+                <div style={hint}>Kinematic viscosity ≈ {cst.toFixed(2)} cSt → drives the Darcy‑Weisbach friction factor. ⚠ Antifreeze viscosity is representative — verify against the product data sheet before approval.</div>
+              </>
+            );
+          })()}
           <label style={checkRow}>
             <input type="checkbox" checked={!!ds["autoFittings"]} onChange={(e) => setBasis("autoFittings", e.target.checked)} />
             <span>Auto-add a 90° elbow where a pipe changes direction</span>
