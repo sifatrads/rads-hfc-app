@@ -26,6 +26,13 @@ const tree = parseProject({
 });
 
 describe("solveProject", () => {
+  it("throws on an unsolvable network instead of returning fake zeros", () => {
+    const empty = parseProject({ schemaVersion: 2, meta: { id: "E", name: "Empty" }, network: { nodes: [], pipes: [], valves: [] } });
+    expect(() => solveProject(empty)).toThrow(/nothing to solve/i);
+    const noPipes = parseProject({ schemaVersion: 2, meta: { id: "N", name: "No pipes" }, network: { nodes: [{ id: "1", type: "junction" }], pipes: [], valves: [] } });
+    expect(() => solveProject(noPipes)).toThrow(/nothing to solve/i);
+  });
+
   it("solves the network to a converged operating point", () => {
     const sol = solveProject(tree);
     expect(sol.summary.converged).toBe(true);

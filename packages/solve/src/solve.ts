@@ -292,6 +292,12 @@ function buildGga(model: ProjectModel, source: { id: string; elevationFt: number
 
 export function solveProject(model: ProjectModel, opts: SolveOptions = {}): ProjectSolution {
   const source = findSource(model);
+  // Guard against a confident-looking solve on an unsolvable network: a phantom
+  // source (no node with the source id — e.g. an empty project) or no pipes can
+  // only produce misleading zeros. Throw so callers show a clear prompt instead.
+  if (!model.network.nodes.some((n) => n.id === source.id) || model.network.pipes.length === 0) {
+    throw new Error("Nothing to solve yet — add a source node, pipes and at least one sprinkler.");
+  }
   const std = (() => {
     try {
       return getStandard((model.meta.standardId ?? "nfpa13") as StandardId);
