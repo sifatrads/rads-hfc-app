@@ -7,6 +7,7 @@ import { type CSSProperties } from "react";
 import type { ProjectModel } from "@rads/model";
 import type { ProjectSolution } from "@rads/solve";
 import { C, FONT, card, sectionTitle } from "../ui";
+import { units } from "../units";
 
 interface Pt { x: number; y: number }
 interface Series { label: string; color: string; pts: Pt[]; dashed?: boolean }
@@ -15,26 +16,32 @@ interface Marker { label: string; color: string; x: number; y: number; up?: bool
 export function GraphTab({ model, solution, error }: { model: ProjectModel; solution: ProjectSolution | null; error?: string }): JSX.Element {
   if (!solution) return <div style={{ ...page, alignItems: "center", justifyContent: "center", color: C.muted }}>{error ? `Solve error: ${error}` : "No supply curve yet."}</div>;
   const s = solution.summary;
+  const u = units(model);
+  // plot in display units (the model is imperial-internal): x = flow, y = pressure.
+  const demandX = u.qN(s.totalDemandGpm);
+  const demandLabel = `demand ${u.q(s.totalDemandGpm, 0)} ${u.U.q}`;
 
-  const supplySeries: Series[] = [{ label: "Water-supply curve (city ± pump)", color: C.accent, pts: s.supplyCurveSamples.map((p) => ({ x: p.flowGpm, y: p.pressurePsi })) }];
+  const supplySeries: Series[] = [{ label: "Water-supply curve (city ± pump)", color: C.accent, pts: s.supplyCurveSamples.map((p) => ({ x: u.qN(p.flowGpm), y: u.pN(p.pressurePsi) })) }];
   const supplyMarkers: Marker[] = [
-    { label: `available ${s.availablePsi.toFixed(1)} psi`, color: C.good, x: s.totalDemandGpm, y: s.availablePsi, up: true },
-    { label: `required ${s.sourcePressurePsi.toFixed(1)} psi`, color: s.passesSupply ? C.good : C.bad, x: s.totalDemandGpm, y: s.sourcePressurePsi },
+    { label: `available ${u.p(s.availablePsi)} ${u.U.p}`, color: C.good, x: demandX, y: u.pN(s.availablePsi), up: true },
+    { label: `required ${u.p(s.sourcePressurePsi)} ${u.U.p}`, color: s.passesSupply ? C.good : C.bad, x: demandX, y: u.pN(s.sourcePressurePsi) },
   ];
 
   const pump = model.network.pump;
-  const dsCurve = datasheetCurve(pump);
-  const shop = (pump?.shopTest ?? []).map((p) => ({ x: p.flowGpm, y: p.psi }));
+  const dsCurve = datasheetCurve(pump).map((p) => ({ x: u.qN(p.x), y: u.pN(p.y) }));
+  const shop = (pump?.shopTest ?? []).map((p) => ({ x: u.qN(p.flowGpm), y: u.pN(p.psi) }));
   const pumpSeries: Series[] = [];
   if (dsCurve.length) pumpSeries.push({ label: "Datasheet (rated) curve", color: C.accent, pts: dsCurve });
   if (shop.length) pumpSeries.push({ label: "Shop-test curve", color: C.warn, pts: shop, dashed: true });
-  const pumpMarkers: Marker[] = [{ label: `operating ${Math.round(s.totalDemandGpm)} gpm @ ${s.sourcePressurePsi.toFixed(1)} psi`, color: C.bad, x: s.totalDemandGpm, y: s.sourcePressurePsi }];
+  const pumpMarkers: Marker[] = [{ label: `operating ${u.q(s.totalDemandGpm, 0)} ${u.U.q} @ ${u.p(s.sourcePressurePsi)} ${u.U.p}`, color: C.bad, x: demandX, y: u.pN(s.sourcePressurePsi) }];
+  const xLabel = `Flow (${u.U.q}) — Q¹·⁸⁵ scale`;
+  const yLabel = `Pressure (${u.U.p})`;
 
   return (
     <div style={page}>
       <div style={{ ...card, padding: 16 }}>
         <div style={sectionTitle}>Hydraulic supply / demand graph</div>
-        <Chart series={supplySeries} markers={supplyMarkers} vline={s.totalDemandGpm} vlabel={`demand ${Math.round(s.totalDemandGpm)} gpm`} />
+        <Chart series={supplySeries} markers={supplyMarkers} vline={demandX} vlabel={demandLabel} xLabel={xLabel} yLabel={yLabel} />
         <div style={legend}>
           <Item color={C.accent} label="Water-supply curve" />
           <Item color={C.good} label="Available at demand" />
@@ -46,7 +53,7 @@ export function GraphTab({ model, solution, error }: { model: ProjectModel; solu
         <div style={sectionTitle}>Fire-pump verification — datasheet · shop-test · hydraulic</div>
         {pumpSeries.length ? (
           <>
-            <Chart series={pumpSeries} markers={pumpMarkers} vline={s.totalDemandGpm} vlabel={`demand ${Math.round(s.totalDemandGpm)} gpm`} />
+            <Chart series={pumpSeries} markers={pumpMarkers} vline={demandX} vlabel={demandLabel} xLabel={xLabel} yLabel={yLabel} />
             <div style={legend}>
               {dsCurve.length ? <Item color={C.accent} label="Datasheet (rated) curve" /> : null}
               {shop.length ? <Item color={C.warn} label="Shop-test curve" /> : null}
@@ -73,7 +80,7 @@ function datasheetCurve(pump: ProjectModel["network"]["pump"]): Pt[] {
   return [{ x: 0, y: churn }, { x: rf, y: rp }, { x: of, y: op }];
 }
 
-function Chart({ series, markers, vline, vlabel }: { series: Series[]; markers: Marker[]; vline?: number; vlabel?: string }): JSX.Element {
+function Chart({ series, markers, vline, vlabel, xLabel, yLabel }: { series: Series[]; markers: Marker[]; vline?: number; vlabel?: string; xLabel: string; yLabel: string }): JSX.Element {
   const W = 900, H = 460, ml = 64, mr = 24, mt = 18, mb = 52;
   const all = [...series.flatMap((s) => s.pts), ...markers];
   const maxQ = Math.max(...all.map((p) => p.x), vline ?? 0, 100) * 1.08;
@@ -93,8 +100,8 @@ function Chart({ series, markers, vline, vlabel }: { series: Series[]; markers: 
       <line x1={ml} y1={H - mb} x2={W - mr} y2={H - mb} stroke={C.ink} strokeWidth={1.5} />
       {xTicks.map((q) => <text key={`tx${q}`} x={X(q)} y={H - mb + 17} fontSize={12} fill={C.muted} textAnchor="middle">{Math.round(q)}</text>)}
       {yTicks.map((p) => <text key={`ty${p}`} x={ml - 8} y={Y(p) + 4} fontSize={12} fill={C.muted} textAnchor="end">{Math.round(p)}</text>)}
-      <text x={(ml + W - mr) / 2} y={H - 12} fontSize={13} fill={C.ink} textAnchor="middle" fontWeight={600}>Flow (gpm) — Q¹·⁸⁵ scale</text>
-      <text x={16} y={(mt + H - mb) / 2} fontSize={13} fill={C.ink} textAnchor="middle" fontWeight={600} transform={`rotate(-90 16 ${(mt + H - mb) / 2})`}>Pressure (psi)</text>
+      <text x={(ml + W - mr) / 2} y={H - 12} fontSize={13} fill={C.ink} textAnchor="middle" fontWeight={600}>{xLabel}</text>
+      <text x={16} y={(mt + H - mb) / 2} fontSize={13} fill={C.ink} textAnchor="middle" fontWeight={600} transform={`rotate(-90 16 ${(mt + H - mb) / 2})`}>{yLabel}</text>
 
       {vline !== undefined && <line x1={X(vline)} y1={mt} x2={X(vline)} y2={H - mb} stroke={C.muted} strokeWidth={1} strokeDasharray="5 4" />}
       {vline !== undefined && vlabel && <text x={X(vline)} y={H - mb + 34} fontSize={11.5} fill={C.muted} textAnchor="middle">{vlabel}</text>}

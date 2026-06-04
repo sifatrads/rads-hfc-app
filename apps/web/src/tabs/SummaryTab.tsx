@@ -4,33 +4,35 @@ import type { CSSProperties } from "react";
 import type { ProjectModel } from "@rads/model";
 import type { ProjectSolution } from "@rads/solve";
 import { C, FONT, card, sectionTitle, toneColor } from "../ui";
+import { units } from "../units";
 
 export function SummaryTab({ model, solution, error }: { model: ProjectModel; solution: ProjectSolution | null; error?: string }): JSX.Element {
   if (!solution) return <Empty msg={error ? `Solve error: ${error}` : "Add nodes, pipes and a water supply to see results."} />;
   const s = solution.summary;
+  const u = units(model);
   const pass = s.passesSupply && s.meetsMinPressure;
   const cards = [
-    { label: "Required pressure", value: s.sourcePressurePsi.toFixed(1), unit: "psi", sub: `at source (node ${s.sourceId})`, tone: undefined },
-    { label: "Total demand", value: Math.round(s.totalDemandGpm).toString(), unit: "gpm", sub: `${Math.round(s.systemFlowGpm)} system + ${Math.round(s.hoseAllowanceGpm)} hose`, tone: undefined },
-    { label: "Supply available", value: s.availablePsi.toFixed(1), unit: "psi", sub: `@ ${Math.round(s.totalDemandGpm)} gpm`, tone: undefined },
-    { label: "Margin", value: (s.marginPsi >= 0 ? "+" : "") + s.marginPsi.toFixed(1), unit: "psi", sub: s.passesSupply ? "supply adequate" : "supply short", tone: (s.marginPsi >= 0 ? "good" : "bad") as "good" | "bad" },
+    { label: "Required pressure", value: u.p(s.sourcePressurePsi), unit: u.U.p, sub: `at source (node ${s.sourceId})`, tone: undefined },
+    { label: "Total demand", value: u.q(s.totalDemandGpm, 0), unit: u.U.q, sub: `${u.q(s.systemFlowGpm, 0)} system + ${u.q(s.hoseAllowanceGpm, 0)} hose`, tone: undefined },
+    { label: "Supply available", value: u.p(s.availablePsi), unit: u.U.p, sub: `@ ${u.q(s.totalDemandGpm, 0)} ${u.U.q}`, tone: undefined },
+    { label: "Margin", value: (s.marginPsi >= 0 ? "+" : "") + u.p(s.marginPsi), unit: u.U.p, sub: s.passesSupply ? "supply adequate" : "supply short", tone: (s.marginPsi >= 0 ? "good" : "bad") as "good" | "bad" },
   ];
 
   const rows: [string, string, ("good" | "warn" | "bad")?][] = [
-    ["System flow (design area)", `${Math.round(s.systemFlowGpm)} gpm`],
-    ["Operating heads (design area)", `${s.operatingHeads}${s.designAreaFt2 ? ` over ${s.designAreaFt2} ft²` : ""}`],
-    ...(s.requiredHeadFlowGpm !== undefined ? [["Required flow per head (density)", `${s.requiredHeadFlowGpm.toFixed(1)} gpm`]] as [string, string][] : []),
-    ["Hose allowance", `${Math.round(s.hoseAllowanceGpm)} gpm`],
-    ["Total demand", `${Math.round(s.totalDemandGpm)} gpm`],
-    ["Required source pressure", `${s.sourcePressurePsi.toFixed(1)} psi`],
-    ["Available at demand", `${s.availablePsi.toFixed(1)} psi`],
-    ["Supply margin", `${s.marginPsi >= 0 ? "+" : ""}${s.marginPsi.toFixed(1)} psi`, s.passesSupply ? "good" : "bad"],
-    ...(s.requiredStoredGal !== undefined ? [["Required stored water", `${s.requiredStoredGal.toLocaleString()} gal @ ${s.durationMin} min${model.network.reservoir?.capacityGal ? ` (tank ${model.network.reservoir.capacityGal.toLocaleString()})` : ""}`, model.network.reservoir?.capacityGal ? (model.network.reservoir.capacityGal >= s.requiredStoredGal ? "good" : "bad") : undefined]] as [string, string, ("good" | "warn" | "bad")?][] : []),
-    ["Most-remote sprinkler", s.mostRemoteSprinkler ? `${s.mostRemoteSprinkler.id} — ${s.mostRemoteSprinkler.pressurePsi.toFixed(1)} psi, ${s.mostRemoteSprinkler.flowGpm.toFixed(1)} gpm` : "—"],
-    ["Min head pressure required", `${s.minSprinklerPressurePsi.toFixed(1)} psi`, s.meetsMinPressure ? "good" : "bad"],
+    ["System flow (design area)", u.qU(s.systemFlowGpm, 0)],
+    ["Operating heads (design area)", `${s.operatingHeads}${s.designAreaFt2 ? ` over ${u.areaU(s.designAreaFt2)}` : ""}`],
+    ...(s.requiredHeadFlowGpm !== undefined ? [["Required flow per head (density)", u.qU(s.requiredHeadFlowGpm)]] as [string, string][] : []),
+    ["Hose allowance", u.qU(s.hoseAllowanceGpm, 0)],
+    ["Total demand", u.qU(s.totalDemandGpm, 0)],
+    ["Required source pressure", u.pU(s.sourcePressurePsi)],
+    ["Available at demand", u.pU(s.availablePsi)],
+    ["Supply margin", `${s.marginPsi >= 0 ? "+" : ""}${u.pU(s.marginPsi)}`, s.passesSupply ? "good" : "bad"],
+    ...(s.requiredStoredGal !== undefined ? [["Required stored water", `${u.galU(s.requiredStoredGal)} @ ${s.durationMin} min${model.network.reservoir?.capacityGal ? ` (tank ${u.galU(model.network.reservoir.capacityGal)})` : ""}`, model.network.reservoir?.capacityGal ? (model.network.reservoir.capacityGal >= s.requiredStoredGal ? "good" : "bad") : undefined]] as [string, string, ("good" | "warn" | "bad")?][] : []),
+    ["Most-remote sprinkler", s.mostRemoteSprinkler ? `${s.mostRemoteSprinkler.id} — ${u.pU(s.mostRemoteSprinkler.pressurePsi)}, ${u.qU(s.mostRemoteSprinkler.flowGpm)}` : "—"],
+    ["Min head pressure required", u.pU(s.minSprinklerPressurePsi), s.meetsMinPressure ? "good" : "bad"],
     ["Heads below minimum", s.lowPressureNodes.length ? `${s.lowPressureNodes.length} (${s.lowPressureNodes.slice(0, 3).map((n) => n.id).join(", ")}${s.lowPressureNodes.length > 3 ? "…" : ""})` : "none", s.lowPressureNodes.length ? "bad" : "good"],
-    ...(s.suctionCheck ? [["Pump suction velocity @ 150% (NFPA 20 ≤ 15 ft/s)", `${s.suctionCheck.velocityFps.toFixed(1)} ft/s`, s.suctionCheck.ok ? "good" : "bad"]] as [string, string, ("good" | "warn" | "bad")?][] : []),
-    ["Max junction imbalance", `${s.maxJunctionImbalanceGpm.toFixed(3)} gpm`, s.maxJunctionImbalanceGpm <= 0.5 ? "good" : "warn"],
+    ...(s.suctionCheck ? [[`Pump suction velocity @ 150% (NFPA 20 ≤ ${u.v(15)} ${u.U.v})`, u.vU(s.suctionCheck.velocityFps), s.suctionCheck.ok ? "good" : "bad"]] as [string, string, ("good" | "warn" | "bad")?][] : []),
+    ["Max junction imbalance", `${u.q(s.maxJunctionImbalanceGpm, 3)} ${u.U.q}`, s.maxJunctionImbalanceGpm <= 0.5 ? "good" : "warn"],
     ["Solver converged", s.converged ? "yes" : "no", s.converged ? "good" : "bad"],
   ];
 
