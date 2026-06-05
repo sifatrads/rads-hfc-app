@@ -317,8 +317,9 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   // solver behaviour is the density-suppression guard below.
   const explicitCount = num(model.designBasis, "operatingSprinklers");
   const residentialCount = residentialDesignCount(model.meta.standardId);
-  // NFPA 15 deluge / water-spray: open nozzles, every head flows at once.
-  const delugeMode = model.meta.fillType === "deluge" || model.meta.systemType === "deluge";
+  // NFPA 15 deluge / water-spray and NFPA 750 water mist: open nozzles, every
+  // head in the zone discharges at once.
+  const delugeMode = model.meta.fillType === "deluge" || model.meta.systemType === "deluge" || model.meta.systemType === "water-mist";
   const open =
     opts.designArea ??
     (delugeMode

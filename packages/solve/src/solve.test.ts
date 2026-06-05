@@ -119,6 +119,37 @@ const fmStorage = parseProject({
   },
 });
 
+describe("NFPA 750 water mist (all nozzles flow)", () => {
+  const mist = parseProject({
+    schemaVersion: 2,
+    meta: { id: "WM", name: "Water mist", systemType: "water-mist", standardId: "nfpa750", units: "metric" },
+    designBasis: { minSprinklerPressurePsi: 175, operatingSprinklers: 1, frictionMethod: "darcy-weisbach" },
+    waterSupply: { type: "city+fire-pump", flowTest: { staticPsi: 200, residualPsi: 180, testFlowGpm: 500 }, firePump: { ratedFlowGpm: 200, ratedPsi: 250, churnPsi: 300 } },
+    network: {
+      nodes: [
+        { id: "SRC", type: "junction", elevationFt: 0 },
+        { id: "CM", type: "junction", elevationFt: 0 },
+        { id: "M1", type: "sprinkler", elevationFt: 0, kFactor: 1.4, coverageAreaFt2: 50 },
+        { id: "M2", type: "sprinkler", elevationFt: 0, kFactor: 1.4, coverageAreaFt2: 50 },
+        { id: "M3", type: "sprinkler", elevationFt: 0, kFactor: 1.4, coverageAreaFt2: 50 },
+      ],
+      pipes: [
+        { id: "P0", from: "SRC", to: "CM", role: "feed-main", nominalSize: "1", material: "stainless-sch10", cFactor: 120, lengthFt: 20 },
+        { id: "P1", from: "CM", to: "M1", role: "branch-line", nominalSize: "1/2", material: "stainless-sch10", cFactor: 120, lengthFt: 8 },
+        { id: "P2", from: "M1", to: "M2", role: "branch-line", nominalSize: "1/2", material: "stainless-sch10", cFactor: 120, lengthFt: 8 },
+        { id: "P3", from: "M2", to: "M3", role: "branch-line", nominalSize: "1/2", material: "stainless-sch10", cFactor: 120, lengthFt: 8 },
+      ],
+      valves: [],
+    },
+  });
+
+  it("opens every nozzle in the zone (ignores the operating-head count)", () => {
+    const s = solveProject(mist).summary;
+    expect(s.operatingHeads).toBe(3); // all 3 flow despite operatingSprinklers: 1
+    expect(s.systemFlowGpm).toBeGreaterThan(0);
+  });
+});
+
 describe("FM DS 8-9 storage (count-at-pressure)", () => {
   it("opens the N most-remote heads and holds them at the scheme minimum pressure", () => {
     const s = solveProject(fmStorage).summary;

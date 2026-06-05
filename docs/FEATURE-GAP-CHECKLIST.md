@@ -58,7 +58,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] NFPA 20 suction-velocity check (≤15 ft/s at 150% flow) ✅ DONE
 - [x] NFPA 15 deluge / water-spray (all nozzles flow at design density) ✅ DONE
 - [x] Darcy-Weisbach method (flow-dependent f, Swamee-Jain, per-material roughness) ✅ DONE
-- [ ] NFPA 750 water mist (D-W trigger, viscosity/density) — niche
+- [x] NFPA 750 water mist (Code + System=water-mist → all-nozzle discharge, high pressure, Darcy-Weisbach + fluid viscosity) ✅ DONE
 - [x] EN 12845 (hazard classes, metric densities, C=100, Table 23 equiv-lengths, four-most-unfavourable report, metric data entry) ✅ DONE
 - [x] FM Global Data Sheets — non-storage HC-1/2/3 density/area (DS 3-26) + STORAGE count-at-pressure schemes (DS 8-9: ESFR/CMSA K+N@Pmin, scheme picker, FM Storage report sheet) ✅ DONE
 - [ ] BS 9251 / EN 16925 residential — UK/EU; large

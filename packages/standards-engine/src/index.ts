@@ -6,19 +6,21 @@ import { nfpa14 } from "./nfpa14";
 import { en12845 } from "./en12845";
 import { fmGlobal } from "./fmglobal";
 import { as2118 } from "./as2118";
+import { nfpa750 } from "./nfpa750";
 
 export * from "./types";
 export * from "./tables-nfpa13";
 export * from "./materials";
 export * from "./sprinklers";
 export * from "./fluids";
-export { nfpa13, nfpa13d, nfpa13r, nfpa14, en12845, fmGlobal, as2118 };
+export { nfpa13, nfpa13d, nfpa13r, nfpa14, en12845, fmGlobal, as2118, nfpa750 };
 
 const REGISTRY: Partial<Record<StandardId, StandardModule>> = {
   nfpa13,
   nfpa13d,
   nfpa13r,
   nfpa14,
+  nfpa750,
   en12845,
   fmds: fmGlobal,
   as2118,

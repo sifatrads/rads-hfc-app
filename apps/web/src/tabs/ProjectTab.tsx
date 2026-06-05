@@ -228,8 +228,8 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             <Txt label="Project no." value={str(model.meta.id)} onChange={(v) => setMeta("id", v)} />
           </Row>
           <Row>
-            <Sel label="Code" value={str(model.meta.standardId, "nfpa13")} options={["nfpa13", "nfpa13d", "nfpa13r", "nfpa14", "en12845", "fmds", "as2118"]} onChange={(v) => onChange(withModel(model, { meta: { ...model.meta, standardId: v, units: standardIsMetric(v) ? "metric" : "imperial" } }))} />
-            <Sel label="System" value={str(model.meta.systemType, "sprinkler")} options={["sprinkler", "standpipe"]} onChange={(v) => setMeta("systemType", v)} />
+            <Sel label="Code" value={str(model.meta.standardId, "nfpa13")} options={["nfpa13", "nfpa13d", "nfpa13r", "nfpa14", "nfpa750", "en12845", "fmds", "as2118"]} onChange={(v) => onChange(withModel(model, { meta: { ...model.meta, standardId: v, units: standardIsMetric(v) ? "metric" : "imperial", ...(v === "nfpa750" ? { systemType: "water-mist" } : {}) } }))} />
+            <Sel label="System" value={str(model.meta.systemType, "sprinkler")} options={["sprinkler", "standpipe", "water-mist"]} onChange={(v) => setMeta("systemType", v)} />
             <Sel label="Fill type" value={str(model.meta.fillType, "wet")} options={["wet", "dry", "preaction", "deluge"]} onChange={(v) => setMeta("fillType", v)} />
             <Sel label="Hazard" value={str(model.meta.hazardClass, hazardOpts[0])} options={hazardOpts} onChange={(v) => setMeta("hazardClass", v)} />
             <Sel label="Units" value={str(model.meta.units, "imperial")} options={["imperial", "metric"]} onChange={(v) => setMeta("units", v)} />

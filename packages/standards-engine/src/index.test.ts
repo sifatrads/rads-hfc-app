@@ -38,6 +38,9 @@ describe("standards-engine: NFPA 13", () => {
     expect(availableStandards()).toContain("nfpa13");
     expect(availableStandards()).toContain("en12845");
     expect(availableStandards()).toContain("fmds");
+    expect(availableStandards()).toContain("nfpa750");
+    expect(getStandard("nfpa750").units).toBe("metric");
+    expect(getStandard("nfpa750").designDensity("light-hazard")).toBeUndefined(); // performance-based
     expect(() => getStandard("iso")).toThrow(/not implemented/i);
   });
 });
