@@ -55,6 +55,9 @@ describe("end-to-end: solve → report → compliance summary", () => {
     expect(typeof cc.result.velocityOk).toBe("boolean");
     expect(typeof cc.supply.storedWaterAdequate).toBe("boolean");
     expect(typeof cc.supply.meetsTargetMargin).toBe("boolean");
+    expect(typeof cc.result.withinComponentRating).toBe("boolean");
+    expect(cc.result.componentRatingPsi).toBe(175);
+    expect(cc.designBasis.deliveredDensityGpmFt2).toBeGreaterThanOrEqual((cc.designBasis.densityGpmFt2 ?? 0) - 1e-4);
     expect(cc.designAreaProof).not.toBeNull();
     // JSON round-trips with no NaN / non-finite leaks
     const round = JSON.parse(JSON.stringify(cc));
@@ -71,5 +74,6 @@ describe("end-to-end: solve → report → compliance summary", () => {
     expect(cc.result.velocityOk).not.toBe(false);
     expect(cc.supply.storedWaterAdequate).toBe(true);
     expect(cc.supply.meetsTargetMargin).toBe(true);
+    expect(cc.result.withinComponentRating).toBe(true);
   });
 });
