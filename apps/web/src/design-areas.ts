@@ -13,6 +13,7 @@ export interface AreaResult {
   label: string;
   anchor: string;
   heads: number;
+  nodeIds: string[];
   sourcePressurePsi: number;
   marginPsi: number;
   passes: boolean;
@@ -68,7 +69,7 @@ export function compareDesignAreas(model: ProjectModel, maxAreas = 5): AreaResul
     seen.add(key);
     try {
       const s = solveProject(model, { designArea: new Set(group) }).summary;
-      results.push({ label: `Area @ ${anchor.id}`, anchor: anchor.id, heads: group.length, sourcePressurePsi: s.sourcePressurePsi, marginPsi: s.marginPsi, passes: s.passesSupply && s.meetsMinPressure });
+      results.push({ label: `Area @ ${anchor.id}`, anchor: anchor.id, heads: group.length, nodeIds: group, sourcePressurePsi: s.sourcePressurePsi, marginPsi: s.marginPsi, passes: s.passesSupply && s.meetsMinPressure });
     } catch { /* skip unsolvable candidate */ }
   }
   // Governing = highest required source pressure (worst case).

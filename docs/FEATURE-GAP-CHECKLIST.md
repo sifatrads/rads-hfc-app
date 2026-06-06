@@ -9,7 +9,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 
 - [ ] Alphanumeric node IDs (≤4 char, e.g. S1, RN3A) — ID flexibility for plan-matching; replaces forced 1..N
 - [x] Hose / Hydrant fixed-flow node flag (gpm on junction/hose-station) ✅ DONE
-- [~] Active-flowing-head (design area) visualization — operating sprinklers (discharge > 0) highlighted with a red halo on the working-plan drawings + legend ✅ DONE (auto-marks the calculated remote area; a draggable area-box UI is a follow-up)
+- [x] Design-area control — auto (most-remote) or LOCK a specific area (AHJ-directed / chosen from the design-area proof); operating heads highlighted on drawings + 3D ✅ DONE
 - [x] Check-Model validation sweep (hanging ends, cyclic, unreachable, no-source) ✅ DONE
 - [x] Zero-diameter / zero-connectivity error check ✅ DONE
 - [ ] CAD auto-heal on node delete (Merge Pipes vs Leave Open) — merge adjacent segments + sum length

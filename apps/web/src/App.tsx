@@ -248,7 +248,7 @@ export function App(): JSX.Element {
               />
             ) : <div style={{ padding: 24, color: C.muted }}>No geometry.</div>
           ) : tab === "summary" ? (
-            <SummaryTab model={model} solution={sol} error={solveError} />
+            <SummaryTab model={model} solution={sol} error={solveError} onChange={(m) => { setModel(m); setNote("Design area updated"); }} />
           ) : tab === "analysis" ? (
             <AnalysisTab model={model} solution={sol} error={solveError} />
           ) : tab === "sizing" ? (

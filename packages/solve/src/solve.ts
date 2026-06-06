@@ -54,6 +54,8 @@ export interface SolveSummary {
   mostRemoteSprinkler?: { id: string; pressurePsi: number; flowGpm: number };
   /** Operating sprinklers in the design area (count). */
   operatingHeads: number;
+  /** True when the operating set was pinned (designBasis.designAreaNodeIds). */
+  manualDesignArea?: boolean;
   /** Design area (ft²) when area-density based. */
   designAreaFt2?: number;
   /** Required discharge per head to meet the design density (gpm). */
@@ -331,8 +333,15 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   // NFPA 15 deluge / water-spray and NFPA 750 water mist: open nozzles, every
   // head in the zone discharges at once.
   const delugeMode = model.meta.fillType === "deluge" || model.meta.systemType === "deluge" || model.meta.systemType === "water-mist";
+  // A locked design area (designBasis.designAreaNodeIds) pins the operating set —
+  // e.g. an AHJ-directed area or a candidate chosen from the design-area proof.
+  const lockedRaw = (model.designBasis as Record<string, unknown> | undefined)?.["designAreaNodeIds"];
+  const spkIds = new Set(sprinklers.map((s) => s.id));
+  const lockedArea = Array.isArray(lockedRaw) ? new Set((lockedRaw as unknown[]).filter((id): id is string => typeof id === "string" && spkIds.has(id))) : undefined;
+  const usedLocked = lockedArea && lockedArea.size > 0 ? lockedArea : undefined;
   const open =
     opts.designArea ??
+    usedLocked ??
     (delugeMode
       ? new Set(sprinklers.map((s) => s.id))
       : // residential (13D=2 / 13R=4) is standard-mandated → it wins over a stale
@@ -468,6 +477,7 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     passesSupply: marginPsi >= -1e-6,
     ...(remote ? { mostRemoteSprinkler: remote } : {}),
     operatingHeads: designNodeIds.length,
+    ...(usedLocked && !opts.designArea ? { manualDesignArea: true } : {}),
     ...(num(model.designBasis, "designAreaFt2") !== undefined ? { designAreaFt2: num(model.designBasis, "designAreaFt2") } : {}),
     ...(requiredHeadFlowGpm !== undefined ? { requiredHeadFlowGpm } : {}),
     minSprinklerPressurePsi,

@@ -8,12 +8,14 @@ import { units } from "../units";
 import { compareDesignAreas, type AreaResult } from "../design-areas";
 import { checkCoverageSpacing, type CoverageReport } from "../coverage-check";
 
-export function SummaryTab({ model, solution, error }: { model: ProjectModel; solution: ProjectSolution | null; error?: string }): JSX.Element {
+export function SummaryTab({ model, solution, error, onChange }: { model: ProjectModel; solution: ProjectSolution | null; error?: string; onChange?: (model: ProjectModel) => void }): JSX.Element {
   const [areas, setAreas] = useState<AreaResult[] | null>(null);
   const [cov, setCov] = useState<CoverageReport | null>(null);
   if (!solution) return <Empty msg={error ? `Solve error: ${error}` : "Add nodes, pipes and a water supply to see results."} />;
   const s = solution.summary;
   const u = units(model);
+  const lockArea = (ids: string[] | undefined) => onChange?.({ ...model, designBasis: { ...(model.designBasis ?? {}), ...(ids ? { designAreaNodeIds: ids } : { designAreaNodeIds: undefined }) } } as ProjectModel);
+  const locked = Array.isArray((model.designBasis as Record<string, unknown> | undefined)?.["designAreaNodeIds"]) && ((model.designBasis as Record<string, unknown>)["designAreaNodeIds"] as unknown[]).length > 0;
   const pass = s.passesSupply && s.meetsMinPressure;
   const cards = [
     { label: "Required pressure", value: u.p(s.sourcePressurePsi), unit: u.U.p, sub: `at source (node ${s.sourceId})`, tone: undefined },
@@ -84,13 +86,19 @@ export function SummaryTab({ model, solution, error }: { model: ProjectModel; so
           <span style={{ flex: 1 }} />
           <button style={areaBtn} onClick={() => setAreas(compareDesignAreas(model))}>⟳ Compare remote areas</button>
         </div>
+        {onChange && (
+          <div style={{ fontSize: 11.5, marginTop: 6, display: "flex", alignItems: "center", gap: 8, color: locked ? C.bad : C.muted }}>
+            <span style={{ fontWeight: locked ? 700 : 400 }}>{locked ? `● Design area: MANUAL (locked) — ${s.operatingHeads} heads` : "Design area: auto (most demanding remote area)"}</span>
+            {locked && <button style={clearBtn} onClick={() => lockArea(undefined)}>Clear → auto</button>}
+          </div>
+        )}
         {areas === null ? (
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>NFPA 13 governs on the most hydraulically demanding area. Solve several candidate remote areas (clustered around the farthest heads) and confirm the auto-picked one is the worst case.</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>NFPA 13 governs on the most hydraulically demanding area. Solve several candidate remote areas (clustered around the farthest heads), confirm the auto-picked one is the worst case — or lock a specific area (e.g. AHJ-directed).</div>
         ) : areas.length === 0 ? (
           <div style={{ fontSize: 12.5, color: C.muted, marginTop: 8 }}>Only one possible design area (operating heads ≥ total heads) — nothing to compare.</div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
-            <thead><tr>{["Remote area", "Heads", `Required (${u.U.p})`, `Margin (${u.U.p})`, ""].map((h) => <th key={h} style={{ fontSize: 10.5, fontWeight: 700, color: C.muted, textAlign: "left", padding: "4px 8px", textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
+            <thead><tr>{["Remote area", "Heads", `Required (${u.U.p})`, `Margin (${u.U.p})`, "", ""].map((h, hi) => <th key={hi} style={{ fontSize: 10.5, fontWeight: 700, color: C.muted, textAlign: "left", padding: "4px 8px", textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
             <tbody>
               {areas.map((a, i) => (
                 <tr key={a.anchor} style={i === 0 ? { background: "#fff7ed" } : i % 2 ? { background: C.zebra } : undefined}>
@@ -99,6 +107,7 @@ export function SummaryTab({ model, solution, error }: { model: ProjectModel; so
                   <td style={{ fontSize: 12.5, padding: "6px 8px", fontWeight: 700 }}>{u.p(a.sourcePressurePsi)}</td>
                   <td style={{ fontSize: 12.5, padding: "6px 8px", color: toneColor(a.marginPsi >= 0 ? "good" : "bad") }}>{a.marginPsi >= 0 ? "+" : ""}{u.p(a.marginPsi)}</td>
                   <td style={{ fontSize: 12.5, padding: "6px 8px", fontWeight: 700, color: toneColor(a.passes ? "good" : "bad") }}>{a.passes ? "PASS" : "REVIEW"}</td>
+                  <td style={{ padding: "4px 8px" }}>{onChange && <button style={lockBtn} onClick={() => lockArea(a.nodeIds)} title="Use this as the locked design area">Lock</button>}</td>
                 </tr>
               ))}
             </tbody>
@@ -149,3 +158,5 @@ const page: CSSProperties = { padding: 18, overflow: "auto", height: "100%", box
 const statGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 };
 const resultBadge: CSSProperties = { color: "#fff", fontWeight: 800, fontSize: 15, letterSpacing: 1, padding: "8px 20px", borderRadius: 8 };
 const areaBtn: CSSProperties = { fontSize: 12, fontWeight: 700, color: "#fff", background: C.accent, border: "none", borderRadius: 7, padding: "6px 12px", cursor: "pointer", whiteSpace: "nowrap" };
+const lockBtn: CSSProperties = { fontSize: 11, fontWeight: 700, color: C.accent, background: "#eef3fb", border: `1px solid ${C.line}`, borderRadius: 6, padding: "3px 9px", cursor: "pointer" };
+const clearBtn: CSSProperties = { fontSize: 11, fontWeight: 700, color: "#fff", background: C.bad, border: "none", borderRadius: 6, padding: "3px 9px", cursor: "pointer" };

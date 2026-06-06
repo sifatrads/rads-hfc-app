@@ -207,6 +207,28 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(solveProject(m).summary.availablePsi).toBeCloseTo(65, 3);
   });
 
+  it("locks the operating set to designBasis.designAreaNodeIds", () => {
+    // two branches; auto would flow the far/most-remote, but we pin the near pair.
+    const nodes: Record<string, unknown>[] = [{ id: "SRC", type: "junction", elevationFt: 0 }, { id: "J", type: "junction", elevationFt: 0 }];
+    const pipes: Record<string, unknown>[] = [{ id: "SUP", from: "SRC", to: "J", role: "feed-main", nominalSize: "3", internalDiameterIn: 3.068, cFactor: 120, lengthFt: 5 }];
+    for (const [pfx, feed] of [["N", 10], ["F", 200]] as const) {
+      let prev = "J";
+      for (let i = 1; i <= 2; i++) { const id = `${pfx}${i}`; nodes.push({ id, type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 120 }); pipes.push({ id: `P-${id}`, from: prev, to: id, role: "branch-line", nominalSize: "1-1/4", internalDiameterIn: 1.38, cFactor: 120, lengthFt: i === 1 ? feed : 10 }); prev = id; }
+    }
+    const m = parseProject({
+      schemaVersion: 2,
+      meta: { id: "LK", name: "locked area", standardId: "nfpa13", hazardClass: "oh1", units: "imperial", systemType: "sprinkler" },
+      designBasis: { sprinklerKFactor: 5.6, operatingSprinklers: 2, minSprinklerPressurePsi: 7, designAreaNodeIds: ["N1", "N2"] },
+      waterSupply: { type: "city+fire-pump", flowTest: { staticPsi: 80, residualPsi: 60, testFlowGpm: 2000 }, firePump: { ratedFlowGpm: 1000, ratedPsi: 120, churnPsi: 140 } },
+      network: { nodes, pipes, valves: [] },
+    });
+    const sol = solveProject(m);
+    expect(sol.summary.manualDesignArea).toBe(true);
+    expect(sol.summary.operatingHeads).toBe(2);
+    expect(sol.results.nodes["N1"]!.dischargeGpm).toBeGreaterThan(1); // pinned heads flow
+    expect(sol.results.nodes["F1"]!.dischargeGpm ?? 0).toBeLessThan(1); // far heads idle
+  });
+
   it("a stray density does not inflate the scheme minimum pressure (method guard)", () => {
     const withDensity = parseProject({
       ...JSON.parse(JSON.stringify(fmStorage)),
