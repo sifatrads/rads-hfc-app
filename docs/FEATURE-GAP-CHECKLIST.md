@@ -83,7 +83,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 
 - [x] Bulk edit (filter pipes by role → set material/size/role across them) ✅ DONE
 - [x] Find node / pipe (filter the tables by id/role/material/note) ✅ DONE
-- [ ] Toggle fixed / variable pressure source node — static supply vs flow-test source
+- [x] Fixed / variable pressure source — supply type selector: city flow-test curve vs fixed-pressure (gravity / elevated tank, flat head); fire pump boosts either ✅ DONE
 - [x] Merge file (combine two networks into one) ✅ DONE
 - [x] Compliance summary export (machine-readable JSON: design basis + demand/supply result + coverage/area/validation checks + cited standard & jurisdiction clauses) for external review (rads-agentic-ai) ✅ DONE
 - [x] Cleanup (remove orphan nodes) ✅ DONE

@@ -191,6 +191,22 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(solveProject(fmStorage).summary.storedWaterAdequate).toBeUndefined();
   });
 
+  it("fixed-pressure source gives a flat supply curve (gravity / elevated tank)", () => {
+    const m = parseProject({
+      schemaVersion: 2,
+      meta: { id: "GT", name: "Gravity tank", standardId: "nfpa13", hazardClass: "oh1", units: "imperial", systemType: "sprinkler" },
+      designBasis: { sprinklerKFactor: 5.6, operatingSprinklers: 2, minSprinklerPressurePsi: 7 },
+      waterSupply: { supplyType: "fixed-pressure", fixedPressurePsi: 65 },
+      network: {
+        nodes: [{ id: "SRC", type: "junction", elevationFt: 0 }, { id: "S1", type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 120 }, { id: "S2", type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 120 }],
+        pipes: [{ id: "P1", from: "SRC", to: "S1", role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor: 120, lengthFt: 10 }, { id: "P2", from: "S1", to: "S2", role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor: 120, lengthFt: 10 }],
+        valves: [],
+      },
+    });
+    // a flat curve → available pressure is the tank head regardless of demand
+    expect(solveProject(m).summary.availablePsi).toBeCloseTo(65, 3);
+  });
+
   it("a stray density does not inflate the scheme minimum pressure (method guard)", () => {
     const withDensity = parseProject({
       ...JSON.parse(JSON.stringify(fmStorage)),

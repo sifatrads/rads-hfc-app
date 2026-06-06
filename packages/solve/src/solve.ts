@@ -103,21 +103,29 @@ function findSource(model: ProjectModel): { id: string; elevationFt: number } {
 
 function supplyCurveFor(model: ProjectModel): { curve: SupplyCurve; maxFlowGpm: number } {
   const ws = model.waterSupply as Record<string, unknown> | undefined;
+  // A fire pump (if modeled) boosts whichever base supply is used.
+  const fp = ws?.["firePump"] as Record<string, unknown> | undefined;
+  const withPump = (curve: SupplyCurve): SupplyCurve =>
+    fp && typeof fp["ratedFlowGpm"] === "number"
+      ? pumpOnSuction(curve, {
+          churnPsi: (fp["churnPsi"] as number) ?? (fp["ratedPsi"] as number) * 1.2,
+          ratedFlowGpm: fp["ratedFlowGpm"] as number,
+          ratedPsi: (fp["ratedPsi"] as number) ?? 0,
+          ...(typeof fp["overloadFlowGpm"] === "number" ? { overloadFlowGpm: fp["overloadFlowGpm"] as number } : {}),
+          ...(typeof fp["overloadPsi"] === "number" ? { overloadPsi: fp["overloadPsi"] as number } : {}),
+        })
+      : curve;
+
+  // Fixed-pressure source: gravity / elevated tank — a flat curve at the tank head.
+  if (ws?.["supplyType"] === "fixed-pressure") {
+    const psi = typeof ws["fixedPressurePsi"] === "number" ? (ws["fixedPressurePsi"] as number) : 50;
+    return { curve: withPump(constantPressureCurve(psi)), maxFlowGpm: 2000 };
+  }
+
   const ft = ws?.["flowTest"] as Record<string, unknown> | undefined;
   if (ft && typeof ft["staticPsi"] === "number") {
     const test: FlowTest = { staticPsi: ft["staticPsi"] as number, residualPsi: (ft["residualPsi"] as number) ?? (ft["staticPsi"] as number), testFlowGpm: (ft["testFlowGpm"] as number) ?? 1000 };
-    let curve = cityCurve(test);
-    const fp = ws?.["firePump"] as Record<string, unknown> | undefined;
-    if (fp && typeof fp["ratedFlowGpm"] === "number") {
-      curve = pumpOnSuction(curve, {
-        churnPsi: (fp["churnPsi"] as number) ?? (fp["ratedPsi"] as number) * 1.2,
-        ratedFlowGpm: fp["ratedFlowGpm"] as number,
-        ratedPsi: (fp["ratedPsi"] as number) ?? 0,
-        ...(typeof fp["overloadFlowGpm"] === "number" ? { overloadFlowGpm: fp["overloadFlowGpm"] as number } : {}),
-        ...(typeof fp["overloadPsi"] === "number" ? { overloadPsi: fp["overloadPsi"] as number } : {}),
-      });
-    }
-    return { curve, maxFlowGpm: test.testFlowGpm * 1.5 };
+    return { curve: withPump(cityCurve(test)), maxFlowGpm: test.testFlowGpm * 1.5 };
   }
   return { curve: constantPressureCurve(100), maxFlowGpm: 2000 };
 }

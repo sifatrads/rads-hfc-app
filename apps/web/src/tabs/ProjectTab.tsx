@@ -342,13 +342,22 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
         </Section>
 
         {/* Water supply */}
-        <Section title="Water supply (city flow test)">
+        <Section title="Water supply">
           <Row>
-            <Num label={`Static (${U.p})`} value={dispPsi(num(ft["staticPsi"]))} step={metric ? 0.1 : 1} onChange={(v) => setFlow("staticPsi", storPsi(v))} />
-            <Num label={`Residual (${U.p})`} value={dispPsi(num(ft["residualPsi"]))} step={metric ? 0.1 : 1} onChange={(v) => setFlow("residualPsi", storPsi(v))} />
-            <Num label={`Test flow (${U.flow})`} value={dispFlow(num(ft["testFlowGpm"]))} step={metric ? 100 : 50} onChange={(v) => setFlow("testFlowGpm", storFlow(v))} />
+            <Sel label="Supply type" value={str(ws["supplyType"], "flow-test")} options={["flow-test", "fixed-pressure"]} onChange={(v) => setSupply("supplyType", v)} />
           </Row>
-          <div style={hint}>Add a fire pump in the Fire Pump section below — it feeds this supply curve.</div>
+          {str(ws["supplyType"], "flow-test") === "fixed-pressure" ? (
+            <Row>
+              <Num label={`Available pressure (${U.p})`} value={dispPsi(num(ws["fixedPressurePsi"]))} step={metric ? 0.1 : 1} onChange={(v) => setSupply("fixedPressurePsi", storPsi(v))} />
+            </Row>
+          ) : (
+            <Row>
+              <Num label={`Static (${U.p})`} value={dispPsi(num(ft["staticPsi"]))} step={metric ? 0.1 : 1} onChange={(v) => setFlow("staticPsi", storPsi(v))} />
+              <Num label={`Residual (${U.p})`} value={dispPsi(num(ft["residualPsi"]))} step={metric ? 0.1 : 1} onChange={(v) => setFlow("residualPsi", storPsi(v))} />
+              <Num label={`Test flow (${U.flow})`} value={dispFlow(num(ft["testFlowGpm"]))} step={metric ? 100 : 50} onChange={(v) => setFlow("testFlowGpm", storFlow(v))} />
+            </Row>
+          )}
+          <div style={hint}>{str(ws["supplyType"], "flow-test") === "fixed-pressure" ? "Gravity / elevated tank — a roughly constant head regardless of flow." : "City flow test — pressure drops with flow (N¹·⁸⁵ curve)."} A fire pump in the section below boosts either supply.</div>
         </Section>
 
         {/* Suction */}
