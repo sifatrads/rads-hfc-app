@@ -85,6 +85,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [ ] 3D object viewer (right-click localized assembly preview) — medium
 - [~] Sprinkler coverage & spacing check (per-head area + along-branch spacing vs NFPA 13 hazard limits; Summary tab) ✅ DONE — full ceiling-grid/plan layout check is a follow-up
 - [x] Protected-area coverage adequacy — installed heads must cover the building/floor footprint (Σ head coverage ≥ protected area); Summary + Compliance Checklist + JSON export ✅ DONE
+- [x] Extended-coverage (EC) sprinkler limits — coverageType=extended-coverage raises the coverage/spacing max (≈400 ft²/20 ft, AUDIT vs listing) so EC factory-floor heads are not false-flagged ✅ DONE
 - [ ] Vertical-offset / clash checking (elevation) — coordination; medium
 
 ## Menus & File Ops

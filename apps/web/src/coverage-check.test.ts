@@ -45,6 +45,14 @@ describe("checkCoverageSpacing", () => {
     expect(r.overCoverage).toBe(0); // 200 ft² is within LH
   });
 
+  it("uses extended-coverage limits when coverageType is extended-coverage", () => {
+    expect(checkCoverageSpacing(m).overCoverage).toBe(1); // BIG (200 ft²) over the OH standard max (130)
+    const ec = parseProject({ ...JSON.parse(JSON.stringify(m)), designBasis: { coverageType: "extended-coverage" } });
+    const r = checkCoverageSpacing(ec);
+    expect(r.maxAreaFt2).toBe(400);
+    expect(r.overCoverage).toBe(0); // 200 ft² is within EC — no longer false-flagged
+  });
+
   it("sums head coverage and checks it against the protected floor area", () => {
     const r = checkCoverageSpacing(m);
     expect(r.totalCoverageFt2).toBe(420); // 100 + 200 + 120

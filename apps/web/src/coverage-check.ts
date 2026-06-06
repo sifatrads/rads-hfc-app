@@ -34,8 +34,12 @@ export interface CoverageReport {
   buildingCoverageOk?: boolean;
 }
 
-/** Standard-coverage, unobstructed limits {maxArea ft², maxSpacing ft} by hazard. */
-function limitsFor(hazard: string): { maxAreaFt2: number; maxSpacingFt: number } {
+/** Coverage / spacing limits {maxArea ft², maxSpacing ft} by hazard. Standard-
+ * spray, unobstructed by default; extended-coverage (EC) heads are listed for a
+ * larger area/spacing (up to ≈ 400 ft² / 20 ft — ⚠ representative upper bound,
+ * confirm each EC head against its listing). */
+function limitsFor(hazard: string, extended: boolean): { maxAreaFt2: number; maxSpacingFt: number } {
+  if (extended) return { maxAreaFt2: 400, maxSpacingFt: 20 }; // EC gross upper bound (AUDIT vs listing)
   const h = hazard.toLowerCase();
   if (h.startsWith("lh") || h === "light" || h === "elh") return { maxAreaFt2: 225, maxSpacingFt: 15 };
   if (h.startsWith("eh") || h.startsWith("hh") || h === "hc-3") return { maxAreaFt2: 100, maxSpacingFt: 12 };
@@ -44,7 +48,8 @@ function limitsFor(hazard: string): { maxAreaFt2: number; maxSpacingFt: number }
 
 export function checkCoverageSpacing(model: ProjectModel): CoverageReport {
   const hazard = String(model.meta.hazardClass ?? "oh2");
-  const lim = limitsFor(hazard);
+  const extended = (model.designBasis as Record<string, unknown> | undefined)?.["coverageType"] === "extended-coverage";
+  const lim = limitsFor(hazard, extended);
   // along-branch spacing ≈ the longest pipe feeding each head from upstream.
   const feedLen = new Map<string, number>();
   for (const p of model.network.pipes) {

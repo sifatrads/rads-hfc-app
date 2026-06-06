@@ -199,7 +199,8 @@ function complianceChecklistSpec(model: ProjectModel, sol: ProjectSolution): Spe
 
   // inline coverage / spacing check (NFPA 13 / BNBC 4.4.7 standard-coverage limits)
   const hz = String(m.hazardClass ?? "oh2").toLowerCase();
-  const lim = hz.startsWith("lh") || hz === "light" || hz === "elh" ? { a: 225, sp: 15 } : hz.startsWith("eh") || hz.startsWith("hh") || hz === "hc-3" ? { a: 100, sp: 12 } : { a: 130, sp: 15 };
+  const ec = (model.designBasis as Record<string, unknown> | undefined)?.["coverageType"] === "extended-coverage";
+  const lim = ec ? { a: 400, sp: 20 } : hz.startsWith("lh") || hz === "light" || hz === "elh" ? { a: 225, sp: 15 } : hz.startsWith("eh") || hz.startsWith("hh") || hz === "hc-3" ? { a: 100, sp: 12 } : { a: 130, sp: 15 };
   const feed = new Map<string, number>();
   for (const p of model.network.pipes) feed.set(p.to, Math.max(feed.get(p.to) ?? 0, (p.lengthFt ?? 0) + (p.additionalLengthFt ?? 0)));
   const heads = model.network.nodes.filter((n) => n.type === "sprinkler" && (n.kFactor ?? 0) > 0);
