@@ -179,6 +179,18 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(s.durationMin).toBe(60);
   });
 
+  it("flags stored-water adequacy against the reservoir capacity", () => {
+    const req = solveProject(fmStorage).summary.requiredStoredGal!;
+    const base = JSON.parse(JSON.stringify(fmStorage));
+    const ample = solveProject(parseProject({ ...base, network: { ...base.network, reservoir: { kind: "ground-tank", capacityGal: req + 5000 } } })).summary;
+    expect(ample.availableStoredGal).toBe(req + 5000);
+    expect(ample.storedWaterAdequate).toBe(true);
+    const undersized = solveProject(parseProject({ ...base, network: { ...base.network, reservoir: { kind: "ground-tank", capacityGal: req - 1000 } } })).summary;
+    expect(undersized.storedWaterAdequate).toBe(false);
+    // no reservoir → adequacy is unknown (undefined)
+    expect(solveProject(fmStorage).summary.storedWaterAdequate).toBeUndefined();
+  });
+
   it("a stray density does not inflate the scheme minimum pressure (method guard)", () => {
     const withDensity = parseProject({
       ...JSON.parse(JSON.stringify(fmStorage)),

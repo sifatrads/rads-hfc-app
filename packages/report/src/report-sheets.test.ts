@@ -138,8 +138,8 @@ describe("NFPA §27.4 report sheets", () => {
       },
     });
     const nameplate = reportSheets(m, solveProject(m)).find((s) => s.title === "Riser Nameplate")!;
-    expect(nameplate.svg).toContain(" L @"); // litres, metric
-    expect(nameplate.svg).not.toContain(" gal @");
+    expect(nameplate.svg).toContain(" L req"); // litres, metric
+    expect(nameplate.svg).not.toContain(" gal");
   });
 
   it("renders computed flows/pressures into the worksheet", () => {

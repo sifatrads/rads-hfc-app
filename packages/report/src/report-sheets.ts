@@ -177,7 +177,7 @@ function complianceChecklistSpec(model: ProjectModel, sol: ProjectSolution): Spe
     { req: "Hydraulic calculation balanced / converged", status: s.converged ? "PASS" : "REVIEW", ref: `${stdId} Ch.27` },
     { req: `Demand applied over the most demanding area (${s.operatingHeads} heads${s.designAreaFt2 ? ` / ${u.areaU(s.designAreaFt2)}` : ""})`, status: "PASS", ref: `${stdId} Fig.19.2.3.1.1` },
     { req: "Hose-stream allowance included in the demand", status: (s.hoseAllowanceGpm ?? 0) > 0 ? "PASS" : m.systemType === "water-mist" ? "N/A" : "REVIEW", ref: `${stdId} Tbl.19.3.3.1.2` },
-    { req: `Water-supply duration / stored volume${s.requiredStoredGal !== undefined ? ` (${u.galU(s.requiredStoredGal)} @ ${s.durationMin}m)` : ""}`, status: "INFO", ref: `${stdId} supply` },
+    { req: `Stored water meets demand × duration${s.requiredStoredGal !== undefined ? ` (req ${u.galU(s.requiredStoredGal)} @ ${s.durationMin}m${s.availableStoredGal !== undefined ? `, tank ${u.galU(s.availableStoredGal)}` : ""})` : ""}`, status: s.storedWaterAdequate === undefined ? "INFO" : s.storedWaterAdequate ? "PASS" : "REVIEW", ref: `${stdId} supply` },
     { req: `Sprinkler protection area within the ${hz.toUpperCase()} maximum (${u.areaU(lim.a)})`, status: heads.length === 0 ? "N/A" : overCov === 0 ? "PASS" : "REVIEW", ref: covRef },
     { req: `Sprinkler spacing within the ${hz.toUpperCase()} maximum (${u.l(lim.sp)} ${u.U.l})`, status: heads.length === 0 ? "N/A" : overSp === 0 ? "PASS" : "REVIEW", ref: covRef },
     { req: "Design values grounded against the published standard", status: std?.verified ? "PASS" : "REVIEW", ref: std?.edition ? `${stdId} ${std.edition}` : stdId },
@@ -200,7 +200,7 @@ function complianceChecklistSpec(model: ProjectModel, sol: ProjectSolution): Spe
   });
   el.push(rect(x, y - rows.length * rowH, w, rows.length * rowH, { stroke: C.line, sw: 0.6, rx: mm(0.8) }));
 
-  const pass = s.passesSupply && s.meetsMinPressure && overCov === 0 && overSp === 0;
+  const pass = s.passesSupply && s.meetsMinPressure && overCov === 0 && overSp === 0 && s.storedWaterAdequate !== false;
   y += mm(5);
   el.push(rect(x, y, w, mm(12), { fill: pass ? "#ecfdf5" : "#fff7ed", stroke: pass ? C.good : C.warn, sw: 1, rx: mm(1.4) }));
   el.push(T(x + mm(4), y + mm(7.5), pass ? "DESIGN MEETS THE CHECKED REQUIREMENTS — subject to engineer review & AHJ acceptance" : "REVIEW REQUIRED — one or more checked items did not pass", { size: mm(3), fill: pass ? C.good : C.warn, weight: "700" }));
@@ -289,8 +289,8 @@ function riserNameplateSpec(model: ProjectModel, sol: ProjectSolution): Spec {
     ["@ test flow", u.qU(num(ft, "testFlowGpm"))],
     ["Available @ demand", u.pU(s.availablePsi)],
     ["Safety margin", u.pU(s.marginPsi)],
-    ["Stored water (req)", s.requiredStoredGal !== undefined ? `${u.galU(s.requiredStoredGal)} @ ${s.durationMin}m` : "—"],
-    ["Supply adequate", s.passesSupply ? "YES" : "NO"],
+    ["Stored water", s.requiredStoredGal !== undefined ? `${u.galU(s.requiredStoredGal)} req${s.availableStoredGal !== undefined ? ` / ${u.galU(s.availableStoredGal)} tank` : ""}` : "—"],
+    ["Supply adequate", `${s.passesSupply ? "YES" : "NO"}${s.storedWaterAdequate === false ? " · LOW STORAGE" : ""}`],
   ]);
   const basis = infoBox(rx, y, half, "Design basis", [
     ["Method", String(db?.["method"] ?? "density/area")],
@@ -348,8 +348,8 @@ function fmStorageSchemeSpec(model: ProjectModel, sol: ProjectSolution): Spec {
     ["Total demand", u.qU(s.totalDemandGpm)],
     ["Required pressure", u.pU(s.sourcePressurePsi)],
     ["Available @ demand", u.pU(s.availablePsi)],
-    ["Stored water (req)", s.requiredStoredGal !== undefined ? `${u.galU(s.requiredStoredGal)} @ ${s.durationMin}m` : "—"],
-    ["Supply adequate", s.passesSupply ? "YES" : "NO"],
+    ["Stored water", s.requiredStoredGal !== undefined ? `${u.galU(s.requiredStoredGal)} req${s.availableStoredGal !== undefined ? ` / ${u.galU(s.availableStoredGal)} tank` : ""}` : "—"],
+    ["Supply adequate", `${s.passesSupply ? "YES" : "NO"}${s.storedWaterAdequate === false ? " · LOW STORAGE" : ""}`],
   ]);
   el.push(scheme.svg, demand.svg);
 

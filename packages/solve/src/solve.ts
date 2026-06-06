@@ -70,6 +70,9 @@ export interface SolveSummary {
    * duration is given; with the reservoir capacity if modeled. */
   requiredStoredGal?: number;
   durationMin?: number;
+  /** Reservoir/tank capacity (gal) if modeled, and whether it meets the requirement. */
+  availableStoredGal?: number;
+  storedWaterAdequate?: boolean;
   converged: boolean;
 }
 
@@ -428,9 +431,11 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   const availablePsi = supply(totalDemandGpm);
   const marginPsi = availablePsi - sourceP;
 
-  // Stored-water requirement = total demand × supply duration.
+  // Stored-water requirement = total demand × supply duration, vs tank capacity.
   const durationMin = num(model.designBasis, "durationMin");
   const requiredStoredGal = durationMin !== undefined ? Math.round(totalDemandGpm * durationMin) : undefined;
+  const availableStoredGal = num(model.network.reservoir, "capacityGal");
+  const storedWaterAdequate = requiredStoredGal !== undefined && availableStoredGal !== undefined ? availableStoredGal >= requiredStoredGal : undefined;
 
   // NFPA 20: suction velocity at 150% rated flow must not exceed 15 ft/s.
   const suction = model.network.suction;
@@ -467,6 +472,8 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     supplyCurveSamples: sampleCurve(supply, maxFlowGpm, 24),
     ...(suctionCheck ? { suctionCheck } : {}),
     ...(requiredStoredGal !== undefined ? { requiredStoredGal, durationMin } : {}),
+    ...(availableStoredGal !== undefined ? { availableStoredGal } : {}),
+    ...(storedWaterAdequate !== undefined ? { storedWaterAdequate } : {}),
     converged: gga.converged,
   };
 
