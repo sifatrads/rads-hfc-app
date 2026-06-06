@@ -72,7 +72,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] NFPA 13 log-grid graph (Q^1.85 X-axis) — in-app Graph now uses the Q^1.85 scale ✅ DONE
 - [x] Interactive sizing editor ✅ DONE (Sizing tab: edit size/material inline → live re-solve → flow/velocity/loss + margin update; velocity-flag, worst-first sort, ⬆⬇ bump; auto-size velocity / auto-size to pass / economize; ↔ 3D pipe-selection sync; metric-aware)
 - [ ] 3D object viewer (right-click localized assembly preview) — medium
-- [ ] Sprinkler-spacing verification vs ceiling grid (plan) — needs ceiling data; medium
+- [~] Sprinkler coverage & spacing check (per-head area + along-branch spacing vs NFPA 13 hazard limits; Summary tab) ✅ DONE — full ceiling-grid/plan layout check is a follow-up
 - [ ] Vertical-offset / clash checking (elevation) — coordination; medium
 
 ## Menus & File Ops

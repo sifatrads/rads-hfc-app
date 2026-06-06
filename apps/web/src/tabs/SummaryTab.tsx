@@ -6,9 +6,11 @@ import type { ProjectSolution } from "@rads/solve";
 import { C, FONT, card, sectionTitle, toneColor } from "../ui";
 import { units } from "../units";
 import { compareDesignAreas, type AreaResult } from "../design-areas";
+import { checkCoverageSpacing, type CoverageReport } from "../coverage-check";
 
 export function SummaryTab({ model, solution, error }: { model: ProjectModel; solution: ProjectSolution | null; error?: string }): JSX.Element {
   const [areas, setAreas] = useState<AreaResult[] | null>(null);
+  const [cov, setCov] = useState<CoverageReport | null>(null);
   if (!solution) return <Empty msg={error ? `Solve error: ${error}` : "Add nodes, pipes and a water supply to see results."} />;
   const s = solution.summary;
   const u = units(model);
@@ -101,6 +103,38 @@ export function SummaryTab({ model, solution, error }: { model: ProjectModel; so
               ))}
             </tbody>
           </table>
+        )}
+      </div>
+
+      <div style={{ ...card, padding: 16, maxWidth: 640 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={sectionTitle}>Coverage &amp; spacing (NFPA 13)</div>
+          <span style={{ flex: 1 }} />
+          <button style={areaBtn} onClick={() => setCov(checkCoverageSpacing(model))}>⟳ Check coverage</button>
+        </div>
+        {cov === null ? (
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Verify each sprinkler's protection area and along-branch spacing against the NFPA 13 maximums for the hazard.</div>
+        ) : cov.heads.length === 0 ? (
+          <div style={{ fontSize: 12.5, color: C.muted, marginTop: 8 }}>No sprinklers to check.</div>
+        ) : (
+          <>
+            <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>{cov.hazard.toUpperCase()} limits: ≤ {u.area(cov.maxAreaFt2)} {u.U.area}/head · spacing ≤ {u.l(cov.maxSpacingFt)} {u.U.l}. {cov.overCoverage + cov.overSpacing === 0 ? "All heads within limits." : `${cov.overCoverage} over-area · ${cov.overSpacing} over-spacing.`}</div>
+            {(cov.overCoverage + cov.overSpacing) > 0 && (
+              <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
+                <thead><tr>{["Head", `Coverage (${u.U.area})`, `Spacing (${u.U.l})`, "Issue"].map((h) => <th key={h} style={{ fontSize: 10.5, fontWeight: 700, color: C.muted, textAlign: "left", padding: "4px 8px", textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {cov.heads.filter((h) => h.overCoverage || h.overSpacing).map((h, i) => (
+                    <tr key={h.id} style={i % 2 ? { background: C.zebra } : undefined}>
+                      <td style={{ fontSize: 12.5, padding: "6px 8px", fontWeight: 700, color: C.primary }}>{h.id}</td>
+                      <td style={{ fontSize: 12.5, padding: "6px 8px", color: toneColor(h.overCoverage ? "bad" : undefined), fontWeight: h.overCoverage ? 700 : 400 }}>{u.area(h.coverageFt2)}</td>
+                      <td style={{ fontSize: 12.5, padding: "6px 8px", color: toneColor(h.overSpacing ? "bad" : undefined), fontWeight: h.overSpacing ? 700 : 400 }}>{u.l(h.spacingFt)}</td>
+                      <td style={{ fontSize: 12, padding: "6px 8px", color: C.bad }}>{[h.overCoverage ? "area" : "", h.overSpacing ? "spacing" : ""].filter(Boolean).join(" + ")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
         )}
       </div>
     </div>
