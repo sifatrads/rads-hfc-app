@@ -254,9 +254,58 @@ function designAreaFactor(model: ProjectModel): number {
   return 1;
 }
 
+/**
+ * NFPA 13 §27.2.4.2.2 "remote area shape": the design area is a rectangle whose
+ * dimension parallel to the branch lines is 1.2·√A, so each branch line carries
+ * ceil(1.2·√A / spacing) sprinklers, taken from the most-remote branch lines
+ * inward until A is covered. Returns undefined (caller falls back to the simple
+ * most-remote accumulation) unless the topology is a clear multi-branch tree
+ * (pipe roles set + ≥ 2 branch lines), so models without roles are unaffected.
+ */
+function branchAwareAreaSet(model: ProjectModel, sourceId: string, designArea: number): Set<string> | undefined {
+  const pipes = model.network.pipes;
+  if (!pipes.some((p) => p.role && p.role !== "branch-line")) return undefined; // roles not set → can't identify branches
+  const cov = new Map(model.network.nodes.map((n) => [n.id, n.coverageAreaFt2 ?? 130]));
+  const spkIds = model.network.nodes.filter((n) => n.type === "sprinkler" && typeof n.kFactor === "number" && n.kFactor > 0).map((n) => n.id);
+  if (spkIds.length === 0) return undefined;
+
+  // union-find over branch-line pipes only → each component is one branch line
+  const parent = new Map<string, string>(model.network.nodes.map((n) => [n.id, n.id]));
+  const find = (x: string): string => { let r = x; while (parent.get(r) !== r) r = parent.get(r)!; while (parent.get(x) !== r) { const n = parent.get(x)!; parent.set(x, r); x = n; } return r; };
+  for (const p of pipes) if ((p.role ?? "branch-line") === "branch-line" && parent.has(p.from) && parent.has(p.to)) { const a = find(p.from), b = find(p.to); if (a !== b) parent.set(a, b); }
+
+  const branches = new Map<string, string[]>();
+  for (const id of spkIds) { const r = find(id); (branches.get(r) ?? branches.set(r, []).get(r)!).push(id); }
+  if (branches.size < 2) return undefined; // single branch → simple accumulation is equivalent
+
+  const dist = pathDistances(model, sourceId);
+  const feedLen = new Map<string, number>(); // branch-line pipe length feeding each sprinkler ≈ spacing
+  for (const p of pipes) if ((p.role ?? "branch-line") === "branch-line" && cov.has(p.to) && model.network.nodes.find((n) => n.id === p.to)?.type === "sprinkler") feedLen.set(p.to, (p.lengthFt ?? 0) + (p.additionalLengthFt ?? 0));
+
+  const dimFt = 1.2 * Math.sqrt(designArea);
+  const branchList = [...branches.values()].map((ids) => {
+    const sorted = ids.slice().sort((a, b) => (dist.get(b) ?? 0) - (dist.get(a) ?? 0)); // most-remote first
+    const sp = ids.map((id) => feedLen.get(id)).filter((v): v is number => typeof v === "number" && v > 0);
+    const S = sp.length ? sp.reduce((s, v) => s + v, 0) / sp.length : 10;
+    return { sorted, perBranch: Math.max(1, Math.ceil(dimFt / S)), remote: Math.max(...ids.map((id) => dist.get(id) ?? 0)) };
+  }).sort((a, b) => b.remote - a.remote); // most-remote branch first
+
+  const set = new Set<string>();
+  let area = 0;
+  for (const br of branchList) {
+    for (let i = 0; i < br.perBranch && i < br.sorted.length && area < designArea; i++) { const id = br.sorted[i]!; set.add(id); area += cov.get(id) ?? 130; }
+    if (area >= designArea) break;
+  }
+  return set.size > 0 ? set : undefined;
+}
+
 function autoPeakAreaSet(model: ProjectModel, sourceId: string): Set<string> | undefined {
   const designArea = (num(model.designBasis, "designAreaFt2") ?? 0) * designAreaFactor(model);
   if (!designArea) return undefined;
+  // Prefer the code-exact 1.2·√A branch-aware area when the topology is a clear
+  // multi-branch tree; otherwise accumulate the most-remote heads by distance.
+  const ba = branchAwareAreaSet(model, sourceId, designArea);
+  if (ba) return ba;
   const dist = pathDistances(model, sourceId);
   const spk = model.network.nodes.filter((n) => n.type === "sprinkler" && typeof n.kFactor === "number" && n.kFactor > 0);
   if (spk.length === 0) return undefined;

@@ -58,6 +58,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 **Already covered:** ✅ NFPA 13 (Sch40 ID, C-value, fitting/valve equiv-len, H-W C, equiv-len modifier) · ✅ Hazen-Williams · ✅ Gridded/looped/tree solver · ✅ Design-area = N most-remote · ✅ Pv / Pn=Pt−Pv · ✅ Pump + 150% overload (graph) · ✅ Required-pressure search
 
 - [x] Auto-Peak: derives operating heads from design area + density-driven min pressure ✅ DONE
+- [x] 1.2·√A rectangular remote-area shape (NFPA 13 §27.2.4.2.2) — branch-aware Auto-Peak: ceil(1.2√A / spacing) heads per branch across the most-remote branch lines; safe fallback to distance-based when topology unclear ✅ DONE
 - [x] Delivered-density verification — density actually delivered at the most-remote head (discharge/coverage) vs design density, explicit on the Compliance Checklist + JSON export ✅ DONE
 - [x] NFPA 14 standpipe auto-sizing (residual at most-remote outlet, per-standpipe flow) ✅ DONE
 - [x] NFPA 13D automation (two most-remote heads, no hose allowance) ✅ DONE

@@ -317,6 +317,35 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(s.deliveredDensityGpmFt2).toBeGreaterThanOrEqual(0.2 - 1e-6); // delivers at least the design density
   });
 
+  it("selects a 1.2·√A rectangular remote area across branch lines (NFPA 13 §27.2.4.2.2)", () => {
+    // two 8-head branch lines: A off the far cross-main end, B off the near end.
+    const nodes: Record<string, unknown>[] = [{ id: "SRC", type: "junction", elevationFt: 0 }, { id: "CM1", type: "junction", elevationFt: 0 }, { id: "CM2", type: "junction", elevationFt: 0 }];
+    const pipes: Record<string, unknown>[] = [
+      { id: "FEED", from: "SRC", to: "CM1", role: "feed-main", nominalSize: "4", internalDiameterIn: 4.026, cFactor: 120, lengthFt: 5 },
+      { id: "XM", from: "CM1", to: "CM2", role: "cross-main", nominalSize: "3", internalDiameterIn: 3.068, cFactor: 120, lengthFt: 100 },
+    ];
+    for (const [pfx, root] of [["A", "CM2"], ["B", "CM1"]] as const) {
+      let prev = root;
+      for (let i = 1; i <= 8; i++) { const id = `${pfx}${i}`; nodes.push({ id, type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 100 }); pipes.push({ id: `P-${id}`, from: prev, to: id, role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor: 120, lengthFt: 10 }); prev = id; }
+    }
+    const m = parseProject({
+      schemaVersion: 2,
+      meta: { id: "BA", name: "branch area", standardId: "nfpa13", hazardClass: "oh2", units: "imperial", systemType: "sprinkler" },
+      designBasis: { sprinklerKFactor: 5.6, densityGpmFt2: 0.2, designAreaFt2: 600, minSprinklerPressurePsi: 7, hoseAllowanceGpm: 250 },
+      waterSupply: { type: "city+fire-pump", flowTest: { staticPsi: 100, residualPsi: 85, testFlowGpm: 4000 }, firePump: { ratedFlowGpm: 2000, ratedPsi: 140, churnPsi: 160 } },
+      network: { nodes, pipes, valves: [] },
+    });
+    const sol = solveProject(m);
+    // 1.2·√600 = 29.4 ft → ceil(29.4/10) = 3 heads/branch; 600 ft² / 100 = 6 heads = 3 from each of the 2 most-remote branches
+    expect(sol.summary.operatingHeads).toBe(6);
+    const flows = (id: string) => (sol.results.nodes[id]?.dischargeGpm ?? 0) > 1;
+    const aFlow = ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"].filter(flows).length;
+    const bFlow = ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8"].filter(flows).length;
+    expect(aFlow).toBe(3); // capped at 3/branch — NOT all 6 from the most-remote branch
+    expect(bFlow).toBe(3); // spread to the adjacent branch line
+    expect(flows("A8") && flows("B8")).toBe(true); // the most-remote head on each
+  });
+
   it("required stored water = total demand × duration", () => {
     const s = solveProject(fmStorage).summary;
     expect(s.requiredStoredGal).toBe(Math.round(s.totalDemandGpm * 60));
