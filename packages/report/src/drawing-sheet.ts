@@ -135,12 +135,18 @@ export function renderDrawingSheetSvg(scene: AnnotatedScene, opts: DrawingSheetO
   }
   // ── nodes (sprinklers = NFPA-170 head symbols) ──
   const usedSymbols = new Set<string>();
+  let anyFlowing = false;
   for (const n of scene.nodes) {
     const c = TN(n.id);
     if (n.kind === "sprinkler" || n.kind === "hose-station") {
       const sym = symbolIdFor(n.sprinklerType ?? "sprinkler-generic");
       usedSymbols.add(sym);
-      el.push(renderSymbolSvg(sym, { cx: c.x, cy: c.y, r: mm(1.4), color: "#e53935", strokeWidth: 0.9 }));
+      // operating heads (in the design / remote area) discharge — highlight them
+      // with a halo; idle heads render in grey so the calculated area stands out.
+      const flowing = (n.result?.dischargeGpm ?? 0) > 0.5;
+      anyFlowing ||= flowing;
+      if (flowing) el.push(`<circle cx="${f(c.x)}" cy="${f(c.y)}" r="${f(mm(2.3))}" fill="#fde2e2" stroke="#e5393566" stroke-width="0.4"/>`);
+      el.push(renderSymbolSvg(sym, { cx: c.x, cy: c.y, r: mm(1.4), color: flowing ? "#e53935" : "#9aa6b2", strokeWidth: 0.9 }));
     } else {
       el.push(`<circle cx="${f(c.x)}" cy="${f(c.y)}" r="${f(mm(0.85))}" fill="${nodeColors.get(n.id) ?? "#263238"}"/>`);
     }
@@ -199,6 +205,10 @@ export function renderDrawingSheetSvg(scene: AnnotatedScene, opts: DrawingSheetO
     el.push(rect(lx, ly - mm(2.3), sw, mm(2.6), { fill: e.swatch }));
     el.push(t(lx + sw + mm(1), ly, e.label, lf, C.ink));
     lx += sw + mm(1.5) + e.label.length * lf * 0.56 + mm(4);
+  }
+  if (anyFlowing) {
+    el.push(`<circle cx="${f(lx + mm(2))}" cy="${f(ly - mm(1))}" r="${f(mm(1.7))}" fill="#fde2e2" stroke="#e53935" stroke-width="0.5"/>`);
+    el.push(t(lx + mm(4.5), ly, "Operating (design area)", lf, C.ink));
   }
   // NFPA-170 symbol legend on the right of the strip
   const symLeg = symbolLegend(usedSymbols);
