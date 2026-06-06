@@ -158,9 +158,15 @@ export function renderDrawingSheetSvg(scene: AnnotatedScene, opts: DrawingSheetO
   }
 
   // ── labels (shared engine, paper space, drawing-rect-local) ──
+  // Equipment callouts (supply / pump / reservoir) are long and cluster at the
+  // source junction where the node/pipe numbers already crowd — divert their
+  // text to a corner key (the glyphs stay on the drawing) so neither overlaps.
+  const EQUIP_CATS = new Set<LabelCategory>(["source", "pump", "reservoir"]);
   const reqs: LabelRequest[] = [];
+  const equipCallouts: string[] = [];
   for (const lbl of scene.labels) {
     if (!enabled.has(lbl.category)) continue;
+    if (EQUIP_CATS.has(lbl.category)) { if (!equipCallouts.includes(lbl.text)) equipCallouts.push(lbl.text); continue; }
     const a = T(project(lbl.anchor, view));
     const box = measureBox(lbl.text, labelFontPx);
     reqs.push({ id: lbl.id, x: a.x - draw.x, y: a.y - draw.y, text: lbl.text, category: lbl.category, priority: lbl.priority, width: box.width, height: box.height });
@@ -169,6 +175,17 @@ export function renderDrawingSheetSvg(scene: AnnotatedScene, opts: DrawingSheetO
   for (const p of placed as PlacedLabel[]) {
     if (p.leader) el.push(line(p.leader.x1 + draw.x, p.leader.y1 + draw.y, p.leader.x2 + draw.x, p.leader.y2 + draw.y, "#7a8aa0", 0.5));
     el.push(halo(p.x + draw.x + 1, p.y + draw.y + p.height - labelFontPx * 0.32, p.text, labelFontPx, C.ink, "600"));
+  }
+
+  // ── equipment key (top-left of the drawing rect) ──
+  if (equipCallouts.length) {
+    const pad = mm(2.5), lh = labelFontPx * 1.75;
+    const boxW = Math.max(mm(28), ...equipCallouts.map((s) => measureBox(s, labelFontPx).width)) + pad * 2;
+    const boxH = mm(3) + lh * equipCallouts.length + mm(2);
+    const bx = draw.x + mm(3), by = draw.y + mm(3);
+    el.push(`<rect x="${f(bx)}" y="${f(by)}" width="${f(boxW)}" height="${f(boxH)}" rx="${f(mm(1))}" fill="#f8fafc" fill-opacity="0.92" stroke="${C.line}" stroke-width="0.5"/>`);
+    el.push(t(bx + pad, by + mm(3.3), "EQUIPMENT", mm(1.7), C.muted, "700"));
+    equipCallouts.forEach((txt, i) => el.push(t(bx + pad, by + mm(3.3) + lh * (i + 1), txt, labelFontPx, C.ink, "500")));
   }
 
   // ── legend strip (horizontal, bottom) ──
