@@ -222,6 +222,28 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(dry.designAreaFt2).toBe(1950); // 1500 × 1.3
   });
 
+  it("reduces the design area for quick-response wet LH/OH systems (NFPA 13 §19.2.3.3)", () => {
+    const nodes: Record<string, unknown>[] = [{ id: "SRC", type: "junction", elevationFt: 0 }];
+    const pipes: Record<string, unknown>[] = [];
+    let prev = "SRC";
+    for (let i = 1; i <= 30; i++) { const id = `S${i}`; nodes.push({ id, type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 100, response: "quick" }); pipes.push({ id: `P${i}`, from: prev, to: id, role: "branch-line", nominalSize: "2-1/2", internalDiameterIn: 2.469, cFactor: 120, lengthFt: 10 }); prev = id; }
+    const base = {
+      schemaVersion: 2,
+      meta: { id: "QR", name: "qr area", standardId: "nfpa13", hazardClass: "oh1", units: "imperial", systemType: "sprinkler", fillType: "wet" },
+      designBasis: { sprinklerKFactor: 5.6, densityGpmFt2: 0.15, designAreaFt2: 1500, minSprinklerPressurePsi: 7, hoseAllowanceGpm: 250, qrAreaReductionPct: 40 },
+      waterSupply: { type: "city+fire-pump", flowTest: { staticPsi: 90, residualPsi: 75, testFlowGpm: 4000 }, firePump: { ratedFlowGpm: 1500, ratedPsi: 130, churnPsi: 150 } },
+      network: { nodes, pipes, valves: [] },
+    };
+    const qr = solveProject(parseProject(base)).summary; // 1500 × 0.6 = 900 ft² → 9 heads
+    expect(qr.qrAreaReductionPct).toBe(40);
+    expect(qr.designAreaFt2).toBe(900);
+    expect(qr.operatingHeads).toBe(9);
+    // a dry system ignores the QR reduction (the +30% wins; QR requires wet)
+    const dry = solveProject(parseProject({ ...JSON.parse(JSON.stringify(base)), meta: { ...base.meta, fillType: "dry" } })).summary;
+    expect(dry.qrAreaReductionPct).toBeUndefined();
+    expect(dry.dryAreaIncreasePct).toBe(30);
+  });
+
   it("required stored water = total demand × duration", () => {
     const s = solveProject(fmStorage).summary;
     expect(s.requiredStoredGal).toBe(Math.round(s.totalDemandGpm * 60));

@@ -63,6 +63,8 @@ export interface SolveSummary {
   designAreaFt2?: number;
   /** Design-area increase applied for a dry / preaction system (e.g. 30), if any. */
   dryAreaIncreasePct?: number;
+  /** Quick-response design-area reduction applied (e.g. 25), if any. */
+  qrAreaReductionPct?: number;
   /** Required discharge per head to meet the design density (gpm). */
   requiredHeadFlowGpm?: number;
   minSprinklerPressurePsi: number;
@@ -212,14 +214,25 @@ function designAreaSet(model: ProjectModel, sourceId: string, count: number): Se
  * (Schematic proxy for "most-demanding remote rectangle"; true geometric remote
  * area needs dimensioned layout.)
  */
-/** NFPA 13 §19.2.3.2: dry-pipe and double-interlock preaction systems increase
- * the design area by 30% (without revising the density). */
-function dryAreaFactor(model: ProjectModel): number {
-  return model.meta.fillType === "dry" || model.meta.fillType === "preaction" ? 1.3 : 1;
+function isDrySystem(model: ProjectModel): boolean {
+  return model.meta.fillType === "dry" || model.meta.fillType === "preaction";
+}
+
+/** NFPA 13 §19.2.3 design-area multiplier: +30% for dry / double-interlock
+ * preaction systems (§19.2.3.2), OR a quick-response reduction (up to 40%) for a
+ * wet light/ordinary-hazard system with QR sprinklers (§19.2.3.3). The two don't
+ * combine — the QR reduction requires a wet system. */
+function designAreaFactor(model: ProjectModel): number {
+  if (isDrySystem(model)) return 1.3;
+  const qr = num(model.designBasis, "qrAreaReductionPct");
+  const hz = String(model.meta.hazardClass ?? "").toLowerCase();
+  const wet = !model.meta.fillType || model.meta.fillType === "wet";
+  if (qr && qr > 0 && wet && (hz === "light" || hz === "oh1" || hz === "oh2")) return Math.max(0.6, 1 - qr / 100);
+  return 1;
 }
 
 function autoPeakAreaSet(model: ProjectModel, sourceId: string): Set<string> | undefined {
-  const designArea = (num(model.designBasis, "designAreaFt2") ?? 0) * dryAreaFactor(model);
+  const designArea = (num(model.designBasis, "designAreaFt2") ?? 0) * designAreaFactor(model);
   if (!designArea) return undefined;
   const dist = pathDistances(model, sourceId);
   const spk = model.network.nodes.filter((n) => n.type === "sprinkler" && typeof n.kFactor === "number" && n.kFactor > 0);
@@ -514,8 +527,9 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     ...(remote ? { mostRemoteSprinkler: remote } : {}),
     operatingHeads: designNodeIds.length,
     ...(usedLocked && !opts.designArea ? { manualDesignArea: true } : {}),
-    ...(num(model.designBasis, "designAreaFt2") !== undefined ? { designAreaFt2: Math.round(num(model.designBasis, "designAreaFt2")! * dryAreaFactor(model)) } : {}),
-    ...(dryAreaFactor(model) > 1 && num(model.designBasis, "designAreaFt2") !== undefined ? { dryAreaIncreasePct: 30 } : {}),
+    ...(num(model.designBasis, "designAreaFt2") !== undefined ? { designAreaFt2: Math.round(num(model.designBasis, "designAreaFt2")! * designAreaFactor(model)) } : {}),
+    ...(isDrySystem(model) && num(model.designBasis, "designAreaFt2") !== undefined ? { dryAreaIncreasePct: 30 } : {}),
+    ...(!isDrySystem(model) && designAreaFactor(model) < 1 && num(model.designBasis, "designAreaFt2") !== undefined ? { qrAreaReductionPct: Math.round((1 - designAreaFactor(model)) * 100) } : {}),
     ...(requiredHeadFlowGpm !== undefined ? { requiredHeadFlowGpm } : {}),
     minSprinklerPressurePsi,
     meetsMinPressure: remote ? remote.pressurePsi >= minSprinklerPressurePsi - 0.5 : true,

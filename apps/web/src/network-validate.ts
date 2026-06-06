@@ -97,6 +97,19 @@ export function checkModel(model: ProjectModel): Issue[] {
   }
   if (standardIsMetric(standardId ?? "") && model.meta.units !== "metric") issues.push({ severity: "warning", message: `${standardId} is a metric standard but project units are "${model.meta.units ?? "imperial"}".` });
 
+  // quick-response area reduction (NFPA 13 §19.2.3.3) — flag mis-application
+  const qr = typeof db?.["qrAreaReductionPct"] === "number" ? (db["qrAreaReductionPct"] as number) : 0;
+  if (qr > 0) {
+    const hz = String(model.meta.hazardClass ?? "").toLowerCase();
+    const wet = !model.meta.fillType || model.meta.fillType === "wet";
+    if (!wet) issues.push({ severity: "warning", message: "Quick-response area reduction is set but the system isn't wet-pipe — NFPA 13 §19.2.3.3 doesn't apply; the reduction is ignored." });
+    else if (!(hz === "light" || hz === "oh1" || hz === "oh2")) issues.push({ severity: "warning", message: `Quick-response area reduction applies only to light / ordinary hazard — ignored for ${hz.toUpperCase()}.` });
+    else {
+      const nonQR = model.network.nodes.filter((n) => n.type === "sprinkler" && (n.kFactor ?? 0) > 0 && n.response && n.response !== "quick" && n.response !== "qr");
+      if (nonQR.length) issues.push({ severity: "warning", message: `Quick-response area reduction set, but ${nonQR.length} head(s) are not quick-response — §19.2.3.3 requires QR throughout the design area.` });
+    }
+  }
+
   return issues;
 }
 
