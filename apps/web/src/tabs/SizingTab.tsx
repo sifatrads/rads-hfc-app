@@ -10,8 +10,6 @@ import { autoSizeVelocity, autoSizeToPass, economizeSizes } from "../auto-size";
 import { units } from "../units";
 import { C, FONT, card, sectionTitle, select, th, td, tdNum, toneColor } from "../ui";
 
-const VLIMIT = 20; // ft/s — NFPA 13 velocity guidance
-
 export function SizingTab({ model, solution, error, onChange, selectedPipe, onSelectPipe }: { model: ProjectModel; solution: ProjectSolution | null; error?: string; onChange: (m: ProjectModel) => void; selectedPipe?: string | null; onSelectPipe?: (id: string) => void }): JSX.Element {
   const [worstFirst, setWorstFirst] = useState(false);
   const [hotOnly, setHotOnly] = useState(false);
@@ -22,6 +20,7 @@ export function SizingTab({ model, solution, error, onChange, selectedPipe, onSe
   if (!solution) return <div style={{ ...page, alignItems: "center", justifyContent: "center", color: C.muted }}>{error ? error : "Add nodes, pipes and a water supply to size the system."}</div>;
   const u = units(model);
   const s = solution.summary;
+  const VLIMIT = s.velocityLimitFps ?? 20; // ft/s — configurable design limit (default 20)
   const pr = solution.results.pipes;
   const pipes = model.network.pipes;
 

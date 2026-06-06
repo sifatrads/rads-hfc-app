@@ -14,6 +14,7 @@ export function AnalysisTab({ model, solution, error }: { model: ProjectModel; s
   const nr = solution.results.nodes;
   const pr = solution.results.pipes;
   const u = units(model);
+  const vLim = solution.summary.velocityLimitFps ?? 20;
   // loss gradient (psi/ft → bar/m): friction over the physical pipe length.
   const slopeFactor = u.metric ? 0.0689476 / 0.3048 : 1;
   const shownPipes = sigOnly ? model.network.pipes.filter((p) => (pr[p.id]?.flowGpm ?? 0) >= 1) : model.network.pipes;
@@ -60,7 +61,7 @@ export function AnalysisTab({ model, solution, error }: { model: ProjectModel; s
             <tbody>
               {shownPipes.map((p, i) => {
                 const r = pr[p.id];
-                const vHot = (r?.velocityFps ?? 0) > 20;
+                const vHot = (r?.velocityFps ?? 0) > vLim;
                 const physLen = (p.lengthFt ?? 0) + (p.additionalLengthFt ?? 0);
                 const slope = physLen > 0 && r?.frictionLossPsi !== undefined ? (r.frictionLossPsi / physLen) * slopeFactor : undefined;
                 return (
@@ -82,7 +83,7 @@ export function AnalysisTab({ model, solution, error }: { model: ProjectModel; s
             </tbody>
           </table>
         </div>
-        <div style={{ fontSize: 11.5, color: C.muted, marginTop: 8 }}>Velocity &gt; {u.v(20)} {u.U.v} flagged red (NFPA 13 guidance). Loss/{u.U.l} = friction gradient (pressure lost per unit pipe length). Total loss = friction + elevation.</div>
+        <div style={{ fontSize: 11.5, color: C.muted, marginTop: 8 }}>Velocity &gt; {u.v(vLim)} {u.U.v} flagged red (design limit). Loss/{u.U.l} = friction gradient (pressure lost per unit pipe length). Total loss = friction + elevation.</div>
       </div>
     </div>
   );

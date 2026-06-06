@@ -66,6 +66,8 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
   const storPsi = (v?: number) => (v === undefined ? undefined : metric ? v / 0.0689476 : v);
   const dispGal = (v?: number) => (v === undefined ? undefined : metric ? Math.round(v * 3.785412) : v); // gal→L
   const storGal = (v?: number) => (v === undefined ? undefined : metric ? v / 3.785412 : v);
+  const dispVel = (v?: number) => (v === undefined ? undefined : metric ? Math.round(v * 0.3048 * 10) / 10 : v); // ft/s→m/s
+  const storVel = (v?: number) => (v === undefined ? undefined : metric ? v / 0.3048 : v);
   const dispDens = (v?: number) => (v === undefined ? undefined : metric ? rnd(v * 40.7458, 1) : v); // gpm/ft²→mm/min
   const storDens = (v?: number) => (v === undefined ? undefined : metric ? v / 40.7458 : v);
   const dispTemp = (v?: number) => (v === undefined ? undefined : metric ? rnd((v - 32) / 1.8, 1) : v); // °F→°C
@@ -317,6 +319,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
           </Row>
           <Row>
             <Sel label="Friction method" value={str(ds["frictionMethod"], "hazen-williams")} options={["hazen-williams", "darcy-weisbach"]} onChange={(v) => setBasis("frictionMethod", v)} />
+            <Num label={`Max velocity (${metric ? "m/s" : "ft/s"}, default ${metric ? "6.1" : "20"})`} value={dispVel(num(ds["maxVelocityFps"]))} step={metric ? 0.5 : 1} onChange={(v) => setBasis("maxVelocityFps", storVel(v))} />
           </Row>
           {ds["frictionMethod"] === "darcy-weisbach" && (() => {
             const ft = str(ds["fluidType"], "water") as FluidType;

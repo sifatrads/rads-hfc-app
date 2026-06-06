@@ -173,6 +173,19 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(flowing("B1") && flowing("B2") && flowing("C1") && flowing("C2")).toBe(true);
   });
 
+  it("reports peak pipe velocity vs the configured limit (default 20 ft/s)", () => {
+    const s = solveProject(fmStorage).summary;
+    expect(typeof s.maxVelocityFps).toBe("number");
+    expect(s.velocityLimitFps).toBe(20);
+    expect(s.velocityOk).toBe(s.maxVelocityFps! <= 20);
+    // a tight configured limit flips the pass flag
+    const base = JSON.parse(JSON.stringify(fmStorage));
+    base.designBasis.maxVelocityFps = 1;
+    const tight = solveProject(parseProject(base)).summary;
+    expect(tight.velocityLimitFps).toBe(1);
+    expect(tight.velocityOk).toBe(false);
+  });
+
   it("required stored water = total demand × duration", () => {
     const s = solveProject(fmStorage).summary;
     expect(s.requiredStoredGal).toBe(Math.round(s.totalDemandGpm * 60));

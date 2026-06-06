@@ -68,6 +68,11 @@ export interface SolveSummary {
   supplyCurveSamples: CurvePoint[];
   /** NFPA 20 pump suction-velocity check at 150% rated flow (limit 15 ft/s). */
   suctionCheck?: { velocityFps: number; atFlowGpm: number; ok: boolean };
+  /** Peak pipe velocity (ft/s) + the configured limit (default 20) + pass flag. */
+  maxVelocityFps?: number;
+  maxVelocityPipe?: string;
+  velocityLimitFps?: number;
+  velocityOk?: boolean;
   /** Required stored water = total demand × supply duration (gal), when a
    * duration is given; with the reservoir capacity if modeled. */
   requiredStoredGal?: number;
@@ -433,6 +438,12 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     };
   }
 
+  // peak pipe velocity vs the configured limit (NFPA 13 guidance / spec default 20 ft/s)
+  const velocityLimitFps = num(model.designBasis, "maxVelocityFps") ?? 20;
+  let maxVelocityFps = 0;
+  let maxVelocityPipe: string | undefined;
+  for (const [id, r] of Object.entries(results.pipes)) if ((r.velocityFps ?? 0) > maxVelocityFps) { maxVelocityFps = r.velocityFps!; maxVelocityPipe = id; }
+
   // most-remote design point (sprinkler or hose connection) = lowest gauge pressure
   let remote: { id: string; pressurePsi: number; flowGpm: number } | undefined;
   for (const id of designNodeIds) {
@@ -487,6 +498,10 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
       .filter((x) => x.pressurePsi < minSprinklerPressurePsi - 0.5)
       .sort((a, b) => a.pressurePsi - b.pressurePsi),
     maxJunctionImbalanceGpm: gga.maxImbalanceGpm,
+    maxVelocityFps: Math.round(maxVelocityFps * 100) / 100,
+    ...(maxVelocityPipe ? { maxVelocityPipe } : {}),
+    velocityLimitFps,
+    velocityOk: maxVelocityFps <= velocityLimitFps + 1e-6,
     supplyCurveSamples: sampleCurve(supply, maxFlowGpm, 24),
     ...(suctionCheck ? { suctionCheck } : {}),
     ...(requiredStoredGal !== undefined ? { requiredStoredGal, durationMin } : {}),

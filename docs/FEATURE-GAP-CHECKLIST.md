@@ -99,6 +99,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 
 - [x] Min operating pressure + low-pressure node flagging ✅ DONE
 - [x] Friction-equation selector (Hazen-Williams / Darcy-Weisbach) ✅ DONE
+- [x] Configurable max-velocity limit (default 20 ft/s) — threads through Analysis + Sizing flags, the Compliance Checklist (PASS/REVIEW) + JSON export ✅ DONE
 - [x] Fluid properties (water / propylene- / ethylene-glycol · temp · concentration → auto viscosity for D-W) ✅ DONE
 - [ ] Demand-sizing modes (satisfy-min / below-available / %-below-available) — flexible targets
 - [ ] Default equivalent-lengths (PDT) editor by type/size — tune fitting tables
