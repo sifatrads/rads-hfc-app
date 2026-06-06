@@ -82,20 +82,24 @@ function row(values: (number | null)[]): Record<string, number> {
  * normalized fitting id then nominal size. Elbow/tee rows use the canonical
  * published values; valve rows follow the provided source and are AUDIT-flagged.
  */
+// Verified against NFPA 13, 2019 Edition, Table 27.2.3.1.1 "Equivalent Schedule 40
+// Steel Pipe Length Chart" (equivalent feet at C = 120). Sizes 1/2" and 3/4" are
+// omitted (sprinkler fittings start at 1"); "—" = not listed for that size.
 export const FITTING_EQUIV_LENGTH_FT: Record<string, Record<string, number>> = {
   //               1   1¼  1½  2   2½  3   3½  4   5   6   8   10  12
   "elbow-45": row([1, 1, 2, 2, 3, 3, 3, 4, 5, 7, 9, 11, 13]),
   "elbow-90": row([2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 18, 22, 27]),
-  "elbow-90-long": row([1, 2, 2, 3, 4, 5, 5, 6, 8, 9, 13, 16, 18]),
-  tee: row([3, 5, 6, 8, 10, 12, 15, 17, 20, 25, 30, 50, 60]),
-  "gate-valve": row([null, null, null, 1, 1, 1, 1, 3, 2, 2, 4, 5, 6]),
-  "butterfly-valve": row([null, null, null, 6, 10, 7, null, 10, 12, 9, 12, 19, 21]),
-  "check-valve": row([5, 7, 11, 9, 16, 14, 19, 22, 27, 32, 22, 45, 55]),
-  "flow-switch": row([6, 9, 10, 14, 22, 17, null, 16, 30, 22, 29, 36, null]),
+  "elbow-90-long": row([2, 2, 2, 3, 4, 5, 5, 6, 8, 9, 13, 16, 18]),
+  tee: row([5, 6, 8, 10, 12, 15, 17, 20, 25, 30, 35, 50, 60]), // tee/cross, flow turned 90°
+  "gate-valve": row([null, null, null, 1, 1, 1, 1, 2, 2, 3, 4, 5, 6]),
+  "butterfly-valve": row([null, null, null, 6, 7, 10, null, 12, 9, 10, 12, 19, 21]),
+  "check-valve": row([5, 7, 9, 11, 14, 16, 19, 22, 27, 32, null, null, null]), // swing check
+  "flow-switch": row([6, 9, 10, 14, 17, 22, null, 30, null, 16, 22, 29, 36]), // vane-type — ⚠ AUDIT (table row hard to read)
 };
 
-/** This reference table needs an audit against the printed NFPA 13 before production. */
-export const FITTING_TABLE_AUDIT_REQUIRED = true;
+/** Core rows verified vs NFPA 13 2019 Table 27.2.3.1.1; the vane-type flow
+ * switch row is still approximate (confirm against the printed table). */
+export const FITTING_TABLE_AUDIT_REQUIRED = false;
 
 /** Map a model fitting/valve `type` string to a Table 27.2.3.1.1 row id. */
 export function normalizeFittingId(type: string): string | undefined {

@@ -230,10 +230,10 @@ describe("in-app data entry → solve", () => {
   });
 
   it("parses fitting codes into equivalent lengths", () => {
-    const f = parseFittingCodes("2E 1T", "2"); // 2": elbow-90 = 5 ft, tee = 8 ft
+    const f = parseFittingCodes("2E 1T", "2"); // 2": elbow-90 = 5 ft, tee = 10 ft (Table 27.2.3.1.1)
     expect(f.find((x) => x.type === "elbow-90")!.qty).toBe(2);
     expect(f.find((x) => x.type === "elbow-90")!.equivalentLengthFt).toBeCloseTo(10, 1);
-    expect(f.find((x) => x.type === "tee")!.equivalentLengthFt).toBeCloseTo(8, 1);
+    expect(f.find((x) => x.type === "tee")!.equivalentLengthFt).toBeCloseTo(10, 1);
   });
 
   it("auto-fittings adds an elbow at a direction change", () => {

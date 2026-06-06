@@ -21,8 +21,19 @@ describe("NFPA 13 §27.2.3 reference tables", () => {
   it("fitting equivalent length applies base × C-multiplier", () => {
     expect(fittingEquivalentLengthFt("elbow-90", "2")).toBe(5); // base at C=120
     expect(fittingEquivalentLengthFt("elbow-90", "2", { cFactor: 100 })).toBeCloseTo(5 * 0.713, 6);
-    expect(fittingEquivalentLengthFt("tee-branch", "2")).toBe(8);
+    expect(fittingEquivalentLengthFt("tee-branch", "2")).toBe(10); // Table 27.2.3.1.1 (was wrongly 8)
     expect(fittingEquivalentLengthFt("coupling", "2")).toBeUndefined(); // unlisted → negligible
+  });
+
+  it("matches NFPA 13 2019 Table 27.2.3.1.1 (verified rows)", () => {
+    expect(fittingEquivalentLengthFt("tee", "3")).toBe(15); // tee/cross 3"
+    expect(fittingEquivalentLengthFt("tee", "8")).toBe(35); // tee/cross 8"
+    expect(fittingEquivalentLengthFt("elbow-90-long", "1")).toBe(2); // long-turn 1"
+    expect(fittingEquivalentLengthFt("gate-valve", "4")).toBe(2); // gate 4"
+    expect(fittingEquivalentLengthFt("gate-valve", "6")).toBe(3); // gate 6"
+    expect(fittingEquivalentLengthFt("butterfly-valve", "3")).toBe(10); // butterfly 3"
+    expect(fittingEquivalentLengthFt("check-valve", "2")).toBe(11); // swing check 2"
+    expect(fittingEquivalentLengthFt("check-valve", "3")).toBe(16); // swing check 3"
   });
 
   it("normalizes fitting type strings to table rows", () => {
