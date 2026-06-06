@@ -43,6 +43,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Report of Utilities — BOM (pipe length by material+size, valve/fitting counts) ✅ DONE
 - [x] Design-area proof — solve candidate remote areas, rank by required pressure, flag the governing one (Summary tab) ✅ DONE
 - [x] Basis of Design / Design Philosophy report sheet — narrative + prepared standard clause references (NFPA 13/14, FM DS 3-26 verified; EN/AS/750 representative) + governing-code option (BNBC/RSC/IBC) ✅ DONE
+- [x] Design notes / assumptions / exclusions — free-text (one bullet per line) on the Project tab → rendered on the Basis of Design sheet + compliance export ✅ DONE
 - [x] Compliance Checklist report sheet — per-requirement PASS/REVIEW (supply, min-pressure, convergence, area, hose, coverage/spacing, grounding) with clause refs + overall verdict ✅ DONE
 - [x] Critical Path / Hydraulic Profile report sheet — traces source→most-remote head: per-segment flow/friction/cumulative-length/pressure + a pressure-gradient sparkline ✅ DONE
 - [x] Significant-pipes-only filter (Analysis tab: hide pipes carrying < 1 gpm) ✅ DONE

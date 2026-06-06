@@ -139,7 +139,23 @@ function basisOfDesignSpec(model: ProjectModel, sol: ProjectSolution): Spec {
   if (refRows.length) {
     el.push(sectionTitle(x, y, w, "Standard references"));
     y += mm(7);
-    el.push(table(x, y, w, [{ label: "Design provision", w: 0.6 }, { label: "Reference", w: 0.4 }], refRows).svg);
+    const refTbl = table(x, y, w, [{ label: "Design provision", w: 0.6 }, { label: "Reference", w: 0.4 }], refRows);
+    el.push(refTbl.svg);
+    y = refTbl.endY;
+  }
+
+  // ── notes / assumptions / exclusions (one bullet per line) ──
+  const notes = String(m.designNotes ?? "").trim();
+  if (notes) {
+    y += mm(8);
+    el.push(sectionTitle(x, y, w, "Notes, assumptions & exclusions"));
+    y += mm(6);
+    for (const ln of notes.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)) {
+      el.push(T(x + mm(1), y + mm(0.2), "•", { size: mm(2.6), fill: C.accent, weight: "700" }));
+      const p = paragraph(x + mm(4), y, w - mm(4), ln);
+      el.push(p.svg);
+      y = p.endY + mm(1.5);
+    }
   }
   return { title: "Basis of Design", inner: el.join("") };
 }

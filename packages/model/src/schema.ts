@@ -211,6 +211,7 @@ export const ProjectMetaSchema = z
     company: z.string().optional(),
     address: z.string().optional(),
     drawingNo: z.string().optional(),
+    designNotes: z.string().optional(), // free-text notes / assumptions / exclusions for the Basis of Design
     createdAt: z.string().optional(),
     updatedAt: z.string().optional(),
     appVersion: z.string().optional(),

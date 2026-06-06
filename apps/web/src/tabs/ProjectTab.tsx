@@ -265,6 +265,9 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             <Txt label="Designer / company" value={str(model.meta.designer)} onChange={(v) => setMeta("designer", v)} />
             <Txt label="Site address" value={str(model.meta.address)} onChange={(v) => setMeta("address", v)} />
           </Row>
+          <Row>
+            <TxtArea label="Design notes / assumptions / exclusions" value={str(model.meta.designNotes)} placeholder="e.g. Antifreeze loop to loading dock by others · seismic bracing per separate calc · C-factors per NFPA 13 Table 27.2.4.8.1 · one line per note" onChange={(v) => setMeta("designNotes", v)} />
+          </Row>
         </Section>
 
         {/* Design basis */}
@@ -667,6 +670,9 @@ function Row({ children }: { children: ReactNode }): JSX.Element {
 }
 function Txt({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }): JSX.Element {
   return <label style={{ ...field, flex: 1 }}><span style={fieldLabel}>{label}</span><input style={input} value={value} onChange={(e) => onChange(e.target.value)} /></label>;
+}
+function TxtArea({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }): JSX.Element {
+  return <label style={{ ...field, flex: 1 }}><span style={fieldLabel}>{label}</span><textarea style={{ ...input, minHeight: 60, resize: "vertical", fontFamily: "inherit", lineHeight: 1.4 }} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} /></label>;
 }
 function Num({ label, value, step, onChange }: { label: string; value: number | undefined; step?: number; onChange: (v: number | undefined) => void }): JSX.Element {
   const [raw, setRaw] = useState<string>(value === undefined ? "" : String(value));

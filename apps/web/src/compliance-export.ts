@@ -20,7 +20,7 @@ export interface ComplianceSummary {
   project: {
     id: string; name: string; standard?: string; standardId?: string; edition?: string;
     governingCode?: string; occupancyHazard?: string; systemType?: string; fillType?: string;
-    units: string; engineer?: string; date?: string;
+    units: string; engineer?: string; date?: string; designNotes?: string;
   };
   designBasis: {
     method: string; hydraulicMethod: "hazen-williams" | "darcy-weisbach";
@@ -70,6 +70,7 @@ export function buildComplianceSummary(model: ProjectModel, solution: ProjectSol
       governingCode: m.governingCode as string | undefined, occupancyHazard: m.hazardClass as string | undefined,
       systemType: (m.systemType as string) ?? "sprinkler", fillType: (m.fillType as string) ?? "wet",
       units: String(m.units ?? "imperial"), engineer: m.engineer as string | undefined, date: m.date as string | undefined,
+      ...(typeof m.designNotes === "string" && m.designNotes.trim() ? { designNotes: m.designNotes.trim() } : {}),
     },
     designBasis: {
       method: String(db["method"] ?? "density/area"),
