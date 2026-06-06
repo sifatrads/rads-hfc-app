@@ -5,9 +5,11 @@
  * assigned coverage area against the limit and its branch-line feed length (the
  * along-branch spacing) against the maximum spacing.
  *
- * ⚠ Representative standard-coverage, unobstructed-construction limits — AUDIT
- * against the applicable NFPA 13 spacing tables (limits vary by construction,
- * sprinkler type/listing and obstruction) before production use.
+ * Standard-coverage limits below match NFPA 13 (LH 225 / OH 130 / EH 100 ft²;
+ * 15 / 15 / 12 ft spacing) and BNBC 2020 Table 4.4.7 — the basis the RSC Fire
+ * Safety Manual mandates for Bangladesh RMG buildings (NFPA 13, OH2). Limits
+ * still vary with construction type, sprinkler listing and obstructions, so
+ * confirm the exact cell for the project before issuing.
  */
 import type { ProjectModel } from "@rads/model";
 
