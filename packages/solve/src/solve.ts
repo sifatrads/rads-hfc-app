@@ -108,7 +108,7 @@ function findSource(model: ProjectModel): { id: string; elevationFt: number } {
   return { id: root?.id ?? "SOURCE", elevationFt: root?.elevationFt ?? 0 };
 }
 
-function supplyCurveFor(model: ProjectModel): { curve: SupplyCurve; maxFlowGpm: number } {
+function supplyCurveFor(model: ProjectModel, source: { id: string; elevationFt: number }): { curve: SupplyCurve; maxFlowGpm: number } {
   const ws = model.waterSupply as Record<string, unknown> | undefined;
   // A fire pump (if modeled) boosts whichever base supply is used.
   const fp = ws?.["firePump"] as Record<string, unknown> | undefined;
@@ -125,8 +125,18 @@ function supplyCurveFor(model: ProjectModel): { curve: SupplyCurve; maxFlowGpm: 
 
   // Fixed-pressure source: gravity / elevated tank — a flat curve at the tank head.
   if (ws?.["supplyType"] === "fixed-pressure") {
-    const psi = typeof ws["fixedPressurePsi"] === "number" ? (ws["fixedPressurePsi"] as number) : 50;
-    return { curve: withPump(constantPressureCurve(psi)), maxFlowGpm: 2000 };
+    let psi = typeof ws["fixedPressurePsi"] === "number" ? (ws["fixedPressurePsi"] as number) : undefined;
+    // No explicit pressure → derive the gravity head from an elevated tank:
+    // (water-surface elevation − supply-point elevation) × 0.4335 psi/ft.
+    if (psi === undefined) {
+      const r = model.network.reservoir as Record<string, unknown> | undefined;
+      const h = typeof r?.["heightFt"] === "number" ? (r["heightFt"] as number) : undefined;
+      if (h !== undefined) {
+        const base = typeof r?.["baseElevationFt"] === "number" ? (r["baseElevationFt"] as number) : 0;
+        psi = Math.max(0, (base + h - (source.elevationFt ?? 0)) * 0.4335);
+      }
+    }
+    return { curve: withPump(constantPressureCurve(psi ?? 50)), maxFlowGpm: 2000 };
   }
 
   const ft = ws?.["flowTest"] as Record<string, unknown> | undefined;
@@ -323,7 +333,7 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
       return undefined;
     }
   })();
-  const { curve: derivedCurve, maxFlowGpm } = supplyCurveFor(model);
+  const { curve: derivedCurve, maxFlowGpm } = supplyCurveFor(model, source);
   const supply = opts.supply ?? derivedCurve;
 
   const sprinklers = model.network.nodes.filter((n) => n.type === "sprinkler" && typeof n.kFactor === "number" && n.kFactor > 0);

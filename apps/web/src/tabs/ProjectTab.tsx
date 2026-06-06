@@ -360,7 +360,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
               <Num label={`Test flow (${U.flow})`} value={dispFlow(num(ft["testFlowGpm"]))} step={metric ? 100 : 50} onChange={(v) => setFlow("testFlowGpm", storFlow(v))} />
             </Row>
           )}
-          <div style={hint}>{str(ws["supplyType"], "flow-test") === "fixed-pressure" ? "Gravity / elevated tank — a roughly constant head regardless of flow." : "City flow test — pressure drops with flow (N¹·⁸⁵ curve)."} A fire pump in the section below boosts either supply.</div>
+          <div style={hint}>{str(ws["supplyType"], "flow-test") === "fixed-pressure" ? "Gravity / elevated tank — a roughly constant head regardless of flow. Leave the pressure blank to derive it from the reservoir height below ((base + height − source elev) × 0.433)." : "City flow test — pressure drops with flow (N¹·⁸⁵ curve)."} A fire pump in the section below boosts either supply.</div>
         </Section>
 
         {/* Suction */}

@@ -220,6 +220,23 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(solveProject(m).summary.availablePsi).toBeCloseTo(65, 3);
   });
 
+  it("derives the fixed-pressure head from an elevated tank height (no explicit pressure)", () => {
+    const m = parseProject({
+      schemaVersion: 2,
+      meta: { id: "ET", name: "Elevated tank", standardId: "nfpa13", hazardClass: "lh", units: "imperial", systemType: "sprinkler" },
+      designBasis: { sprinklerKFactor: 5.6, operatingSprinklers: 1, minSprinklerPressurePsi: 7 },
+      waterSupply: { supplyType: "fixed-pressure" }, // no pressure → derive from the tank
+      network: {
+        nodes: [{ id: "SRC", type: "junction", elevationFt: 0 }, { id: "S1", type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 120 }],
+        pipes: [{ id: "P1", from: "SRC", to: "S1", role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor: 120, lengthFt: 10 }],
+        reservoir: { kind: "elevated-tank", heightFt: 100, baseElevationFt: 0, capacityGal: 30000 },
+        valves: [],
+      },
+    });
+    // 100 ft of head × 0.4335 psi/ft ≈ 43.35 psi
+    expect(solveProject(m).summary.availablePsi).toBeCloseTo(43.35, 1);
+  });
+
   it("locks the operating set to designBasis.designAreaNodeIds", () => {
     // two branches; auto would flow the far/most-remote, but we pin the near pair.
     const nodes: Record<string, unknown>[] = [{ id: "SRC", type: "junction", elevationFt: 0 }, { id: "J", type: "junction", elevationFt: 0 }];
