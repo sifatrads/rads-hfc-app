@@ -41,7 +41,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Riser nameplate report (system/design/demand/supply/prepared-by) ✅ DONE
 - [x] Heads Summary (per-head K/coverage/elev/pressure/flow) ✅ DONE
 - [x] Report of Utilities — BOM (pipe length by material+size, valve/fitting counts) ✅ DONE
-- [ ] Calc-summary of all/selected design areas, sorted by safety margin — multi-area proof
+- [x] Design-area proof — solve candidate remote areas, rank by required pressure, flag the governing one (Summary tab) ✅ DONE
 - [ ] Significant-pipes-only filter (hide zero-flow segments) — cleaner submittals; small
 - [ ] Loss-slope (psi/ft) column — easy add to existing pipe table
 - [ ] Batch print / page-selection — submittal convenience; small

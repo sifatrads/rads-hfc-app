@@ -1,12 +1,14 @@
 /** Summary tab — the NFPA §27.4.5.2 summary in-app: result stat cards + the key
  * design/demand/supply figures, live from the solve. */
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import type { ProjectModel } from "@rads/model";
 import type { ProjectSolution } from "@rads/solve";
 import { C, FONT, card, sectionTitle, toneColor } from "../ui";
 import { units } from "../units";
+import { compareDesignAreas, type AreaResult } from "../design-areas";
 
 export function SummaryTab({ model, solution, error }: { model: ProjectModel; solution: ProjectSolution | null; error?: string }): JSX.Element {
+  const [areas, setAreas] = useState<AreaResult[] | null>(null);
   if (!solution) return <Empty msg={error ? `Solve error: ${error}` : "Add nodes, pipes and a water supply to see results."} />;
   const s = solution.summary;
   const u = units(model);
@@ -73,6 +75,34 @@ export function SummaryTab({ model, solution, error }: { model: ProjectModel; so
           </tbody>
         </table>
       </div>
+
+      <div style={{ ...card, padding: 16, maxWidth: 640 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={sectionTitle}>Design-area proof (most demanding remote area)</div>
+          <span style={{ flex: 1 }} />
+          <button style={areaBtn} onClick={() => setAreas(compareDesignAreas(model))}>⟳ Compare remote areas</button>
+        </div>
+        {areas === null ? (
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>NFPA 13 governs on the most hydraulically demanding area. Solve several candidate remote areas (clustered around the farthest heads) and confirm the auto-picked one is the worst case.</div>
+        ) : areas.length === 0 ? (
+          <div style={{ fontSize: 12.5, color: C.muted, marginTop: 8 }}>Only one possible design area (operating heads ≥ total heads) — nothing to compare.</div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
+            <thead><tr>{["Remote area", "Heads", `Required (${u.U.p})`, `Margin (${u.U.p})`, ""].map((h) => <th key={h} style={{ fontSize: 10.5, fontWeight: 700, color: C.muted, textAlign: "left", padding: "4px 8px", textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
+            <tbody>
+              {areas.map((a, i) => (
+                <tr key={a.anchor} style={i === 0 ? { background: "#fff7ed" } : i % 2 ? { background: C.zebra } : undefined}>
+                  <td style={{ fontSize: 12.5, padding: "6px 8px", fontWeight: i === 0 ? 800 : 500, color: i === 0 ? C.bad : C.ink }}>{a.label}{i === 0 ? " · governing" : ""}</td>
+                  <td style={{ fontSize: 12.5, padding: "6px 8px" }}>{a.heads}</td>
+                  <td style={{ fontSize: 12.5, padding: "6px 8px", fontWeight: 700 }}>{u.p(a.sourcePressurePsi)}</td>
+                  <td style={{ fontSize: 12.5, padding: "6px 8px", color: toneColor(a.marginPsi >= 0 ? "good" : "bad") }}>{a.marginPsi >= 0 ? "+" : ""}{u.p(a.marginPsi)}</td>
+                  <td style={{ fontSize: 12.5, padding: "6px 8px", fontWeight: 700, color: toneColor(a.passes ? "good" : "bad") }}>{a.passes ? "PASS" : "REVIEW"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
@@ -84,3 +114,4 @@ function Empty({ msg }: { msg: string }): JSX.Element {
 const page: CSSProperties = { padding: 18, overflow: "auto", height: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 14, fontFamily: FONT, background: C.page };
 const statGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 };
 const resultBadge: CSSProperties = { color: "#fff", fontWeight: 800, fontSize: 15, letterSpacing: 1, padding: "8px 20px", borderRadius: 8 };
+const areaBtn: CSSProperties = { fontSize: 12, fontWeight: 700, color: "#fff", background: C.accent, border: "none", borderRadius: 7, padding: "6px 12px", cursor: "pointer", whiteSpace: "nowrap" };
