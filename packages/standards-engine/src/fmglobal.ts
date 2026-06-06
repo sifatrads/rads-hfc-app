@@ -37,29 +37,53 @@ const DENSITY: Record<string, DesignDensityPoint> = {
 // (§2.3.1.11).
 const HOSE: Record<string, number> = { "hc-1": 250, "hc-2": 250, "hc-3": 500 };
 
-// ── FM DS 8-9 ceiling storage protection — count-at-pressure schemes ──
-// Hose demand + supply duration are GROUNDED to DS 8-9 Table 14 (by ceiling-
-// sprinkler count, NOT by suppression/control mode): ≤12 heads → 250 gpm; 13–19
-// → 500 gpm (60–90 min); 20+ → 500 gpm (120 min). Grounded protection cells:
-// K16.8 → 12 @ 63 psi and K14.0 → 12 @ 90 psi, both at a 40 ft ceiling for
-// uncartoned plastic (DS 8-9, Jul-2024). The per-cell K/N/pressure in the rest of
-// the table are ⚠ REPRESENTATIVE — DS 8-9's protection tables are dense grids that
-// don't extract cleanly; replace each with the exact current DS 8-9 cell for the
-// specific commodity/arrangement/storage+ceiling height before issuing a design,
-// and never mix FM with NFPA 13 criteria. K16.8 is the minimum ceiling K for
-// storage; K14 is legacy (12 @ 90 psi @ 40 ft → now "DNA" at 45 ft per recent
-// revisions). >50 ft ceilings may need >12 heads — out of v1 scope.
+// ── FM DS 8-9 ceiling storage protection — count-at-pressure (GROUNDED) ──
+// The cells below are the actual "No. of sprinklers @ psi" from FM DS 8-9
+// (Jul-2024): ceiling-level protection for SOLID-PILED / PALLETIZED / SHELF /
+// BIN-BOX storage with a WET system and quick-response PENDENT storage sprinklers
+//   · Tables 2 & 3 — Class 1-3 and Class 4 + cartoned unexpanded plastic
+//     (identical for these K-factors)
+//   · Table 4 — cartoned expanded plastic
+//   · Tables 5/6 — uncartoned (exposed) plastic
+// Hose demand + supply duration are from Table 14, by the number of ceiling
+// sprinklers in the design (≤12 → 250 gpm/60 min; 13-19 → 500 gpm/90 min; 20+ →
+// 500 gpm/120 min). Min 7 psi at the most remote sprinkler.
+// ⚠ NOT covered (use the specific DS 8-9 table): open-frame RACK storage
+// (Tables 8-11) + in-rack sprinklers, DRY or UPRIGHT systems, extended-coverage
+// storage sprinklers, and ceilings above 40 ft. Never mix FM with NFPA 13.
+interface StorageCell { group: string; name: string; ceilFt: number; k: number; n: number; psi: number }
+const STORAGE_CELLS: StorageCell[] = [
+  // Class 1-4 + cartoned unexpanded plastic — DS 8-9 Tables 2 & 3
+  { group: "c14", name: "Class 1-4 / cartoned unexp. plastic", ceilFt: 20, k: 16.8, n: 12, psi: 7 },
+  { group: "c14", name: "Class 1-4 / cartoned unexp. plastic", ceilFt: 25, k: 16.8, n: 10, psi: 13 },
+  { group: "c14", name: "Class 1-4 / cartoned unexp. plastic", ceilFt: 30, k: 16.8, n: 12, psi: 35 },
+  { group: "c14", name: "Class 1-4 / cartoned unexp. plastic", ceilFt: 40, k: 16.8, n: 9, psi: 52 },
+  { group: "c14", name: "Class 1-4 / cartoned unexp. plastic", ceilFt: 30, k: 22.4, n: 9, psi: 20 },
+  { group: "c14", name: "Class 1-4 / cartoned unexp. plastic", ceilFt: 40, k: 22.4, n: 9, psi: 28 },
+  { group: "c14", name: "Class 1-4 / cartoned unexp. plastic", ceilFt: 30, k: 25.2, n: 9, psi: 20 },
+  { group: "c14", name: "Class 1-4 / cartoned unexp. plastic", ceilFt: 40, k: 25.2, n: 9, psi: 22 },
+  // Cartoned expanded plastic — DS 8-9 Table 4
+  { group: "cep", name: "Cartoned expanded plastic", ceilFt: 20, k: 16.8, n: 12, psi: 13 },
+  { group: "cep", name: "Cartoned expanded plastic", ceilFt: 30, k: 16.8, n: 12, psi: 35 },
+  { group: "cep", name: "Cartoned expanded plastic", ceilFt: 30, k: 22.4, n: 12, psi: 25 },
+  { group: "cep", name: "Cartoned expanded plastic", ceilFt: 40, k: 22.4, n: 12, psi: 75 },
+  { group: "cep", name: "Cartoned expanded plastic", ceilFt: 30, k: 25.2, n: 12, psi: 20 },
+  { group: "cep", name: "Cartoned expanded plastic", ceilFt: 40, k: 25.2, n: 12, psi: 60 },
+  // Uncartoned (exposed) plastic — DS 8-9 Tables 5/6
+  { group: "unc", name: "Uncartoned (exposed) plastic", ceilFt: 30, k: 16.8, n: 12, psi: 35 },
+  { group: "unc", name: "Uncartoned (exposed) plastic", ceilFt: 40, k: 16.8, n: 12, psi: 52 },
+  { group: "unc", name: "Uncartoned (exposed) plastic", ceilFt: 30, k: 25.2, n: 9, psi: 20 },
+  { group: "unc", name: "Uncartoned (exposed) plastic", ceilFt: 40, k: 25.2, n: 9, psi: 40 },
+];
+/** DS 8-9 Table 14: hose demand (gpm) + supply duration (min) by ceiling-head count. */
+const tbl14 = (n: number): { hose: number; dur: number } => (n <= 12 ? { hose: 250, dur: 60 } : n <= 19 ? { hose: 500, dur: 90 } : { hose: 500, dur: 120 });
 const STORAGE_SCHEMES: StorageScheme[] = [
-  { id: "esfr-k14-12-50", label: "ESFR K14.0 — 12 @ 50 psi (legacy ≤30 ft)", mode: "suppression", kFactor: 14.0, designSprinklers: 12, minPressurePsi: 50, hoseAllowanceGpm: 250, durationMin: 60, commodity: "Class 1–4 + cartoned unexp. plastic", maxStorageHeightFt: 25, maxCeilingHeightFt: 30, note: "AUDIT: K14 phased out >30 ft / exposed plastics; retrofit only." },
-  { id: "esfr-k16.8-12-35", label: "ESFR K16.8 — 12 @ 35 psi (≤30 ft ceiling)", mode: "suppression", kFactor: 16.8, designSprinklers: 12, minPressurePsi: 35, hoseAllowanceGpm: 250, durationMin: 60, commodity: "Class 1–4 + cartoned unexp. plastic", maxStorageHeightFt: 25, maxCeilingHeightFt: 30, note: "Most-installed low-ceiling ESFR." },
-  { id: "esfr-k16.8-12-52", label: "ESFR K16.8 — 12 @ 52 psi (35–40 ft ceiling)", mode: "suppression", kFactor: 16.8, designSprinklers: 12, minPressurePsi: 52, hoseAllowanceGpm: 250, durationMin: 60, commodity: "Class 1–4 + cartoned unexp. plastic", maxStorageHeightFt: 35, maxCeilingHeightFt: 40, note: "AUDIT: per-cell value." },
-  { id: "esfr-k16.8-12-63", label: "ESFR K16.8 — 12 @ 63 psi (45 ft ceiling)", mode: "suppression", kFactor: 16.8, designSprinklers: 12, minPressurePsi: 63, hoseAllowanceGpm: 250, durationMin: 60, commodity: "Class 1–4 + cartoned unexp. plastic", maxStorageHeightFt: 40, maxCeilingHeightFt: 45, note: "AUDIT: per-cell value." },
-  { id: "esfr-k22.4-12-40", label: "ESFR K22.4 — 12 @ 40 psi", mode: "suppression", kFactor: 22.4, designSprinklers: 12, minPressurePsi: 40, hoseAllowanceGpm: 250, durationMin: 60, commodity: "Class 1–4 + cartoned unexp. plastic", maxStorageHeightFt: 35, maxCeilingHeightFt: 45, note: "AUDIT: FM Jul-2015 K320 cells start ~20 psi @25/30 ft." },
-  { id: "esfr-k22.4-12-63", label: "ESFR K22.4 — 12 @ 63 psi (45 ft ceiling)", mode: "suppression", kFactor: 22.4, designSprinklers: 12, minPressurePsi: 63, hoseAllowanceGpm: 250, durationMin: 60, commodity: "Class 1–4 + cartoned unexp. plastic", maxStorageHeightFt: 40, maxCeilingHeightFt: 45, note: "AUDIT: per-cell value." },
-  { id: "esfr-k25.2-12-40", label: "ESFR K25.2 — 12 @ 40 psi", mode: "suppression", kFactor: 25.2, designSprinklers: 12, minPressurePsi: 40, hoseAllowanceGpm: 250, durationMin: 60, commodity: "Class 1–4 + cartoned unexp. plastic", maxStorageHeightFt: 35, maxCeilingHeightFt: 40, note: "AUDIT: FM K360 low cell ~20 psi @25/30 ft." },
-  { id: "esfr-k25.2-12-50", label: "ESFR K25.2 — 12 @ 50 psi (48 ft ceiling)", mode: "suppression", kFactor: 25.2, designSprinklers: 12, minPressurePsi: 50, hoseAllowanceGpm: 250, durationMin: 60, commodity: "Class 1–4 + cartoned unexp. plastic", maxStorageHeightFt: 40, maxCeilingHeightFt: 48, note: "Flagship tall-warehouse ESFR (publicly grounded, 5 ft aisles)." },
-  { id: "esfr-k25.2-12-60", label: "ESFR K25.2 — 12 @ 60 psi (exposed plastic ≤40 ft)", mode: "suppression", kFactor: 25.2, designSprinklers: 12, minPressurePsi: 60, hoseAllowanceGpm: 250, durationMin: 60, commodity: "Exposed (uncartoned) nonexpanded Group A plastic", maxStorageHeightFt: 40, maxCeilingHeightFt: 40, note: "Only ESFR option for exposed plastic (publicly grounded)." },
-  { id: "cmsa-k16.8-15-25", label: "CMSA (large-drop) K16.8 upright — 15 @ 25 psi", mode: "control", kFactor: 16.8, designSprinklers: 15, minPressurePsi: 25, hoseAllowanceGpm: 500, durationMin: 90, commodity: "Class 1–4 / cartoned plastics where ESFR unsuitable", note: "Hose/duration per DS 8-9 Table 14: 15 heads → 500 gpm, 90 min. AUDIT: count(12–25)/psi are commodity/height specific — replace with the FM cell." },
+  ...STORAGE_CELLS.map((c): StorageScheme => {
+    const h = tbl14(c.n);
+    return { id: `fm-${c.group}-k${c.k}-${c.ceilFt}`, label: `${c.name} · K${c.k} ${c.n} @ ${c.psi} psi (≤${c.ceilFt} ft)`, mode: "suppression", kFactor: c.k, designSprinklers: c.n, minPressurePsi: c.psi, hoseAllowanceGpm: h.hose, durationMin: h.dur, commodity: c.name, maxCeilingHeightFt: c.ceilFt };
+  }),
+  // Control mode (CMSA / large-drop) where ESFR is unsuitable
+  { id: "cmsa-k16.8-15-25", label: "CMSA (large-drop) K16.8 upright — 15 @ 25 psi", mode: "control", kFactor: 16.8, designSprinklers: 15, minPressurePsi: 25, hoseAllowanceGpm: 500, durationMin: 90, commodity: "Class 1-4 / where ESFR unsuitable", note: "Hose/duration per Table 14 (15 heads → 500 gpm/90 min). AUDIT: count/psi are commodity/height specific — confirm the DS 8-9 cell." },
 ];
 
 export const fmGlobal: StandardModule = {

@@ -72,20 +72,24 @@ describe("standards-engine: FM Global Data Sheets", () => {
     expect(db).toEqual({ densityGpmFt2: 0.2, designAreaFt2: 2500, minPressurePsi: 7, hoseAllowanceGpm: 250 });
   });
 
-  it("offers DS 8-9 storage count-at-pressure schemes", () => {
+  it("offers DS 8-9 Table 2-6 storage schemes (grounded count-at-pressure)", () => {
     const schemes = s.storageSchemes!();
     expect(schemes.length).toBeGreaterThan(0);
-    const flagship = schemes.find((x) => x.id === "esfr-k25.2-12-50")!;
-    expect(flagship).toMatchObject({ kFactor: 25.2, designSprinklers: 12, minPressurePsi: 50, mode: "suppression", hoseAllowanceGpm: 250, durationMin: 60 });
-    // DS 8-9 Table 14: hose/duration by ceiling-head count — 15 heads → 500 gpm, 90 min
+    // Class 1-4 K16.8 @ 30 ft = 12 @ 35 psi (DS 8-9 Tables 2 & 3)
+    expect(schemes.find((x) => x.id === "fm-c14-k16.8-30")).toMatchObject({ kFactor: 16.8, designSprinklers: 12, minPressurePsi: 35, mode: "suppression", hoseAllowanceGpm: 250, durationMin: 60 });
+    // K25.2 @ 30 ft = 9 @ 20 psi — grounded (NOT the old representative "12 @ 40")
+    expect(schemes.find((x) => x.id === "fm-c14-k25.2-30")).toMatchObject({ designSprinklers: 9, minPressurePsi: 20 });
+    // cartoned expanded plastic K22.4 @ 40 ft = 12 @ 75 psi (Table 4)
+    expect(schemes.find((x) => x.id === "fm-cep-k22.4-40")).toMatchObject({ designSprinklers: 12, minPressurePsi: 75 });
+    // control-mode CMSA: 15 heads → 500 gpm / 90 min (Table 14)
     const cmsa = schemes.find((x) => x.mode === "control")!;
     expect(cmsa.hoseAllowanceGpm).toBe(500);
     expect(cmsa.durationMin).toBe(90);
   });
 
   it("resolves a storage scheme into an imperial design basis", () => {
-    const b = designBasisForScheme("fmds", "esfr-k16.8-12-35");
-    expect(b).toEqual({ operatingSprinklers: 12, minPressurePsi: 35, kFactor: 16.8, hoseAllowanceGpm: 250, durationMin: 60, method: "fm-storage", schemeLabel: "ESFR K16.8 — 12 @ 35 psi (≤30 ft ceiling)" });
+    const b = designBasisForScheme("fmds", "fm-c14-k16.8-30");
+    expect(b).toEqual({ operatingSprinklers: 12, minPressurePsi: 35, kFactor: 16.8, hoseAllowanceGpm: 250, durationMin: 60, method: "fm-storage", schemeLabel: "Class 1-4 / cartoned unexp. plastic · K16.8 12 @ 35 psi (≤30 ft)" });
     expect(designBasisForScheme("fmds", "bogus")).toBeUndefined();
   });
 
