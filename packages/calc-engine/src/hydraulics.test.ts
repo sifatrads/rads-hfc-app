@@ -22,6 +22,14 @@ describe("hydraulics primitives (NFPA 13 §27.2.2)", () => {
     expect(hazenWilliamsLossPsi(Q, C, d, 50)).toBeCloseTo(p * 50, 8);
   });
 
+  it("Hazen-Williams matches FIXED NFPA 13 §27.2.2.1 reference values (catches a constant/exponent change)", () => {
+    // Sch-40 steel, C = 120; hardcoded results of 4.52·Q^1.85/(C^1.85·d^4.87) — not
+    // recomputed here, so a changed constant or exponent fails this.
+    expect(hazenWilliamsPsiPerFoot(100, 120, 1.049)).toBeCloseTo(2.5555, 3); // 100 gpm, 1"
+    expect(hazenWilliamsPsiPerFoot(250, 120, 2.067)).toBeCloseTo(0.51184, 4); // 250 gpm, 2"
+    expect(hazenWilliamsPsiPerFoot(500, 120, 4.026)).toBeCloseTo(0.071781, 5); // 500 gpm, 4"
+  });
+
   it("flow exponent is 1.85 (doubling flow ⇒ loss × 2^1.85)", () => {
     const a = hazenWilliamsPsiPerFoot(100, 120, 2);
     const b = hazenWilliamsPsiPerFoot(200, 120, 2);
