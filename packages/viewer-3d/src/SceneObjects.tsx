@@ -83,12 +83,15 @@ export function Nodes({ scene, t, onPick }: { scene: AnnotatedScene; t: SceneTra
     scene.nodes.forEach((n, i) => {
       const [x, y, z] = toThree(n.pos, t);
       const head = n.kind === "sprinkler" || n.kind === "hose-station";
+      // operating heads (in the design / remote area) discharge — show them
+      // bright red and a touch larger; idle heads are greyed so the active area reads.
+      const flowing = head && (n.result?.dischargeGpm ?? 0) > 0.5;
       o.position.set(x, y, z);
-      const r = head ? 0.16 : 0.1;
+      const r = head ? (flowing ? 0.2 : 0.14) : 0.1;
       o.scale.set(r, r, r);
       o.updateMatrix();
       mesh.setMatrixAt(i, o.matrix);
-      mesh.setColorAt(i, col.set(head ? "#e53935" : "#37474f"));
+      mesh.setColorAt(i, col.set(flowing ? "#e53935" : head ? "#9aa6b2" : "#37474f"));
     });
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
