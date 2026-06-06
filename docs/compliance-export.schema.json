@@ -90,7 +90,8 @@
         "maxVelocityFps": { "type": "number" },
         "velocityLimitFps": { "type": "number" },
         "withinComponentRating": { "type": "boolean", "description": "Required pressure ≤ component rating (default 175 psi)." },
-        "componentRatingPsi": { "type": "number" }
+        "componentRatingPsi": { "type": "number" },
+        "pumpCurveOk": { "type": "boolean", "description": "NFPA 20 §6.2 pump-curve shape ok: churn head ≤ 140% rated and head at 150% flow ≥ 65% rated (when a pump datasheet is provided)." }
       }
     },
     "coverageSpacing": {

@@ -412,6 +412,24 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(solveProject(mk(false)).summary.totalDemandGpm).toBeCloseTo(1250, 0);
   });
 
+  it("checks the NFPA 20 §6.2 pump curve (churn ≤140%, head at 150% flow ≥65% rated)", () => {
+    const withPump = (ds: Record<string, number>) => parseProject({
+      schemaVersion: 2,
+      meta: { id: "P", name: "pump", standardId: "nfpa13", hazardClass: "oh2", units: "imperial", systemType: "sprinkler" },
+      designBasis: { sprinklerKFactor: 5.6, densityGpmFt2: 0.2, designAreaFt2: 1500, minSprinklerPressurePsi: 7, hoseAllowanceGpm: 250 },
+      waterSupply: { type: "city", flowTest: { staticPsi: 80, residualPsi: 65, testFlowGpm: 3000 } },
+      network: {
+        nodes: [{ id: "SRC", type: "junction", elevationFt: 0 }, { id: "S1", type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 130 }, { id: "S2", type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 130 }],
+        pipes: [{ id: "P1", from: "SRC", to: "S1", role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor: 120, lengthFt: 10 }, { id: "P2", from: "S1", to: "S2", role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor: 120, lengthFt: 10 }],
+        valves: [],
+        pump: { datasheet: ds },
+      },
+    });
+    expect(solveProject(withPump({ ratedFlowGpm: 500, ratedPsi: 100, churnPsi: 130, overloadPsi: 70 })).summary.pumpCurveCheck).toMatchObject({ churnPctRated: 130, churnOk: true, overloadPctRated: 70, overloadOk: true, ok: true });
+    expect(solveProject(withPump({ ratedFlowGpm: 500, ratedPsi: 100, churnPsi: 150, overloadPsi: 70 })).summary.pumpCurveCheck).toMatchObject({ churnOk: false, ok: false }); // churn 150% > 140%
+    expect(solveProject(withPump({ ratedFlowGpm: 500, ratedPsi: 100, churnPsi: 130, overloadPsi: 60 })).summary.pumpCurveCheck).toMatchObject({ overloadOk: false, ok: false }); // 150%-flow head 60% < 65%
+  });
+
   it("required stored water = total demand × duration", () => {
     const s = solveProject(fmStorage).summary;
     expect(s.requiredStoredGal).toBe(Math.round(s.totalDemandGpm * 60));

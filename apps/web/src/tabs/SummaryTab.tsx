@@ -40,6 +40,7 @@ export function SummaryTab({ model, solution, error, onChange }: { model: Projec
     ["Min head pressure required", u.pU(s.minSprinklerPressurePsi), s.meetsMinPressure ? "good" : "bad"],
     ["Heads below minimum", s.lowPressureNodes.length ? `${s.lowPressureNodes.length} (${s.lowPressureNodes.slice(0, 3).map((n) => n.id).join(", ")}${s.lowPressureNodes.length > 3 ? "…" : ""})` : "none", s.lowPressureNodes.length ? "bad" : "good"],
     ...(s.suctionCheck ? [[`Pump suction velocity @ 150% (NFPA 20 ≤ ${u.v(15)} ${u.U.v})`, u.vU(s.suctionCheck.velocityFps), s.suctionCheck.ok ? "good" : "bad"]] as [string, string, ("good" | "warn" | "bad")?][] : []),
+    ...(s.pumpCurveCheck ? [[`Pump curve (NFPA 20 §6.2: churn ≤140%, 150%-flow ≥65%)`, [s.pumpCurveCheck.churnPctRated !== undefined ? `churn ${s.pumpCurveCheck.churnPctRated}%` : "", s.pumpCurveCheck.overloadPctRated !== undefined ? `150%→${s.pumpCurveCheck.overloadPctRated}%` : ""].filter(Boolean).join(" · ") || "—", s.pumpCurveCheck.ok ? "good" : "bad"]] as [string, string, ("good" | "warn" | "bad")?][] : []),
     ["Max junction imbalance", `${u.q(s.maxJunctionImbalanceGpm, 3)} ${u.U.q}`, s.maxJunctionImbalanceGpm <= 0.5 ? "good" : "warn"],
     ["Solver converged", s.converged ? "yes" : "no", s.converged ? "good" : "bad"],
   ];

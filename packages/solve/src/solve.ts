@@ -87,6 +87,10 @@ export interface SolveSummary {
   supplyCurveSamples: CurvePoint[];
   /** NFPA 20 pump suction-velocity check at 150% rated flow (limit 15 ft/s). */
   suctionCheck?: { velocityFps: number; atFlowGpm: number; ok: boolean };
+  /** NFPA 20 §6.2 pump-curve shape: churn/shutoff head ≤ 140% rated (§6.2.2);
+   * head at 150% rated flow ≥ 65% rated (§6.2.1). Present only when a datasheet
+   * with the relevant points is provided. `ok` = every provided check passes. */
+  pumpCurveCheck?: { churnPctRated?: number; churnOk?: boolean; overloadPctRated?: number; overloadOk?: boolean; ok: boolean };
   /** Peak pipe velocity (ft/s) + the configured limit (default 20) + pass flag. */
   maxVelocityFps?: number;
   maxVelocityPipe?: string;
@@ -621,6 +625,22 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     suctionCheck = { velocityFps: vel, atFlowGpm: overload, ok: vel <= 15 };
   }
 
+  // NFPA 20 §6.2: churn (shutoff) head ≤ 140% rated (§6.2.2); head at 150% rated
+  // flow ≥ 65% rated (§6.2.1). Checked only against the points the datasheet gives.
+  let pumpCurveCheck: SolveSummary["pumpCurveCheck"];
+  if (pumpDs && typeof pumpDs.ratedPsi === "number" && pumpDs.ratedPsi > 0) {
+    const rated = pumpDs.ratedPsi;
+    const churn = typeof pumpDs.churnPsi === "number" ? pumpDs.churnPsi : undefined;
+    const over = typeof pumpDs.overloadPsi === "number" ? pumpDs.overloadPsi : undefined;
+    const churnOk = churn !== undefined ? churn <= rated * 1.4 + 1e-6 : undefined;
+    const overloadOk = over !== undefined ? over >= rated * 0.65 - 1e-6 : undefined;
+    pumpCurveCheck = {
+      ...(churn !== undefined ? { churnPctRated: Math.round((churn / rated) * 100), churnOk } : {}),
+      ...(over !== undefined ? { overloadPctRated: Math.round((over / rated) * 100), overloadOk } : {}),
+      ok: churnOk !== false && overloadOk !== false,
+    };
+  }
+
   const summary: SolveSummary = {
     sourceId: source.id,
     sourceElevationFt: source.elevationFt,
@@ -658,6 +678,7 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     velocityOk: maxVelocityFps <= velocityLimitFps + 1e-6,
     supplyCurveSamples: sampleCurve(supply, maxFlowGpm, 24),
     ...(suctionCheck ? { suctionCheck } : {}),
+    ...(pumpCurveCheck ? { pumpCurveCheck } : {}),
     ...(requiredStoredGal !== undefined ? { requiredStoredGal, durationMin } : {}),
     ...(availableStoredGal !== undefined ? { availableStoredGal } : {}),
     ...(storedWaterAdequate !== undefined ? { storedWaterAdequate } : {}),
