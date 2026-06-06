@@ -7,11 +7,11 @@
  * plus fixed hose + duration. Both map onto the existing solver (density/area and
  * the N-most-remote-at-min-pressure binary search respectively).
  *
- * ⚠ Representative data — AUDIT against the current FM Data Sheets before use.
- *   The full FM 8-9 Tables 2-11 (per-cell K/count/pressure) are proprietary; only
- *   a few cells below are publicly grounded. Replace each with the exact current
- *   table cell for the specific commodity/arrangement/height/edition, and never
- *   mix FM with NFPA 13 criteria (they differ for the same sprinkler).
+ * Non-storage HC-1/2/3 demands are taken from FM DS 3-26 Table 2.3.1.10 (the
+ * wet / ≤30 ft ceiling base case). The STORAGE (DS 8-9) ESFR/CMSA scheme table
+ * below is still ⚠ REPRESENTATIVE — confirm each per-cell K/count/pressure
+ * against the current DS 8-9 for the specific commodity/arrangement/height/
+ * edition before issuing a design, and never mix FM with NFPA 13 criteria.
  */
 import type { StandardModule, HazardClass, DesignDensityPoint, StorageScheme, StorageDesignBasis } from "./types";
 import { fittingEquivalentLengthFt } from "./tables-nfpa13";
@@ -22,14 +22,19 @@ const HAZARDS: HazardClass[] = [
   { id: "hc-3", label: "Hazard Category 3 (HC-3)" },
 ];
 
-// Density (gpm/ft²) over area of operation (ft²) — FM DS 3-26 non-storage.
+// Density (gpm/ft²) over area of operation (ft²) — FM DS 3-26 Table 2.3.1.10,
+// wet system at a maximum ceiling height of 30 ft (9 m) [the most common base
+// case]. NOTE: the full table also gives higher demand areas for dry systems and
+// taller ceilings (45/60/100 ft) — those variants are not yet selectable here.
 const DENSITY: Record<string, DesignDensityPoint> = {
-  "hc-1": { hazardClassId: "hc-1", density: 0.1, area: 2500 },
-  "hc-2": { hazardClassId: "hc-2", density: 0.2, area: 2500 },
-  "hc-3": { hazardClassId: "hc-3", density: 0.3, area: 2500 },
+  "hc-1": { hazardClassId: "hc-1", density: 0.1, area: 1500 }, // 4 mm/min / 140 m²
+  "hc-2": { hazardClassId: "hc-2", density: 0.2, area: 2500 }, // 8 mm/min / 230 m²
+  "hc-3": { hazardClassId: "hc-3", density: 0.3, area: 2500 }, // 12 mm/min / 230 m²
 };
 
-// Hose-stream demand (gpm).
+// Hose-stream demand (gpm) — DS 3-26 §2.3.1.12 (250 HC-1/HC-2, 500 HC-3); supply
+// for 60 min (§2.3.1.13); minimum 7 psi (0.5 bar) at the most remote sprinkler
+// (§2.3.1.11).
 const HOSE: Record<string, number> = { "hc-1": 250, "hc-2": 250, "hc-3": 500 };
 
 // ── FM DS 8-9 ceiling storage protection — count-at-pressure schemes ──

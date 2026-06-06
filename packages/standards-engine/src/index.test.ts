@@ -53,8 +53,9 @@ describe("standards-engine: FM Global Data Sheets", () => {
     expect(s.hazardClasses().map((h) => h.id)).toEqual(["hc-1", "hc-2", "hc-3"]);
   });
 
-  it("exposes DS 3-26 density over 2500 ft² and hose demand", () => {
-    expect(s.designDensity("hc-1")).toEqual({ hazardClassId: "hc-1", density: 0.1, area: 2500 });
+  it("exposes DS 3-26 Table 2.3.1.10 density/area and hose demand", () => {
+    expect(s.designDensity("hc-1")).toEqual({ hazardClassId: "hc-1", density: 0.1, area: 1500 }); // 4 mm/min / 140 m²
+    expect(s.designDensity("hc-2")).toEqual({ hazardClassId: "hc-2", density: 0.2, area: 2500 });
     expect(s.designDensity("hc-3")).toEqual({ hazardClassId: "hc-3", density: 0.3, area: 2500 });
     expect(s.hoseAllowance("hc-1")).toBe(250);
     expect(s.hoseAllowance("hc-3")).toBe(500);
