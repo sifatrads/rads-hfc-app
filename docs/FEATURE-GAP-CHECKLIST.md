@@ -87,6 +87,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [~] Sprinkler coverage & spacing check (per-head area + along-branch spacing vs NFPA 13 hazard limits; Summary tab) ✅ DONE — full ceiling-grid/plan layout check is a follow-up
 - [x] Protected-area coverage adequacy — installed heads must cover the building/floor footprint (Σ head coverage ≥ protected area); Summary + Compliance Checklist + JSON export ✅ DONE
 - [x] Extended-coverage (EC) sprinkler limits — coverageType=extended-coverage raises the coverage/spacing max (≈400 ft²/20 ft, AUDIT vs listing) so EC factory-floor heads are not false-flagged ✅ DONE
+- [x] Extended-coverage 5-sprinkler minimum design area (NFPA 13 §19.3.3.2.2.3) — EC Auto-Peak uses ≥5 operating heads even when the area is met with fewer ✅ DONE
 - [ ] Vertical-offset / clash checking (elevation) — coordination; medium
 
 ## Menus & File Ops

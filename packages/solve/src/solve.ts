@@ -279,7 +279,7 @@ function designAreaFactor(model: ProjectModel): number {
  * most-remote accumulation) unless the topology is a clear multi-branch tree
  * (pipe roles set + ≥ 2 branch lines), so models without roles are unaffected.
  */
-function branchAwareAreaSet(model: ProjectModel, sourceId: string, designArea: number): Set<string> | undefined {
+function branchAwareAreaSet(model: ProjectModel, sourceId: string, designArea: number, minHeads: number): Set<string> | undefined {
   const pipes = model.network.pipes;
   if (!pipes.some((p) => p.role && p.role !== "branch-line")) return undefined; // roles not set → can't identify branches
   const cov = new Map(model.network.nodes.map((n) => [n.id, n.coverageAreaFt2 ?? 130]));
@@ -310,18 +310,21 @@ function branchAwareAreaSet(model: ProjectModel, sourceId: string, designArea: n
   const set = new Set<string>();
   let area = 0;
   for (const br of branchList) {
-    for (let i = 0; i < br.perBranch && i < br.sorted.length && area < designArea; i++) { const id = br.sorted[i]!; set.add(id); area += cov.get(id) ?? 130; }
-    if (area >= designArea) break;
+    for (let i = 0; i < br.perBranch && i < br.sorted.length && (area < designArea || set.size < minHeads); i++) { const id = br.sorted[i]!; set.add(id); area += cov.get(id) ?? 130; }
+    if (area >= designArea && set.size >= minHeads) break;
   }
-  return set.size > 0 ? set : undefined;
+  return set.size > 0 && set.size >= minHeads ? set : undefined; // fall back if the EC 5-head minimum can't be met within branches
 }
 
 function autoPeakAreaSet(model: ProjectModel, sourceId: string): Set<string> | undefined {
   const designArea = (num(model.designBasis, "designAreaFt2") ?? 0) * designAreaFactor(model);
   if (!designArea) return undefined;
+  // NFPA 13 §19.3.3.2.2.3: an extended-coverage design area is the hazard area OR
+  // the area of 5 sprinklers, whichever is greater → at least 5 operating heads.
+  const minHeads = (model.designBasis as Record<string, unknown> | undefined)?.["coverageType"] === "extended-coverage" ? 5 : 0;
   // Prefer the code-exact 1.2·√A branch-aware area when the topology is a clear
   // multi-branch tree; otherwise accumulate the most-remote heads by distance.
-  const ba = branchAwareAreaSet(model, sourceId, designArea);
+  const ba = branchAwareAreaSet(model, sourceId, designArea, minHeads);
   if (ba) return ba;
   const dist = pathDistances(model, sourceId);
   const spk = model.network.nodes.filter((n) => n.type === "sprinkler" && typeof n.kFactor === "number" && n.kFactor > 0);
@@ -332,7 +335,7 @@ function autoPeakAreaSet(model: ProjectModel, sourceId: string): Set<string> | u
   for (const n of spk) {
     set.add(n.id);
     area += n.coverageAreaFt2 ?? 130;
-    if (area >= designArea) break;
+    if (area >= designArea && set.size >= minHeads) break;
   }
   return set;
 }

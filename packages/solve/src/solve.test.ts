@@ -375,6 +375,24 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(qrSlope.operatingHeads).toBe(8); // ×0.6×1.3 = ×0.78 = 780
   });
 
+  it("requires at least 5 operating heads for extended-coverage (NFPA 13 §19.3.3.2.2.3)", () => {
+    const mk = (ec: boolean) => {
+      const nodes: Record<string, unknown>[] = [{ id: "SRC", type: "junction", elevationFt: 0 }];
+      const pipes: Record<string, unknown>[] = [];
+      let prev = "SRC";
+      for (let i = 1; i <= 8; i++) { const id = `S${i}`; nodes.push({ id, type: "sprinkler", elevationFt: 0, kFactor: 11.2, coverageAreaFt2: 400 }); pipes.push({ id: `P${i}`, from: prev, to: id, role: "branch-line", nominalSize: "3", internalDiameterIn: 3.068, cFactor: 120, lengthFt: 14 }); prev = id; }
+      return parseProject({
+        schemaVersion: 2,
+        meta: { id: "EC", name: "ec area", standardId: "nfpa13", hazardClass: "oh2", units: "imperial", systemType: "sprinkler" },
+        designBasis: { sprinklerKFactor: 11.2, densityGpmFt2: 0.2, designAreaFt2: 1500, minSprinklerPressurePsi: 7, hoseAllowanceGpm: 250, ...(ec ? { coverageType: "extended-coverage" } : {}) },
+        waterSupply: { type: "city+fire-pump", flowTest: { staticPsi: 100, residualPsi: 90, testFlowGpm: 8000 }, firePump: { ratedFlowGpm: 4000, ratedPsi: 175, churnPsi: 195 } },
+        network: { nodes, pipes, valves: [] },
+      });
+    };
+    expect(solveProject(mk(false)).summary.operatingHeads).toBe(4); // 1500 / 400 = 4 heads meet the area
+    expect(solveProject(mk(true)).summary.operatingHeads).toBe(5); // EC → at least 5 sprinklers
+  });
+
   it("required stored water = total demand × duration", () => {
     const s = solveProject(fmStorage).summary;
     expect(s.requiredStoredGal).toBe(Math.round(s.totalDemandGpm * 60));
