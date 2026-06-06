@@ -7,10 +7,12 @@ import { C, FONT, card, sectionTitle, toneColor } from "../ui";
 import { units } from "../units";
 import { compareDesignAreas, type AreaResult } from "../design-areas";
 import { checkCoverageSpacing, type CoverageReport } from "../coverage-check";
+import { compareSupplyScenarios, type SupplyScenario } from "../supply-scenarios";
 
 export function SummaryTab({ model, solution, error, onChange }: { model: ProjectModel; solution: ProjectSolution | null; error?: string; onChange?: (model: ProjectModel) => void }): JSX.Element {
   const [areas, setAreas] = useState<AreaResult[] | null>(null);
   const [cov, setCov] = useState<CoverageReport | null>(null);
+  const [scen, setScen] = useState<SupplyScenario[] | null>(null);
   if (!solution) return <Empty msg={error ? `Solve error: ${error}` : "Add nodes, pipes and a water supply to see results."} />;
   const s = solution.summary;
   const u = units(model);
@@ -147,6 +149,32 @@ export function SummaryTab({ model, solution, error, onChange }: { model: Projec
               </table>
             )}
           </>
+        )}
+      </div>
+
+      <div style={{ ...card, padding: 16, maxWidth: 640 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={sectionTitle}>Supply robustness (contingency)</div>
+          <span style={{ flex: 1 }} />
+          <button style={areaBtn} onClick={() => setScen(compareSupplyScenarios(model))}>⟳ Test contingencies</button>
+        </div>
+        {scen === null ? (
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Re-solve the design with the fire pump off and a degraded supply to see how much margin survives a single failure (RSC requires duty + standby pumps).</div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
+            <thead><tr>{["Scenario", `Available (${u.U.p})`, `Required (${u.U.p})`, `Margin (${u.U.p})`, ""].map((h, hi) => <th key={hi} style={{ fontSize: 10.5, fontWeight: 700, color: C.muted, textAlign: "left", padding: "4px 8px", textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
+            <tbody>
+              {scen.map((sc, i) => (
+                <tr key={sc.label} style={i === 0 ? { background: "#eef6ff" } : i % 2 ? { background: C.zebra } : undefined}>
+                  <td style={{ fontSize: 12.5, padding: "6px 8px", fontWeight: i === 0 ? 700 : 500 }}>{sc.label}{sc.note ? <span style={{ color: C.muted, fontWeight: 400 }}> · {sc.note}</span> : null}</td>
+                  <td style={{ fontSize: 12.5, padding: "6px 8px" }}>{u.p(sc.availablePsi)}</td>
+                  <td style={{ fontSize: 12.5, padding: "6px 8px" }}>{u.p(sc.requiredPsi)}</td>
+                  <td style={{ fontSize: 12.5, padding: "6px 8px", fontWeight: 700, color: toneColor(sc.marginPsi >= 0 ? "good" : "bad") }}>{sc.marginPsi >= 0 ? "+" : ""}{u.p(sc.marginPsi)}</td>
+                  <td style={{ fontSize: 12.5, padding: "6px 8px", fontWeight: 700, color: toneColor(sc.passes ? "good" : "bad") }}>{sc.passes ? "PASS" : "FAIL"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
