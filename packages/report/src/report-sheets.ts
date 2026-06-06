@@ -39,6 +39,7 @@ function units(model: ProjectModel) {
     qU: (v?: number, d?: number) => `${fmt(v, k.q, d ?? (metric ? 0 : 1))} ${U.q}`,
     densU: (v?: number, d?: number) => `${fmt(v, k.dens, d ?? (metric ? 1 : 3))} ${U.dens}`,
     areaU: (v?: number, d?: number) => `${fmt(v, k.area, d ?? (metric ? 1 : 0))} ${U.area}`,
+    galU: (v?: number) => (v === undefined || !Number.isFinite(v) ? "—" : `${Math.round(v * (metric ? 3.785412 : 1)).toLocaleString()} ${metric ? "L" : "gal"}`),
   };
 }
 
@@ -146,7 +147,7 @@ function riserNameplateSpec(model: ProjectModel, sol: ProjectSolution): Spec {
     ["@ test flow", u.qU(num(ft, "testFlowGpm"))],
     ["Available @ demand", u.pU(s.availablePsi)],
     ["Safety margin", u.pU(s.marginPsi)],
-    ["Stored water (req)", s.requiredStoredGal !== undefined ? `${s.requiredStoredGal.toLocaleString()} gal @ ${s.durationMin}m` : "—"],
+    ["Stored water (req)", s.requiredStoredGal !== undefined ? `${u.galU(s.requiredStoredGal)} @ ${s.durationMin}m` : "—"],
     ["Supply adequate", s.passesSupply ? "YES" : "NO"],
   ]);
   const basis = infoBox(rx, y, half, "Design basis", [
@@ -205,7 +206,7 @@ function fmStorageSchemeSpec(model: ProjectModel, sol: ProjectSolution): Spec {
     ["Total demand", u.qU(s.totalDemandGpm)],
     ["Required pressure", u.pU(s.sourcePressurePsi)],
     ["Available @ demand", u.pU(s.availablePsi)],
-    ["Stored water (req)", s.requiredStoredGal !== undefined ? `${s.requiredStoredGal.toLocaleString()} gal @ ${s.durationMin}m` : "—"],
+    ["Stored water (req)", s.requiredStoredGal !== undefined ? `${u.galU(s.requiredStoredGal)} @ ${s.durationMin}m` : "—"],
     ["Supply adequate", s.passesSupply ? "YES" : "NO"],
   ]);
   el.push(scheme.svg, demand.svg);

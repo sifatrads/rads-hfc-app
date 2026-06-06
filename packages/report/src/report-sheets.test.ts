@@ -116,6 +116,32 @@ describe("NFPA §27.4 report sheets", () => {
     expect(plain.length).toBeGreaterThanOrEqual(6);
   });
 
+  it("renders stored water in litres (not gallons) on a metric report", () => {
+    const m = parseProject({
+      schemaVersion: 2,
+      meta: { id: "MET", name: "Metric stored water", systemType: "sprinkler", standardId: "as2118", hazardClass: "oh2", units: "metric" },
+      designBasis: { densityGpmFt2: 0.1227, designAreaFt2: 1550, sprinklerKFactor: 5.6, operatingSprinklers: 2, minSprinklerPressurePsi: 7.25, durationMin: 30, hoseAllowanceGpm: 0 },
+      waterSupply: { type: "city", flowTest: { staticPsi: 87, residualPsi: 70, testFlowGpm: 2000 } },
+      network: {
+        nodes: [
+          { id: "SRC", type: "junction", elevationFt: 0 },
+          { id: "CM", type: "junction", elevationFt: 0 },
+          { id: "S1", type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 130 },
+          { id: "S2", type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 130 },
+        ],
+        pipes: [
+          { id: "P0", from: "SRC", to: "CM", role: "feed-main", nominalSize: "3", material: "steel-sch40", cFactor: 120, lengthFt: 20 },
+          { id: "P1", from: "CM", to: "S1", role: "branch-line", nominalSize: "1-1/4", material: "steel-sch40", cFactor: 120, lengthFt: 10 },
+          { id: "P2", from: "S1", to: "S2", role: "branch-line", nominalSize: "1", material: "steel-sch40", cFactor: 120, lengthFt: 10 },
+        ],
+        valves: [],
+      },
+    });
+    const nameplate = reportSheets(m, solveProject(m)).find((s) => s.title === "Riser Nameplate")!;
+    expect(nameplate.svg).toContain(" L @"); // litres, metric
+    expect(nameplate.svg).not.toContain(" gal @");
+  });
+
   it("renders computed flows/pressures into the worksheet", () => {
     const sol = solveProject(model);
     const pages = pipeWorksheetSheets(model, sol);
