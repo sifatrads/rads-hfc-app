@@ -173,6 +173,20 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(flowing("B1") && flowing("B2") && flowing("C1") && flowing("C2")).toBe(true);
   });
 
+  it("checks the supply margin against a design target margin", () => {
+    const base = JSON.parse(JSON.stringify(fmStorage));
+    const sBase = solveProject(fmStorage).summary;
+    expect(sBase.targetMarginPsi).toBeUndefined(); // no target set → not checked
+    // a target below the actual margin passes
+    base.designBasis.targetMarginPsi = Math.max(1, sBase.marginPsi - 5);
+    expect(solveProject(parseProject(base)).summary.meetsTargetMargin).toBe(true);
+    // a target above the actual margin fails
+    base.designBasis.targetMarginPsi = sBase.marginPsi + 50;
+    const tight = solveProject(parseProject(base)).summary;
+    expect(tight.targetMarginPsi).toBe(sBase.marginPsi + 50);
+    expect(tight.meetsTargetMargin).toBe(false);
+  });
+
   it("reports peak pipe velocity vs the configured limit (default 20 ft/s)", () => {
     const s = solveProject(fmStorage).summary;
     expect(typeof s.maxVelocityFps).toBe("number");

@@ -50,6 +50,9 @@ export interface SolveSummary {
   /** Supply margin = available − required (psi). */
   marginPsi: number;
   passesSupply: boolean;
+  /** Design target safety margin (psi) + whether the margin meets it, when set. */
+  targetMarginPsi?: number;
+  meetsTargetMargin?: boolean;
   /** Most-remote (lowest-pressure) sprinkler. */
   mostRemoteSprinkler?: { id: string; pressurePsi: number; flowGpm: number };
   /** Operating sprinklers in the design area (count). */
@@ -468,6 +471,8 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   const totalDemandGpm = systemFlowGpm + hoseAllowanceGpm;
   const availablePsi = supply(totalDemandGpm);
   const marginPsi = availablePsi - sourceP;
+  const targetMarginPsi = num(model.designBasis, "targetMarginPsi");
+  const meetsTargetMargin = targetMarginPsi !== undefined && targetMarginPsi > 0 ? marginPsi >= targetMarginPsi - 1e-6 : undefined;
 
   // Stored-water requirement = total demand × supply duration, vs tank capacity.
   const durationMin = num(model.designBasis, "durationMin");
@@ -496,6 +501,8 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     availablePsi,
     marginPsi,
     passesSupply: marginPsi >= -1e-6,
+    ...(targetMarginPsi !== undefined && targetMarginPsi > 0 ? { targetMarginPsi } : {}),
+    ...(meetsTargetMargin !== undefined ? { meetsTargetMargin } : {}),
     ...(remote ? { mostRemoteSprinkler: remote } : {}),
     operatingHeads: designNodeIds.length,
     ...(usedLocked && !opts.designArea ? { manualDesignArea: true } : {}),

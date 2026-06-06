@@ -102,7 +102,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Friction-equation selector (Hazen-Williams / Darcy-Weisbach) ✅ DONE
 - [x] Configurable max-velocity limit (default 20 ft/s) — threads through Analysis + Sizing flags, the Compliance Checklist (PASS/REVIEW) + JSON export ✅ DONE
 - [x] Fluid properties (water / propylene- / ethylene-glycol · temp · concentration → auto viscosity for D-W) ✅ DONE
-- [ ] Demand-sizing modes (satisfy-min / below-available / %-below-available) — flexible targets
+- [~] Target safety margin — designBasis.targetMarginPsi: supply must clear the demand by ≥ target; PASS/REVIEW on the Compliance Checklist + JSON export + Project field ✅ DONE (the %-below-available variant is a follow-up)
 - [ ] Default equivalent-lengths (PDT) editor by type/size — tune fitting tables
 - [ ] Precision / tolerance + decimal places — convergence + display control
 - [ ] Bar vs kPa metric split (3-way English/Bar/kPa) — finer metric control

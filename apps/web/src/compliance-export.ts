@@ -28,7 +28,7 @@ export interface ComplianceSummary {
     sprinklerKFactor?: number; minSprinklerPressurePsi?: number; hoseAllowanceGpm?: number; durationMin?: number;
   };
   demand: { systemFlowGpm?: number; totalDemandGpm?: number; requiredSourcePressurePsi?: number; mostRemoteHead?: { id: string; pressurePsi?: number; flowGpm?: number } };
-  supply: { staticPsi?: number; residualPsi?: number; testFlowGpm?: number; availablePsi?: number; marginPsi?: number; passesSupply: boolean; requiredStoredGal?: number; availableStoredGal?: number; storedWaterAdequate?: boolean; durationMin?: number };
+  supply: { staticPsi?: number; residualPsi?: number; testFlowGpm?: number; availablePsi?: number; marginPsi?: number; passesSupply: boolean; targetMarginPsi?: number; meetsTargetMargin?: boolean; requiredStoredGal?: number; availableStoredGal?: number; storedWaterAdequate?: boolean; durationMin?: number };
   result: { pass: boolean; meetsMinPressure: boolean; passesSupply: boolean; converged: boolean; velocityOk?: boolean; maxVelocityFps?: number; velocityLimitFps?: number };
   coverageSpacing: { hazard: string; maxAreaFt2: number; maxSpacingFt: number; headsChecked: number; overCoverage: number; overSpacing: number };
   designAreaProof: { areasChecked: number; governing?: { label: string; requiredSourcePressurePsi: number; marginPsi: number; passes: boolean } } | null;
@@ -86,6 +86,7 @@ export function buildComplianceSummary(model: ProjectModel, solution: ProjectSol
     supply: {
       staticPsi: numOf(ft, "staticPsi"), residualPsi: numOf(ft, "residualPsi"), testFlowGpm: numOf(ft, "testFlowGpm"),
       availablePsi: r(s.availablePsi), marginPsi: r(s.marginPsi), passesSupply: !!s.passesSupply,
+      ...(s.targetMarginPsi !== undefined ? { targetMarginPsi: r(s.targetMarginPsi) } : {}), ...(s.meetsTargetMargin !== undefined ? { meetsTargetMargin: s.meetsTargetMargin } : {}),
       requiredStoredGal: r(s.requiredStoredGal, 0), availableStoredGal: r(s.availableStoredGal, 0), storedWaterAdequate: s.storedWaterAdequate, durationMin: s.durationMin,
     },
     result: { pass: !!(s.passesSupply && s.meetsMinPressure && s.velocityOk !== false), meetsMinPressure: !!s.meetsMinPressure, passesSupply: !!s.passesSupply, converged: !!s.converged, velocityOk: s.velocityOk, maxVelocityFps: r(s.maxVelocityFps), velocityLimitFps: s.velocityLimitFps },

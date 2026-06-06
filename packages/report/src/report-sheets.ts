@@ -189,6 +189,7 @@ function complianceChecklistSpec(model: ProjectModel, sol: ProjectSolution): Spe
   type Row = { req: string; status: "PASS" | "REVIEW" | "INFO" | "N/A"; ref: string };
   const rows: Row[] = [
     { req: "Water supply meets total system + hose demand", status: s.passesSupply ? "PASS" : "REVIEW", ref: `${stdId} Ch.27` },
+    ...(s.targetMarginPsi ? [{ req: `Supply safety margin ≥ target (${u.p(s.targetMarginPsi)} ${u.U.p}; actual ${u.p(s.marginPsi)})`, status: (s.meetsTargetMargin ? "PASS" : "REVIEW") as Row["status"], ref: "design target" }] : []),
     { req: `Minimum pressure maintained at the most remote ${sprWord}`, status: s.meetsMinPressure ? "PASS" : "REVIEW", ref: `${stdId} §27.2` },
     { req: "Hydraulic calculation balanced / converged", status: s.converged ? "PASS" : "REVIEW", ref: `${stdId} Ch.27` },
     { req: `Demand applied over the most demanding area (${s.operatingHeads} heads${s.designAreaFt2 ? ` / ${u.areaU(s.designAreaFt2)}` : ""})`, status: "PASS", ref: `${stdId} Fig.19.2.3.1.1` },
@@ -217,7 +218,7 @@ function complianceChecklistSpec(model: ProjectModel, sol: ProjectSolution): Spe
   });
   el.push(rect(x, y - rows.length * rowH, w, rows.length * rowH, { stroke: C.line, sw: 0.6, rx: mm(0.8) }));
 
-  const pass = s.passesSupply && s.meetsMinPressure && overCov === 0 && overSp === 0 && s.storedWaterAdequate !== false && s.velocityOk !== false;
+  const pass = s.passesSupply && s.meetsMinPressure && overCov === 0 && overSp === 0 && s.storedWaterAdequate !== false && s.velocityOk !== false && s.meetsTargetMargin !== false;
   y += mm(5);
   el.push(rect(x, y, w, mm(12), { fill: pass ? "#ecfdf5" : "#fff7ed", stroke: pass ? C.good : C.warn, sw: 1, rx: mm(1.4) }));
   el.push(T(x + mm(4), y + mm(7.5), pass ? "DESIGN MEETS THE CHECKED REQUIREMENTS — subject to engineer review & AHJ acceptance" : "REVIEW REQUIRED — one or more checked items did not pass", { size: mm(3), fill: pass ? C.good : C.warn, weight: "700" }));

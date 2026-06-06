@@ -323,6 +323,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
           <Row>
             <Sel label="Friction method" value={str(ds["frictionMethod"], "hazen-williams")} options={["hazen-williams", "darcy-weisbach"]} onChange={(v) => setBasis("frictionMethod", v)} />
             <Num label={`Max velocity (${metric ? "m/s" : "ft/s"}, default ${metric ? "6.1" : "20"})`} value={dispVel(num(ds["maxVelocityFps"]))} step={metric ? 0.5 : 1} onChange={(v) => setBasis("maxVelocityFps", storVel(v))} />
+            <Num label={`Target margin (${U.p})`} value={dispPsi(num(ds["targetMarginPsi"]))} step={metric ? 0.5 : 1} onChange={(v) => setBasis("targetMarginPsi", storPsi(v))} />
           </Row>
           {ds["frictionMethod"] === "darcy-weisbach" && (() => {
             const ft = str(ds["fluidType"], "water") as FluidType;
