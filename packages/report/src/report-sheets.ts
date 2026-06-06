@@ -218,6 +218,7 @@ function complianceChecklistSpec(model: ProjectModel, sol: ProjectSolution): Spe
     ...(s.targetMarginPsi ? [{ req: `Supply safety margin ≥ target (${u.p(s.targetMarginPsi)} ${u.U.p}; actual ${u.p(s.marginPsi)})`, status: (s.meetsTargetMargin ? "PASS" : "REVIEW") as Row["status"], ref: "design target" }] : []),
     { req: `Minimum pressure maintained at the most remote ${sprWord}`, status: s.meetsMinPressure ? "PASS" : "REVIEW", ref: `${stdId} §27.2` },
     { req: "Hydraulic calculation balanced / converged", status: s.converged ? "PASS" : "REVIEW", ref: `${stdId} Ch.27` },
+    { req: `System operating pressure within component rating (≤ ${u.p(s.componentRatingPsi)} ${u.U.p}; req ${u.p(s.sourcePressurePsi)})`, status: s.withinComponentRating ? "PASS" : "REVIEW", ref: `${stdId} working pressure` },
     { req: `Demand applied over the most demanding area (${s.operatingHeads} heads${s.designAreaFt2 ? ` / ${u.areaU(s.designAreaFt2)}` : ""}${s.dryAreaIncreasePct ? ` · +${s.dryAreaIncreasePct}% dry/preaction` : s.qrAreaReductionPct ? ` · −${s.qrAreaReductionPct}% quick-response` : ""})`, status: "PASS", ref: s.dryAreaIncreasePct ? `${stdId} §19.2.3.2` : s.qrAreaReductionPct ? `${stdId} §19.2.3.3` : `${stdId} Fig.19.2.3.1.1` },
     { req: "Hose-stream allowance included in the demand", status: (s.hoseAllowanceGpm ?? 0) > 0 ? "PASS" : m.systemType === "water-mist" ? "N/A" : "REVIEW", ref: `${stdId} Tbl.19.3.3.1.2` },
     { req: `Stored water meets demand × duration${s.requiredStoredGal !== undefined ? ` (req ${u.galU(s.requiredStoredGal)} @ ${s.durationMin}m${s.availableStoredGal !== undefined ? `, tank ${u.galU(s.availableStoredGal)}` : ""})` : ""}`, status: s.storedWaterAdequate === undefined ? "INFO" : s.storedWaterAdequate ? "PASS" : "REVIEW", ref: `${stdId} supply` },
@@ -245,7 +246,7 @@ function complianceChecklistSpec(model: ProjectModel, sol: ProjectSolution): Spe
   });
   el.push(rect(x, y - rows.length * rowH, w, rows.length * rowH, { stroke: C.line, sw: 0.6, rx: mm(0.8) }));
 
-  const pass = s.passesSupply && s.meetsMinPressure && overCov === 0 && overSp === 0 && s.storedWaterAdequate !== false && s.velocityOk !== false && s.meetsTargetMargin !== false && buildingCoverageOk !== false;
+  const pass = s.passesSupply && s.meetsMinPressure && overCov === 0 && overSp === 0 && s.storedWaterAdequate !== false && s.velocityOk !== false && s.meetsTargetMargin !== false && buildingCoverageOk !== false && s.withinComponentRating;
   y += mm(5);
   el.push(rect(x, y, w, mm(12), { fill: pass ? "#ecfdf5" : "#fff7ed", stroke: pass ? C.good : C.warn, sw: 1, rx: mm(1.4) }));
   el.push(T(x + mm(4), y + mm(7.5), pass ? "DESIGN MEETS THE CHECKED REQUIREMENTS — subject to engineer review & AHJ acceptance" : "REVIEW REQUIRED — one or more checked items did not pass", { size: mm(3), fill: pass ? C.good : C.warn, weight: "700" }));

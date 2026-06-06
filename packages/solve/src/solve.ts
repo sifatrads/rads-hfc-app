@@ -53,6 +53,10 @@ export interface SolveSummary {
   /** Design target safety margin (psi) + whether the margin meets it, when set. */
   targetMarginPsi?: number;
   meetsTargetMargin?: boolean;
+  /** Component pressure rating (psi, default 175) + whether the required source
+   * pressure stays within it — above it needs special (300 psi) components. */
+  componentRatingPsi: number;
+  withinComponentRating: boolean;
   /** Most-remote (lowest-pressure) sprinkler. */
   mostRemoteSprinkler?: { id: string; pressurePsi: number; flowGpm: number };
   /** Operating sprinklers in the design area (count). */
@@ -515,6 +519,8 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   const marginPsi = availablePsi - sourceP;
   const targetMarginPsi = num(model.designBasis, "targetMarginPsi");
   const meetsTargetMargin = targetMarginPsi !== undefined && targetMarginPsi > 0 ? marginPsi >= targetMarginPsi - 1e-6 : undefined;
+  // NFPA 13: components must be rated for the system working pressure (≥ 175 psi).
+  const componentRatingPsi = num(model.designBasis, "maxComponentPressurePsi") ?? 175;
 
   // Stored-water requirement = total demand × supply duration, vs tank capacity.
   // Duration defaults by hazard (NFPA 13 Table 19.3.3.1.2) when not entered.
@@ -546,6 +552,8 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     passesSupply: marginPsi >= -1e-6,
     ...(targetMarginPsi !== undefined && targetMarginPsi > 0 ? { targetMarginPsi } : {}),
     ...(meetsTargetMargin !== undefined ? { meetsTargetMargin } : {}),
+    componentRatingPsi,
+    withinComponentRating: sourceP <= componentRatingPsi + 1e-6,
     ...(remote ? { mostRemoteSprinkler: remote } : {}),
     operatingHeads: designNodeIds.length,
     ...(usedLocked && !opts.designArea ? { manualDesignArea: true } : {}),

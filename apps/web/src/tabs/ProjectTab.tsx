@@ -320,6 +320,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             <Num label={`Min head pressure (${U.p})`} value={dispPsi(num(ds["minSprinklerPressurePsi"]))} step={metric ? 0.1 : 1} onChange={(v) => setBasis("minSprinklerPressurePsi", storPsi(v))} />
             <Num label={`Hose allowance (${U.flow})`} value={dispFlow(num(ds["hoseAllowanceGpm"]))} step={metric ? 100 : 50} onChange={(v) => setBasis("hoseAllowanceGpm", storFlow(v))} />
             <Num label="Supply duration (min, auto by hazard)" value={num(ds["durationMin"])} step={10} onChange={(v) => setBasis("durationMin", v)} />
+            <Num label={`Component rating (${U.p}, def 175)`} value={dispPsi(num(ds["maxComponentPressurePsi"]))} step={metric ? 5 : 25} onChange={(v) => setBasis("maxComponentPressurePsi", storPsi(v))} />
           </Row>
           <Row>
             <Sel label="Friction method" value={str(ds["frictionMethod"], "hazen-williams")} options={["hazen-williams", "darcy-weisbach"]} onChange={(v) => setBasis("frictionMethod", v)} />

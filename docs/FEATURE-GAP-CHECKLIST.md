@@ -107,6 +107,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Min operating pressure + low-pressure node flagging ✅ DONE
 - [x] Friction-equation selector (Hazen-Williams / Darcy-Weisbach) ✅ DONE
 - [x] Configurable max-velocity limit (default 20 ft/s) — threads through Analysis + Sizing flags, the Compliance Checklist (PASS/REVIEW) + JSON export ✅ DONE
+- [x] Component pressure-rating check (≥175 psi, configurable) — flags when the required source pressure exceeds the component rating (Compliance Checklist + JSON export) ✅ DONE
 - [x] Fluid properties (water / propylene- / ethylene-glycol · temp · concentration → auto viscosity for D-W) ✅ DONE
 - [~] Target safety margin — designBasis.targetMarginPsi: supply must clear the demand by ≥ target; PASS/REVIEW on the Compliance Checklist + JSON export + Project field ✅ DONE (the %-below-available variant is a follow-up)
 - [ ] Default equivalent-lengths (PDT) editor by type/size — tune fitting tables

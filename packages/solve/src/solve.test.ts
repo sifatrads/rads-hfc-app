@@ -281,6 +281,25 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(eqOf(120, 1.985)).toBeCloseTo(10 * equivalentLengthModifier(1.985, "2"), 4);
   });
 
+  it("flags when the required pressure exceeds the component rating (175 psi)", () => {
+    // a very long small branch forces a high required source pressure
+    const nodes: Record<string, unknown>[] = [{ id: "SRC", type: "junction", elevationFt: 0 }];
+    const pipes: Record<string, unknown>[] = [];
+    let prev = "SRC";
+    for (let i = 1; i <= 8; i++) { const id = `S${i}`; nodes.push({ id, type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 130 }); pipes.push({ id: `P${i}`, from: prev, to: id, role: "branch-line", nominalSize: "1", internalDiameterIn: 1.049, cFactor: 120, lengthFt: 60 }); prev = id; }
+    const m = parseProject({
+      schemaVersion: 2,
+      meta: { id: "HP", name: "high pressure", standardId: "nfpa13", hazardClass: "oh2", units: "imperial", systemType: "sprinkler" },
+      designBasis: { sprinklerKFactor: 5.6, densityGpmFt2: 0.2, designAreaFt2: 1500, minSprinklerPressurePsi: 7, hoseAllowanceGpm: 250 },
+      waterSupply: { type: "city+fire-pump", flowTest: { staticPsi: 120, residualPsi: 110, testFlowGpm: 3000 }, firePump: { ratedFlowGpm: 1500, ratedPsi: 200, churnPsi: 230 } },
+      network: { nodes, pipes, valves: [] },
+    });
+    const s = solveProject(m).summary;
+    expect(s.componentRatingPsi).toBe(175);
+    expect(s.sourcePressurePsi).toBeGreaterThan(175);
+    expect(s.withinComponentRating).toBe(false);
+  });
+
   it("required stored water = total demand × duration", () => {
     const s = solveProject(fmStorage).summary;
     expect(s.requiredStoredGal).toBe(Math.round(s.totalDemandGpm * 60));
