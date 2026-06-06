@@ -205,6 +205,10 @@ function complianceChecklistSpec(model: ProjectModel, sol: ProjectSolution): Spe
   const heads = model.network.nodes.filter((n) => n.type === "sprinkler" && (n.kFactor ?? 0) > 0);
   const overCov = heads.filter((h) => (h.coverageAreaFt2 ?? 0) > lim.a).length;
   const overSp = heads.filter((h) => (feed.get(h.id) ?? 0) > lim.sp).length;
+  const totalCovFt2 = heads.reduce((sum, h) => sum + (h.coverageAreaFt2 ?? 0), 0);
+  const protRaw = (m as Record<string, unknown>)["protectedAreaFt2"];
+  const protectedAreaFt2 = typeof protRaw === "number" && protRaw > 0 ? protRaw : undefined;
+  const buildingCoverageOk = protectedAreaFt2 !== undefined ? totalCovFt2 >= protectedAreaFt2 : undefined;
   const sprWord = m.systemType === "standpipe" ? "outlet" : m.systemType === "water-mist" ? "nozzle" : "sprinkler";
   const covRef = jur ? `${jur.code} cov.` : `${stdId} spacing`;
 
@@ -218,6 +222,7 @@ function complianceChecklistSpec(model: ProjectModel, sol: ProjectSolution): Spe
     { req: "Hose-stream allowance included in the demand", status: (s.hoseAllowanceGpm ?? 0) > 0 ? "PASS" : m.systemType === "water-mist" ? "N/A" : "REVIEW", ref: `${stdId} Tbl.19.3.3.1.2` },
     { req: `Stored water meets demand × duration${s.requiredStoredGal !== undefined ? ` (req ${u.galU(s.requiredStoredGal)} @ ${s.durationMin}m${s.availableStoredGal !== undefined ? `, tank ${u.galU(s.availableStoredGal)}` : ""})` : ""}`, status: s.storedWaterAdequate === undefined ? "INFO" : s.storedWaterAdequate ? "PASS" : "REVIEW", ref: `${stdId} supply` },
     { req: `Sprinkler protection area within the ${hz.toUpperCase()} maximum (${u.areaU(lim.a)})`, status: heads.length === 0 ? "N/A" : overCov === 0 ? "PASS" : "REVIEW", ref: covRef },
+    ...(protectedAreaFt2 !== undefined ? [{ req: `Installed heads cover the protected floor area (${u.areaU(totalCovFt2)} of ${u.areaU(protectedAreaFt2)})`, status: (buildingCoverageOk ? "PASS" : "REVIEW") as Row["status"], ref: covRef }] : []),
     { req: `Sprinkler spacing within the ${hz.toUpperCase()} maximum (${u.l(lim.sp)} ${u.U.l})`, status: heads.length === 0 ? "N/A" : overSp === 0 ? "PASS" : "REVIEW", ref: covRef },
     { req: `Peak pipe velocity within ${u.v(s.velocityLimitFps ?? 20)} ${u.U.v}${s.maxVelocityFps !== undefined ? ` (${u.v(s.maxVelocityFps)}${s.maxVelocityPipe ? ` @ ${s.maxVelocityPipe}` : ""})` : ""}`, status: s.velocityOk === undefined ? "INFO" : s.velocityOk ? "PASS" : "REVIEW", ref: `${stdId} velocity` },
     { req: "Design values grounded against the published standard", status: std?.verified ? "PASS" : "REVIEW", ref: std?.edition ? `${stdId} ${std.edition}` : stdId },
@@ -240,7 +245,7 @@ function complianceChecklistSpec(model: ProjectModel, sol: ProjectSolution): Spe
   });
   el.push(rect(x, y - rows.length * rowH, w, rows.length * rowH, { stroke: C.line, sw: 0.6, rx: mm(0.8) }));
 
-  const pass = s.passesSupply && s.meetsMinPressure && overCov === 0 && overSp === 0 && s.storedWaterAdequate !== false && s.velocityOk !== false && s.meetsTargetMargin !== false;
+  const pass = s.passesSupply && s.meetsMinPressure && overCov === 0 && overSp === 0 && s.storedWaterAdequate !== false && s.velocityOk !== false && s.meetsTargetMargin !== false && buildingCoverageOk !== false;
   y += mm(5);
   el.push(rect(x, y, w, mm(12), { fill: pass ? "#ecfdf5" : "#fff7ed", stroke: pass ? C.good : C.warn, sw: 1, rx: mm(1.4) }));
   el.push(T(x + mm(4), y + mm(7.5), pass ? "DESIGN MEETS THE CHECKED REQUIREMENTS — subject to engineer review & AHJ acceptance" : "REVIEW REQUIRED — one or more checked items did not pass", { size: mm(3), fill: pass ? C.good : C.warn, weight: "700" }));

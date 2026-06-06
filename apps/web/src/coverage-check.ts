@@ -27,6 +27,11 @@ export interface CoverageReport {
   heads: HeadCoverage[];
   overCoverage: number;
   overSpacing: number;
+  /** Sum of the installed heads' protection areas (ft²). */
+  totalCoverageFt2: number;
+  /** Building / floor footprint to protect (ft²), when given, + adequacy. */
+  protectedAreaFt2?: number;
+  buildingCoverageOk?: boolean;
 }
 
 /** Standard-coverage, unobstructed limits {maxArea ft², maxSpacing ft} by hazard. */
@@ -53,6 +58,9 @@ export function checkCoverageSpacing(model: ProjectModel): CoverageReport {
       const spacingFt = feedLen.get(n.id) ?? 0;
       return { id: n.id, coverageFt2, spacingFt, overCoverage: coverageFt2 > lim.maxAreaFt2, overSpacing: spacingFt > lim.maxSpacingFt };
     });
+  const totalCoverageFt2 = Math.round(heads.reduce((sum, h) => sum + h.coverageFt2, 0));
+  const protRaw = (model.meta as Record<string, unknown>)["protectedAreaFt2"];
+  const protectedAreaFt2 = typeof protRaw === "number" && protRaw > 0 ? protRaw : undefined;
   return {
     hazard,
     maxAreaFt2: lim.maxAreaFt2,
@@ -60,5 +68,7 @@ export function checkCoverageSpacing(model: ProjectModel): CoverageReport {
     heads,
     overCoverage: heads.filter((h) => h.overCoverage).length,
     overSpacing: heads.filter((h) => h.overSpacing).length,
+    totalCoverageFt2,
+    ...(protectedAreaFt2 !== undefined ? { protectedAreaFt2, buildingCoverageOk: totalCoverageFt2 >= protectedAreaFt2 - 1e-6 } : {}),
   };
 }

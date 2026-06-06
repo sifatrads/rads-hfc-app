@@ -44,4 +44,14 @@ describe("checkCoverageSpacing", () => {
     expect(r.maxAreaFt2).toBe(225);
     expect(r.overCoverage).toBe(0); // 200 ft² is within LH
   });
+
+  it("sums head coverage and checks it against the protected floor area", () => {
+    const r = checkCoverageSpacing(m);
+    expect(r.totalCoverageFt2).toBe(420); // 100 + 200 + 120
+    expect(r.protectedAreaFt2).toBeUndefined(); // not set → no building check
+    const big = parseProject({ ...JSON.parse(JSON.stringify(m)), meta: { ...m.meta, protectedAreaFt2: 1000 } });
+    expect(checkCoverageSpacing(big).buildingCoverageOk).toBe(false); // 420 < 1000
+    const small = parseProject({ ...JSON.parse(JSON.stringify(m)), meta: { ...m.meta, protectedAreaFt2: 400 } });
+    expect(checkCoverageSpacing(small).buildingCoverageOk).toBe(true); // 420 ≥ 400
+  });
 });

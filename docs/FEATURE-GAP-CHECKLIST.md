@@ -78,6 +78,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Interactive sizing editor ✅ DONE (Sizing tab: edit size/material inline → live re-solve → flow/velocity/loss + margin update; velocity-flag, worst-first sort, ⬆⬇ bump; auto-size velocity / auto-size to pass / economize; ↔ 3D pipe-selection sync; metric-aware)
 - [ ] 3D object viewer (right-click localized assembly preview) — medium
 - [~] Sprinkler coverage & spacing check (per-head area + along-branch spacing vs NFPA 13 hazard limits; Summary tab) ✅ DONE — full ceiling-grid/plan layout check is a follow-up
+- [x] Protected-area coverage adequacy — installed heads must cover the building/floor footprint (Σ head coverage ≥ protected area); Summary + Compliance Checklist + JSON export ✅ DONE
 - [ ] Vertical-offset / clash checking (elevation) — coordination; medium
 
 ## Menus & File Ops

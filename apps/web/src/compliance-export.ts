@@ -30,7 +30,7 @@ export interface ComplianceSummary {
   demand: { systemFlowGpm?: number; totalDemandGpm?: number; requiredSourcePressurePsi?: number; mostRemoteHead?: { id: string; pressurePsi?: number; flowGpm?: number } };
   supply: { staticPsi?: number; residualPsi?: number; testFlowGpm?: number; availablePsi?: number; marginPsi?: number; passesSupply: boolean; targetMarginPsi?: number; meetsTargetMargin?: boolean; requiredStoredGal?: number; availableStoredGal?: number; storedWaterAdequate?: boolean; durationMin?: number };
   result: { pass: boolean; meetsMinPressure: boolean; passesSupply: boolean; converged: boolean; velocityOk?: boolean; maxVelocityFps?: number; velocityLimitFps?: number };
-  coverageSpacing: { hazard: string; maxAreaFt2: number; maxSpacingFt: number; headsChecked: number; overCoverage: number; overSpacing: number };
+  coverageSpacing: { hazard: string; maxAreaFt2: number; maxSpacingFt: number; headsChecked: number; overCoverage: number; overSpacing: number; totalCoverageFt2: number; protectedAreaFt2?: number; buildingCoverageOk?: boolean };
   designAreaProof: { areasChecked: number; governing?: { label: string; requiredSourcePressurePsi: number; marginPsi: number; passes: boolean } } | null;
   validation: { errors: string[]; warnings: string[] };
   references: { standard: string; edition?: string; verified: boolean; clauses: ClauseRef[] } | null;
@@ -90,7 +90,7 @@ export function buildComplianceSummary(model: ProjectModel, solution: ProjectSol
       requiredStoredGal: r(s.requiredStoredGal, 0), availableStoredGal: r(s.availableStoredGal, 0), storedWaterAdequate: s.storedWaterAdequate, durationMin: s.durationMin,
     },
     result: { pass: !!(s.passesSupply && s.meetsMinPressure && s.velocityOk !== false), meetsMinPressure: !!s.meetsMinPressure, passesSupply: !!s.passesSupply, converged: !!s.converged, velocityOk: s.velocityOk, maxVelocityFps: r(s.maxVelocityFps), velocityLimitFps: s.velocityLimitFps },
-    coverageSpacing: { hazard: cov.hazard, maxAreaFt2: cov.maxAreaFt2, maxSpacingFt: cov.maxSpacingFt, headsChecked: cov.heads.length, overCoverage: cov.overCoverage, overSpacing: cov.overSpacing },
+    coverageSpacing: { hazard: cov.hazard, maxAreaFt2: cov.maxAreaFt2, maxSpacingFt: cov.maxSpacingFt, headsChecked: cov.heads.length, overCoverage: cov.overCoverage, overSpacing: cov.overSpacing, totalCoverageFt2: cov.totalCoverageFt2, ...(cov.protectedAreaFt2 !== undefined ? { protectedAreaFt2: cov.protectedAreaFt2, buildingCoverageOk: cov.buildingCoverageOk } : {}) },
     designAreaProof,
     validation: {
       errors: issues.filter((i) => i.severity === "error").map((i) => i.message),

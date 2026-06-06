@@ -128,6 +128,9 @@ export function SummaryTab({ model, solution, error, onChange }: { model: Projec
         ) : (
           <>
             <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>{cov.hazard.toUpperCase()} limits: ≤ {u.area(cov.maxAreaFt2)} {u.U.area}/head · spacing ≤ {u.l(cov.maxSpacingFt)} {u.U.l}. {cov.overCoverage + cov.overSpacing === 0 ? "All heads within limits." : `${cov.overCoverage} over-area · ${cov.overSpacing} over-spacing.`}</div>
+            <div style={{ fontSize: 12, marginTop: 4, color: cov.buildingCoverageOk === false ? C.bad : C.muted }}>
+              {cov.heads.length} heads cover {u.area(cov.totalCoverageFt2)} {u.U.area}{cov.protectedAreaFt2 !== undefined ? ` of ${u.area(cov.protectedAreaFt2)} ${u.U.area} protected — ${cov.buildingCoverageOk ? "adequate" : "SHORT, add heads"}` : ` (set a protected area on the Project tab to check building coverage)`}.
+            </div>
             {(cov.overCoverage + cov.overSpacing) > 0 && (
               <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
                 <thead><tr>{["Head", `Coverage (${u.U.area})`, `Spacing (${u.U.l})`, "Issue"].map((h) => <th key={h} style={{ fontSize: 10.5, fontWeight: 700, color: C.muted, textAlign: "left", padding: "4px 8px", textTransform: "uppercase" }}>{h}</th>)}</tr></thead>

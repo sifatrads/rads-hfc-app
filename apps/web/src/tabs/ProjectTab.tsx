@@ -310,6 +310,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
           <Row>
             <Num label={`Density (${U.dens})`} value={dispDens(num(ds["densityGpmFt2"]))} step={metric ? 0.5 : 0.01} onChange={(v) => setBasis("densityGpmFt2", storDens(v))} />
             <Num label={`Design area (${U.area})`} value={dispArea(num(ds["designAreaFt2"]))} step={metric ? 5 : 50} onChange={(v) => setBasis("designAreaFt2", storArea(v))} />
+            <Num label={`Protected floor area (${U.area})`} value={dispArea(num((model.meta as Record<string, unknown>)["protectedAreaFt2"]))} step={metric ? 50 : 500} onChange={(v) => setMeta("protectedAreaFt2", storArea(v))} />
           </Row>
           <Row>
             <Num label={`Sprinkler K (${U.k})`} value={dispK(num(ds["sprinklerKFactor"]))} step={metric ? 1 : 0.1} onChange={(v) => setBasis("sprinklerKFactor", storK(v))} />
