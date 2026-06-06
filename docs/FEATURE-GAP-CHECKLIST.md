@@ -68,6 +68,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] NFPA 15 deluge / water-spray (all nozzles flow at design density) ✅ DONE
 - [x] Dry-pipe / preaction 30% design-area increase (NFPA 13 §19.2.3.2) — Auto-Peak pulls more heads for dry/preaction; effective area + note on nameplate/checklist/export ✅ DONE
 - [x] Quick-response design-area reduction (NFPA 13 §19.2.3.3) — wet LH/OH + QR heads: up to 40% smaller area; opt-in % with a Check-Model warning if conditions are not met ✅ DONE
+- [x] Sloped-ceiling +30% area + correct compounding of multiple area adjustments (NFPA 13 §19.3.3.2.4/.2.8) — dry × sloped × QR compounded on the original area ✅ DONE
 - [x] Darcy-Weisbach method (flow-dependent f, Swamee-Jain, per-material roughness) ✅ DONE
 - [x] NFPA 750 water mist (Code + System=water-mist → all-nozzle discharge, high pressure, Darcy-Weisbach + fluid viscosity) ✅ DONE
 - [x] EN 12845 (hazard classes, metric densities, C=100, Table 23 equiv-lengths, four-most-unfavourable report, metric data entry) ✅ DONE

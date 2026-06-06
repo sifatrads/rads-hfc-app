@@ -347,6 +347,34 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(flows("A8") && flows("B8")).toBe(true); // the most-remote head on each
   });
 
+  it("compounds sloped / dry / QR design-area adjustments (NFPA 13 §19.3.3.2.8)", () => {
+    const mk = (extra: Record<string, unknown>, fillType = "wet") => {
+      const nodes: Record<string, unknown>[] = [{ id: "SRC", type: "junction", elevationFt: 0 }];
+      const pipes: Record<string, unknown>[] = [];
+      let prev = "SRC";
+      for (let i = 1; i <= 30; i++) { const id = `S${i}`; nodes.push({ id, type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 100 }); pipes.push({ id: `P${i}`, from: prev, to: id, role: "branch-line", nominalSize: "2-1/2", internalDiameterIn: 2.469, cFactor: 120, lengthFt: 10 }); prev = id; }
+      return parseProject({
+        schemaVersion: 2,
+        meta: { id: "AA", name: "area adj", standardId: "nfpa13", hazardClass: "oh2", units: "imperial", systemType: "sprinkler", fillType },
+        designBasis: { sprinklerKFactor: 5.6, densityGpmFt2: 0.2, designAreaFt2: 1000, minSprinklerPressurePsi: 7, hoseAllowanceGpm: 250, ...extra },
+        waterSupply: { type: "city+fire-pump", flowTest: { staticPsi: 100, residualPsi: 85, testFlowGpm: 5000 }, firePump: { ratedFlowGpm: 2000, ratedPsi: 150, churnPsi: 170 } },
+        network: { nodes, pipes, valves: [] },
+      });
+    };
+    expect(solveProject(mk({})).summary.operatingHeads).toBe(10); // base 1000/100
+    const slope = solveProject(mk({ steepSlope: true })).summary;
+    expect(slope.slopeAreaIncreasePct).toBe(30);
+    expect(slope.operatingHeads).toBe(13); // ×1.3 = 1300
+    const drySlope = solveProject(mk({ steepSlope: true }, "dry")).summary;
+    expect(drySlope.dryAreaIncreasePct).toBe(30);
+    expect(drySlope.slopeAreaIncreasePct).toBe(30);
+    expect(drySlope.operatingHeads).toBe(17); // ×1.69 = 1690
+    const qrSlope = solveProject(mk({ steepSlope: true, qrAreaReductionPct: 40 })).summary;
+    expect(qrSlope.qrAreaReductionPct).toBe(40);
+    expect(qrSlope.slopeAreaIncreasePct).toBe(30);
+    expect(qrSlope.operatingHeads).toBe(8); // ×0.6×1.3 = ×0.78 = 780
+  });
+
   it("required stored water = total demand × duration", () => {
     const s = solveProject(fmStorage).summary;
     expect(s.requiredStoredGal).toBe(Math.round(s.totalDemandGpm * 60));

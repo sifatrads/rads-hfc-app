@@ -69,6 +69,8 @@ export interface SolveSummary {
   designAreaDimFt?: number;
   /** Design-area increase applied for a dry / preaction system (e.g. 30), if any. */
   dryAreaIncreasePct?: number;
+  /** Design-area increase applied for a sloped ceiling (> 2/12), if any. */
+  slopeAreaIncreasePct?: number;
   /** Quick-response design-area reduction applied (e.g. 25), if any. */
   qrAreaReductionPct?: number;
   /** Required discharge per head to meet the design density (gpm). */
@@ -243,17 +245,30 @@ function defaultDurationMin(model: ProjectModel): number | undefined {
   return undefined;
 }
 
-/** NFPA 13 §19.2.3 design-area multiplier: +30% for dry / double-interlock
- * preaction systems (§19.2.3.2), OR a quick-response reduction (up to 40%) for a
- * wet light/ordinary-hazard system with QR sprinklers (§19.2.3.3). The two don't
- * combine — the QR reduction requires a wet system. */
-function designAreaFactor(model: ProjectModel): number {
-  if (isDrySystem(model)) return 1.3;
-  const qr = num(model.designBasis, "qrAreaReductionPct");
+/**
+ * NFPA 13 §19.3.3.2 design-area adjustments, compounded per §19.3.3.2.8 (each
+ * applied to the originally-selected area):
+ *   - dry / double-interlock preaction → +30% (§19.3.3.2.5)
+ *   - sloped ceiling, pitch > 2 in 12  → +30% (§19.3.3.2.4)
+ *   - quick-response, wet LH/OH        → reduction up to 40% (§19.3.3.2.3)
+ * QR requires a WET system (so never with dry) but DOES compound with a slope.
+ */
+function areaAdjustments(model: ProjectModel): { factor: number; dryPct?: number; slopePct?: number; qrPct?: number } {
+  const dry = isDrySystem(model);
+  const slope = (model.designBasis as Record<string, unknown> | undefined)?.["steepSlope"] === true;
+  const qrRaw = num(model.designBasis, "qrAreaReductionPct");
   const hz = String(model.meta.hazardClass ?? "").toLowerCase();
   const wet = !model.meta.fillType || model.meta.fillType === "wet";
-  if (qr && qr > 0 && wet && (hz === "light" || hz === "oh1" || hz === "oh2")) return Math.max(0.6, 1 - qr / 100);
-  return 1;
+  const qrOk = !!qrRaw && qrRaw > 0 && wet && (hz === "light" || hz === "oh1" || hz === "oh2");
+  let factor = 1;
+  if (dry) factor *= 1.3;
+  if (slope) factor *= 1.3;
+  let qrPct: number | undefined;
+  if (qrOk) { const qf = Math.max(0.6, 1 - qrRaw! / 100); factor *= qf; qrPct = Math.round((1 - qf) * 100); }
+  return { factor, ...(dry ? { dryPct: 30 } : {}), ...(slope ? { slopePct: 30 } : {}), ...(qrPct !== undefined ? { qrPct } : {}) };
+}
+function designAreaFactor(model: ProjectModel): number {
+  return areaAdjustments(model).factor;
 }
 
 /**
@@ -576,6 +591,7 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   const meetsTargetMargin = targetMarginPsi !== undefined && targetMarginPsi > 0 ? marginPsi >= targetMarginPsi - 1e-6 : undefined;
   // NFPA 13: components must be rated for the system working pressure (≥ 175 psi).
   const componentRatingPsi = num(model.designBasis, "maxComponentPressurePsi") ?? 175;
+  const areaAdj = areaAdjustments(model); // dry / sloped / QR design-area factors (§19.3.3.2.8)
   // Density actually delivered at the most remote sprinkler (discharge / coverage).
   const designDensityGpmFt2 = num(model.designBasis, "densityGpmFt2");
   const remoteCovFt2 = remote ? model.network.nodes.find((n) => n.id === remote.id)?.coverageAreaFt2 : undefined;
@@ -616,9 +632,10 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     ...(remote ? { mostRemoteSprinkler: remote } : {}),
     operatingHeads: designNodeIds.length,
     ...(usedLocked && !opts.designArea ? { manualDesignArea: true } : {}),
-    ...(num(model.designBasis, "designAreaFt2") !== undefined ? { designAreaFt2: Math.round(num(model.designBasis, "designAreaFt2")! * designAreaFactor(model)), designAreaDimFt: Math.round(1.2 * Math.sqrt(num(model.designBasis, "designAreaFt2")! * designAreaFactor(model)) * 10) / 10 } : {}),
-    ...(isDrySystem(model) && num(model.designBasis, "designAreaFt2") !== undefined ? { dryAreaIncreasePct: 30 } : {}),
-    ...(!isDrySystem(model) && designAreaFactor(model) < 1 && num(model.designBasis, "designAreaFt2") !== undefined ? { qrAreaReductionPct: Math.round((1 - designAreaFactor(model)) * 100) } : {}),
+    ...(num(model.designBasis, "designAreaFt2") !== undefined ? { designAreaFt2: Math.round(num(model.designBasis, "designAreaFt2")! * areaAdj.factor), designAreaDimFt: Math.round(1.2 * Math.sqrt(num(model.designBasis, "designAreaFt2")! * areaAdj.factor) * 10) / 10 } : {}),
+    ...(num(model.designBasis, "designAreaFt2") !== undefined && areaAdj.dryPct ? { dryAreaIncreasePct: areaAdj.dryPct } : {}),
+    ...(num(model.designBasis, "designAreaFt2") !== undefined && areaAdj.slopePct ? { slopeAreaIncreasePct: areaAdj.slopePct } : {}),
+    ...(num(model.designBasis, "designAreaFt2") !== undefined && areaAdj.qrPct ? { qrAreaReductionPct: areaAdj.qrPct } : {}),
     ...(requiredHeadFlowGpm !== undefined ? { requiredHeadFlowGpm } : {}),
     ...(designDensityGpmFt2 !== undefined ? { designDensityGpmFt2 } : {}),
     ...(designDensityGpmFt2 !== undefined && deliveredDensityGpmFt2 !== undefined ? { deliveredDensityGpmFt2 } : {}),

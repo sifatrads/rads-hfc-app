@@ -328,6 +328,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             <Num label={`Max velocity (${metric ? "m/s" : "ft/s"}, default ${metric ? "6.1" : "20"})`} value={dispVel(num(ds["maxVelocityFps"]))} step={metric ? 0.5 : 1} onChange={(v) => setBasis("maxVelocityFps", storVel(v))} />
             <Num label={`Target margin (${U.p})`} value={dispPsi(num(ds["targetMarginPsi"]))} step={metric ? 0.5 : 1} onChange={(v) => setBasis("targetMarginPsi", storPsi(v))} />
             <Num label="QR area reduction (%)" value={num(ds["qrAreaReductionPct"])} step={5} onChange={(v) => setBasis("qrAreaReductionPct", v)} />
+            <label style={{ ...checkRow, flex: 1 }}><input type="checkbox" checked={ds["steepSlope"] === true} onChange={(e) => setBasis("steepSlope", e.target.checked || undefined)} /><span>Sloped ceiling &gt; 2/12 (+30%)</span></label>
           </Row>
           {ds["frictionMethod"] === "darcy-weisbach" && (() => {
             const ft = str(ds["fluidType"], "water") as FluidType;
