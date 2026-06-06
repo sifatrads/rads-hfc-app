@@ -18,7 +18,7 @@ import {
   type GgaResult,
 } from "@rads/calc-engine";
 import { cityCurve, pumpOnSuction, constantPressureCurve, sampleCurve, velocityFps, type SupplyCurve, type FlowTest, type CurvePoint } from "@rads/calc-engine";
-import { getStandard, internalDiameterForMaterial, defaultCFactorForMaterial, pipeMaterial, roughnessForMaterial, fittingEquivalentLengthFt, cValueMultiplier, type StandardId } from "@rads/standards-engine";
+import { getStandard, internalDiameterForMaterial, defaultCFactorForMaterial, pipeMaterial, roughnessForMaterial, fittingEquivalentLengthFt, cValueMultiplier, equivalentLengthModifier, type StandardId } from "@rads/standards-engine";
 
 export interface NodeResult {
   totalPressurePsi?: number;
@@ -333,12 +333,13 @@ function buildGga(model: ProjectModel, source: { id: string; elevationFt: number
       }
     }
     const cFactor = pipeCFactor(p, std, dry);
-    // NFPA 13 §27.2.3.1.1: fitting equivalent lengths are tabulated for C = 120;
-    // scale them to the pipe's actual C-factor (Hazen-Williams, imperial only —
-    // the metric/EN fitting table already carries C, and Darcy-Weisbach uses the
-    // physical equivalent length).
-    if (!dwMethod && std?.units !== "metric" && eq > 0 && cFactor !== 120) eq *= cValueMultiplier(cFactor);
     const id = pipeId(p);
+    // NFPA 13 §27.2.3.1.1: fitting equivalent lengths are tabulated for Schedule-40
+    // steel at C = 120; scale them to the pipe's actual C-factor (Table 27.2.3.1.2)
+    // and actual internal diameter ((actual ID / Sch-40 ID)^4.87). Hazen-Williams,
+    // imperial only — the metric/EN fitting table already carries C, and
+    // Darcy-Weisbach uses the physical equivalent length.
+    if (!dwMethod && std?.units !== "metric" && eq > 0) eq *= cValueMultiplier(cFactor) * equivalentLengthModifier(id, p.nominalSize ?? "1");
     const physLen = Math.max(0, (p.lengthFt ?? 0) + (p.additionalLengthFt ?? 0));
     const link = dwMethod
       ? dwPipeLink(p.id, p.from, p.to, { internalDiameterIn: id, lengthFt: physLen, equivalentLengthFt: eq, roughnessFt: roughnessForMaterial(p.material), viscosityFt2s })
