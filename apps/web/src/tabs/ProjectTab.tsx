@@ -122,14 +122,14 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
   };
   const setSupply = (k: string, v: unknown) => onChange(withModel(model, { waterSupply: { ...ws, [k]: v } }));
   const setFlow = (k: string, v: unknown) => onChange(withModel(model, { waterSupply: { ...ws, flowTest: { ...ft, [k]: v } } }));
-  const setRes = (k: string, v: unknown) => onChange(withModel(model, { network: { ...model.network, reservoir: { ...res, [k]: v } } }));
+  const setRes = (k: string, v: unknown) => onChange(withModel(model, { network: { ...model.network, reservoir: { ...res, [k]: v } } as ProjectModel["network"] }));
   const toggleRes = (on: boolean) =>
     onChange(withModel(model, {
       network: { ...model.network, reservoir: on ? { kind: "ground-tank", capacityGal: 20000, heightFt: 12, lengthFt: 20, widthFt: 20, connectedNode: nodeIds[0] } : undefined },
     }));
 
   // ── suction line ──
-  const setSuc = (k: string, v: unknown) => onChange(withModel(model, { network: { ...model.network, suction: { ...suc, [k]: v } } }));
+  const setSuc = (k: string, v: unknown) => onChange(withModel(model, { network: { ...model.network, suction: { ...suc, [k]: v } } as ProjectModel["network"] }));
   const toggleSuc = (on: boolean) =>
     onChange(withModel(model, { network: { ...model.network, suction: on ? { sizeIn: 6, lengthFt: 20, material: "ductile-iron", cFactor: 140, liftFt: 0, fittings: [] } : undefined } }));
 
@@ -513,7 +513,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
                   <td style={td}><NodeSel ids={nodeIds} value={p.from} onChange={(v) => setPipe(i, { from: v })} /></td>
                   <td style={td}><NodeSel ids={nodeIds} value={p.to} onChange={(v) => setPipe(i, { to: v })} /></td>
                   <td style={td}><select style={cellInput} value={p.role ?? "branch-line"} onChange={(e) => setPipe(i, { role: e.target.value })}>{PIPE_ROLES.map((o) => <option key={o} value={o}>{o}</option>)}</select></td>
-                  <td style={td}><select style={{ ...cellInput, width: 64 }} value={p.nominalSize ?? "1"} onChange={(e) => setPipe(i, { nominalSize: e.target.value, ...(p.fittingCode ? { fittings: parseFittingCodes(p.fittingCode, e.target.value) } : {}) })}>{NOMINAL_SIZES.map((o) => <option key={o} value={o}>{o}"</option>)}</select></td>
+                  <td style={td}><select style={{ ...cellInput, width: 64 }} value={p.nominalSize ?? "1"} onChange={(e) => setPipe(i, { nominalSize: e.target.value, ...(p.fittingCode ? { fittings: parseFittingCodes(p.fittingCode, e.target.value) as Pipe["fittings"] } : {}) })}>{NOMINAL_SIZES.map((o) => <option key={o} value={o}>{o}"</option>)}</select></td>
                   {showAdv && <>
                     <td style={td}><select style={{ ...cellInput, width: 130 }} value={p.material ?? "steel-sch40"} onChange={(e) => setPipe(i, { material: e.target.value })}>{matOptions.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></td>
                     <td style={td}><NumCell value={effC(p)} onChange={(v) => setPipe(i, { cFactor: v })} /></td>
@@ -522,7 +522,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
                   <td style={td}><NumCell value={dispLen(p.lengthFt)} onChange={(v) => setPipe(i, { lengthFt: storLen(v) ?? 0 })} /></td>
                   {showAdv && <>
                     <td style={td}><NumCell value={dispLen(p.additionalLengthFt)} onChange={(v) => setPipe(i, { additionalLengthFt: storLen(v) })} /></td>
-                    <td style={td}><input style={{ ...cellInput, width: 70 }} value={p.fittingCode ?? ""} placeholder="2E 1T" title="Fitting codes: E elbow, T tee, GV/BV/CV valves" onChange={(e) => setPipe(i, { fittingCode: e.target.value, fittings: parseFittingCodes(e.target.value, p.nominalSize ?? "1") })} /></td>
+                    <td style={td}><input style={{ ...cellInput, width: 70 }} value={p.fittingCode ?? ""} placeholder="2E 1T" title="Fitting codes: E elbow, T tee, GV/BV/CV valves" onChange={(e) => setPipe(i, { fittingCode: e.target.value, fittings: parseFittingCodes(e.target.value, p.nominalSize ?? "1") as Pipe["fittings"] })} /></td>
                   </>}
                   <td style={td}>
                     <select style={{ ...cellInput, width: 92 }} value={p.direction ?? ""} onChange={(e) => setPipe(i, { direction: (e.target.value || undefined) as Direction | undefined })}>

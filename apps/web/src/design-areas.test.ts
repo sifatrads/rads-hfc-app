@@ -17,7 +17,7 @@ const twoBranch = parseProject({
       { id: "FF", from: "J", to: "CMF", role: "feed-main", nominalSize: "3", internalDiameterIn: 3.068, cFactor: 120, lengthFt: 200 },
     ];
     for (const [pfx, cm] of [["N", "CMN"], ["F", "CMF"]] as const) {
-      let prev = cm;
+      let prev: string = cm;
       for (let i = 1; i <= 4; i++) { const id = `${pfx}${i}`; nodes.push({ id, type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 100 }); pipes.push({ id: `P-${id}`, from: prev, to: id, role: "branch-line", nominalSize: "1-1/4", internalDiameterIn: 1.38, cFactor: 120, lengthFt: 10 }); prev = id; }
     }
     return { nodes, pipes, valves: [] };
