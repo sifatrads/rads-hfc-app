@@ -71,6 +71,10 @@ export interface SolveSummary {
   qrAreaReductionPct?: number;
   /** Required discharge per head to meet the design density (gpm). */
   requiredHeadFlowGpm?: number;
+  /** Design density (gpm/ft²) + the density actually delivered at the most remote
+   * sprinkler (its discharge / coverage), for density/area designs. */
+  designDensityGpmFt2?: number;
+  deliveredDensityGpmFt2?: number;
   minSprinklerPressurePsi: number;
   meetsMinPressure: boolean;
   /** Design-area sprinklers whose pressure falls below the minimum (id + psi). */
@@ -521,6 +525,10 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   const meetsTargetMargin = targetMarginPsi !== undefined && targetMarginPsi > 0 ? marginPsi >= targetMarginPsi - 1e-6 : undefined;
   // NFPA 13: components must be rated for the system working pressure (≥ 175 psi).
   const componentRatingPsi = num(model.designBasis, "maxComponentPressurePsi") ?? 175;
+  // Density actually delivered at the most remote sprinkler (discharge / coverage).
+  const designDensityGpmFt2 = num(model.designBasis, "densityGpmFt2");
+  const remoteCovFt2 = remote ? model.network.nodes.find((n) => n.id === remote.id)?.coverageAreaFt2 : undefined;
+  const deliveredDensityGpmFt2 = remote && remoteCovFt2 ? Math.round((remote.flowGpm / remoteCovFt2) * 10000) / 10000 : undefined;
 
   // Stored-water requirement = total demand × supply duration, vs tank capacity.
   // Duration defaults by hazard (NFPA 13 Table 19.3.3.1.2) when not entered.
@@ -561,6 +569,8 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     ...(isDrySystem(model) && num(model.designBasis, "designAreaFt2") !== undefined ? { dryAreaIncreasePct: 30 } : {}),
     ...(!isDrySystem(model) && designAreaFactor(model) < 1 && num(model.designBasis, "designAreaFt2") !== undefined ? { qrAreaReductionPct: Math.round((1 - designAreaFactor(model)) * 100) } : {}),
     ...(requiredHeadFlowGpm !== undefined ? { requiredHeadFlowGpm } : {}),
+    ...(designDensityGpmFt2 !== undefined ? { designDensityGpmFt2 } : {}),
+    ...(designDensityGpmFt2 !== undefined && deliveredDensityGpmFt2 !== undefined ? { deliveredDensityGpmFt2 } : {}),
     minSprinklerPressurePsi,
     meetsMinPressure: remote ? remote.pressurePsi >= minSprinklerPressurePsi - 0.5 : true,
     lowPressureNodes: designNodeIds

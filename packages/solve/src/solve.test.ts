@@ -300,6 +300,23 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(s.withinComponentRating).toBe(false);
   });
 
+  it("reports the density delivered at the most remote sprinkler ≥ design density", () => {
+    const m = parseProject({
+      schemaVersion: 2,
+      meta: { id: "DD", name: "delivered density", standardId: "nfpa13", hazardClass: "oh2", units: "imperial", systemType: "sprinkler" },
+      designBasis: { sprinklerKFactor: 5.6, densityGpmFt2: 0.2, designAreaFt2: 1500, minSprinklerPressurePsi: 7, hoseAllowanceGpm: 250 },
+      waterSupply: { type: "city+fire-pump", flowTest: { staticPsi: 90, residualPsi: 75, testFlowGpm: 3000 }, firePump: { ratedFlowGpm: 1000, ratedPsi: 110, churnPsi: 130 } },
+      network: {
+        nodes: [{ id: "SRC", type: "junction", elevationFt: 0 }, ...Array.from({ length: 4 }, (_, i) => ({ id: `S${i + 1}`, type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 100 }))],
+        pipes: Array.from({ length: 4 }, (_, i) => ({ id: `P${i + 1}`, from: i === 0 ? "SRC" : `S${i}`, to: `S${i + 1}`, role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor: 120, lengthFt: 10 })),
+        valves: [],
+      },
+    });
+    const s = solveProject(m).summary;
+    expect(s.designDensityGpmFt2).toBe(0.2);
+    expect(s.deliveredDensityGpmFt2).toBeGreaterThanOrEqual(0.2 - 1e-6); // delivers at least the design density
+  });
+
   it("required stored water = total demand × duration", () => {
     const s = solveProject(fmStorage).summary;
     expect(s.requiredStoredGal).toBe(Math.round(s.totalDemandGpm * 60));
