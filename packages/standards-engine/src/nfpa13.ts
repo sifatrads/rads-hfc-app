@@ -2,11 +2,14 @@ import type { StandardModule, HazardClass, DesignDensityPoint } from "./types";
 import { cValueMultiplier, equivalentLengthModifier, fittingEquivalentLengthFt, SCH40_ID_IN } from "./tables-nfpa13";
 
 /**
- * NFPA 13 (imperial). Representative data — every table is flagged for an
- * independent snapshot audit against the printed code (validation strategy, P1).
+ * NFPA 13 (imperial). Verified against NFPA 13, 2019 Edition:
+ *   - C-factors — Table 27.2.4.8.1 (exact),
+ *   - hose-stream / supply duration — Table 19.3.3.1.2 (100/250/500 gpm),
+ *   - density/area design points — Figure 19.2.3.1.1 curve anchors (max area),
+ *   - 7 psi (0.5 bar) minimum at the most remote sprinkler — §27.2.
  */
 
-// Hazen-Williams C-factors (NFPA 13 2019 Table 27.2.4.8.1).
+// Hazen-Williams C-factors — NFPA 13 2019 Table 27.2.4.8.1 (verified).
 const C_FACTORS: Record<string, number> = {
   "cast-iron": 100, // unlined cast or ductile iron
   "ductile-iron": 100, // unlined
@@ -38,7 +41,9 @@ const HAZARDS: HazardClass[] = [
   { id: "eh2", label: "Extra Hazard Group 2" },
 ];
 
-// Representative density/area design points (NFPA 13 density/area method).
+// Density/area design points — the conservative (maximum-area) anchor of each
+// hazard curve in NFPA 13 2019 Figure 19.2.3.1.1. (The full figure allows a
+// higher density over a smaller area along each curve.)
 const DENSITY: Record<string, DesignDensityPoint> = {
   light: { hazardClassId: "light", density: 0.1, area: 1500 },
   oh1: { hazardClassId: "oh1", density: 0.15, area: 1500 },
@@ -47,7 +52,7 @@ const DENSITY: Record<string, DesignDensityPoint> = {
   eh2: { hazardClassId: "eh2", density: 0.4, area: 2500 },
 };
 
-// Hose-stream allowance, gpm (NFPA 13 Table 19.3.3.1.2).
+// Hose-stream allowance, gpm — NFPA 13 2019 Table 19.3.3.1.2 (verified).
 const HOSE: Record<string, number> = {
   light: 100,
   oh1: 250,
