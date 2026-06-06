@@ -412,6 +412,27 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(solveProject(mk(false)).summary.totalDemandGpm).toBeCloseTo(1250, 0);
   });
 
+  it("adds the hose allowance at the supply — draws the supply down, not the system piping (NFPA 13 §27.2.4.1)", () => {
+    const mk = (hose: number) => parseProject({
+      schemaVersion: 2,
+      meta: { id: "H", name: "hose", standardId: "nfpa13", hazardClass: "oh2", units: "imperial", systemType: "sprinkler" },
+      designBasis: { sprinklerKFactor: 5.6, densityGpmFt2: 0.2, designAreaFt2: 600, minSprinklerPressurePsi: 7, hoseAllowanceGpm: hose },
+      waterSupply: { type: "city", flowTest: { staticPsi: 80, residualPsi: 60, testFlowGpm: 2000 } },
+      network: {
+        nodes: [{ id: "SRC", type: "junction", elevationFt: 0 }, { id: "S1", type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 130 }, { id: "S2", type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 130 }],
+        pipes: [{ id: "P1", from: "SRC", to: "S1", role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor: 120, lengthFt: 10 }, { id: "P2", from: "S1", to: "S2", role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor: 120, lengthFt: 10 }],
+        valves: [],
+      },
+    });
+    const withHose = solveProject(mk(250)).summary;
+    const noHose = solveProject(mk(0)).summary;
+    expect(withHose.totalDemandGpm).toBeCloseTo(withHose.systemFlowGpm + 250, 3); // hose is in the total
+    expect(withHose.systemFlowGpm).toBeCloseTo(noHose.systemFlowGpm, 3); // sprinkler flow unchanged by hose
+    expect(withHose.sourcePressurePsi).toBeCloseTo(noHose.sourcePressurePsi, 3); // hose not in the piping → same required pressure
+    expect(withHose.availablePsi).toBeLessThan(noHose.availablePsi); // but the supply is drawn down at the higher total flow
+    expect(withHose.marginPsi).toBeLessThan(noHose.marginPsi);
+  });
+
   it("checks the NFPA 20 §6.2 pump curve (churn ≤140%, head at 150% flow ≥65% rated)", () => {
     const withPump = (ds: Record<string, number>) => parseProject({
       schemaVersion: 2,
