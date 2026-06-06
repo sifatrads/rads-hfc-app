@@ -25,6 +25,25 @@ describe("NFPA 13 §27.2.3 reference tables", () => {
     expect(fittingEquivalentLengthFt("coupling", "2")).toBeUndefined(); // unlisted → negligible
   });
 
+  it("Sch-40 internal diameters match NFPA 13 2019 Table A.16.3.2", () => {
+    expect(SCH40_ID_IN["1"]).toBe(1.049);
+    expect(SCH40_ID_IN["2"]).toBe(2.067);
+    expect(SCH40_ID_IN["2-1/2"]).toBe(2.469);
+    expect(SCH40_ID_IN["4"]).toBe(4.026);
+    expect(SCH40_ID_IN["6"]).toBe(6.065);
+    expect(SCH40_ID_IN["8"]).toBe(7.981);
+    expect(SCH40_ID_IN["10"]).toBe(10.02);
+    expect(SCH40_ID_IN["12"]).toBe(11.938);
+  });
+
+  it("C-value multipliers match NFPA 13 2019 Table 27.2.3.2.1", () => {
+    expect(cValueMultiplier(100)).toBe(0.713);
+    expect(cValueMultiplier(120)).toBe(1.0);
+    expect(cValueMultiplier(130)).toBe(1.16);
+    expect(cValueMultiplier(140)).toBe(1.33);
+    expect(cValueMultiplier(150)).toBe(1.51);
+  });
+
   it("matches NFPA 13 2019 Table 27.2.3.1.1 (verified rows)", () => {
     expect(fittingEquivalentLengthFt("tee", "3")).toBe(15); // tee/cross 3"
     expect(fittingEquivalentLengthFt("tee", "8")).toBe(35); // tee/cross 8"

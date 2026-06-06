@@ -37,6 +37,8 @@ export function cValueMultiplier(cFactor: number): number {
 }
 
 /** Schedule 40 steel internal diameters, in. (Schedule 30 for ≥ 8 in.). */
+/** Schedule 40 steel pipe internal diameters (in) — verified vs NFPA 13, 2019
+ * Edition, Table A.16.3.2 Steel Pipe Dimensions. */
 export const SCH40_ID_IN: Record<string, number> = {
   "1/2": 0.622,
   "3/4": 0.824,
