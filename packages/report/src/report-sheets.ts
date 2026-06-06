@@ -207,6 +207,67 @@ function complianceChecklistSpec(model: ProjectModel, sol: ProjectSolution): Spe
   return { title: "Compliance Checklist", inner: el.join("") };
 }
 
+// ── critical path / hydraulic profile (source → governing head) ──
+function criticalPathSpec(model: ProjectModel, sol: ProjectSolution): Spec {
+  const u = units(model);
+  const s = sol.summary;
+  const { x, w } = INNER;
+  let y = CONTENT_TOP + mm(4);
+  const el: string[] = [sectionTitle(x, y, w, "Critical Path — Hydraulic Profile")];
+  y += mm(7);
+  const target = s.mostRemoteSprinkler?.id;
+  if (!target) { el.push(T(x, y + mm(4), "No governing sprinkler identified.", { size: mm(2.6), fill: C.muted })); return { title: "Critical Path", inner: el.join("") }; }
+
+  // trace the unique path from the source to the most-remote head (incoming pipe per node)
+  const incoming = new Map<string, ProjectModel["network"]["pipes"][number]>();
+  for (const p of model.network.pipes) if (!incoming.has(p.to)) incoming.set(p.to, p);
+  const nodeById = new Map(model.network.nodes.map((n) => [n.id, n]));
+  const chain: { id: string; pipe?: ProjectModel["network"]["pipes"][number] }[] = [];
+  let cur: string | undefined = target;
+  const seen = new Set<string>();
+  while (cur && !seen.has(cur)) { seen.add(cur); const pipe = incoming.get(cur); chain.push({ id: cur, pipe }); cur = pipe?.from; }
+  chain.reverse(); // source → head
+
+  let cum = 0;
+  const pts: { d: number; p: number }[] = [];
+  const rows: string[][] = chain.map((step) => {
+    const n = nodeById.get(step.id);
+    const pr = sol.results.nodes[step.id];
+    const pipeR = step.pipe ? sol.results.pipes[step.pipe.id] : undefined;
+    cum += step.pipe ? (step.pipe.lengthFt ?? 0) + (step.pipe.additionalLengthFt ?? 0) : 0;
+    const press = pr?.totalPressurePsi;
+    if (typeof press === "number") pts.push({ d: cum, p: press });
+    return [step.id, step.pipe?.id ?? "source", u.q(pipeR?.flowGpm), u.p(pipeR?.frictionLossPsi, 2), u.l(cum), u.p(press), u.l(n?.elevationFt ?? 0)];
+  });
+
+  // hydraulic-gradient sparkline (pressure vs cumulative distance)
+  if (pts.length >= 2) {
+    const gh = mm(26), gw = w;
+    const dmax = Math.max(1, ...pts.map((q) => q.d));
+    const pmax = Math.max(1, ...pts.map((q) => q.p)), pmin = Math.min(...pts.map((q) => q.p), 0);
+    const X = (d: number) => x + (d / dmax) * gw;
+    const Y = (p: number) => y + gh - ((p - pmin) / (pmax - pmin || 1)) * gh;
+    el.push(rect(x, y, gw, gh, { fill: "#fbfdff", stroke: C.line, sw: 0.6, rx: mm(1) }));
+    el.push(line(x, Y(pmin), x + gw, Y(pmin), C.line, 0.4));
+    el.push(`<polyline points="${pts.map((q) => `${X(q.d).toFixed(1)},${Y(q.p).toFixed(1)}`).join(" ")}" fill="none" stroke="${C.accent}" stroke-width="1.4"/>`);
+    pts.forEach((q) => el.push(`<circle cx="${X(q.d).toFixed(1)}" cy="${Y(q.p).toFixed(1)}" r="1.3" fill="${C.primary}"/>`));
+    el.push(T(x + mm(2), y + mm(4), `${u.p(pts[0]!.p)} ${u.U.p}`, { size: mm(2.2), fill: C.muted }));
+    el.push(T(x + gw - mm(2), Y(pts[pts.length - 1]!.p) - mm(1.5), `${u.p(pts[pts.length - 1]!.p)} ${u.U.p}`, { size: mm(2.2), fill: C.bad, anchor: "end" }));
+    el.push(T(x + gw / 2, y + gh + mm(3.5), `Pressure along the critical path · ${u.l(dmax)} ${u.U.l} total`, { size: mm(2.1), fill: C.muted, anchor: "middle" }));
+    y += gh + mm(7);
+  }
+
+  const cols: Column[] = [
+    { label: "Node", w: 0.13 }, { label: "Via", w: 0.13 },
+    { label: "Flow", unit: u.U.q, w: 0.16, align: "r" }, { label: "Friction", unit: u.U.p, w: 0.16, align: "r" },
+    { label: "Σ Length", unit: u.U.l, w: 0.14, align: "r" }, { label: "Pressure", unit: u.U.p, w: 0.14, align: "r" }, { label: "Elev", unit: u.U.l, w: 0.14, align: "r" },
+  ];
+  const shown = rows.slice(0, 30);
+  el.push(table(x, y, w, cols, shown).svg);
+  if (rows.length > shown.length) el.push(T(x, y + mm(8) + shown.length * mm(5.6) + mm(4), `+ ${rows.length - shown.length} more segments`, { size: mm(2.1), fill: C.muted }));
+  return { title: "Critical Path", inner: el.join("") };
+}
+
 // ── cover ──
 function coverSpec(model: ProjectModel, sol: ProjectSolution): Spec {
   const u = units(model);
@@ -807,6 +868,7 @@ export function reportSheets(model: ProjectModel, sol: ProjectSolution): Sheet[]
     summarySpec(model, sol),
     graphSpec(model, sol),
     supplySpec(model, sol),
+    criticalPathSpec(model, sol),
     ...nodeSpecs(model, sol),
     ...headsSummarySpecs(model, sol),
     ...sprinklerScheduleSpecs(model),
