@@ -244,6 +244,21 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(dry.dryAreaIncreasePct).toBe(30);
   });
 
+  it("defaults the water-supply duration by hazard when none is entered (Table 19.3.3.1.2)", () => {
+    const mk = (hz: string) => parseProject({
+      schemaVersion: 2,
+      meta: { id: "D", name: "d", standardId: "nfpa13", hazardClass: hz, units: "imperial", systemType: "sprinkler" },
+      designBasis: { sprinklerKFactor: 5.6, densityGpmFt2: 0.2, designAreaFt2: 1500, operatingSprinklers: 2, minSprinklerPressurePsi: 7 },
+      waterSupply: { type: "city", flowTest: { staticPsi: 80, residualPsi: 65, testFlowGpm: 2000 } },
+      network: { nodes: [{ id: "SRC", type: "junction", elevationFt: 0 }, { id: "S1", type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 120 }, { id: "S2", type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 120 }], pipes: [{ id: "P0", from: "SRC", to: "S1", role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor: 120, lengthFt: 10 }, { id: "P1", from: "S1", to: "S2", role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor: 120, lengthFt: 10 }], valves: [] },
+    });
+    expect(solveProject(mk("light")).summary.durationMin).toBe(30);
+    expect(solveProject(mk("oh2")).summary.durationMin).toBe(60);
+    expect(solveProject(mk("eh1")).summary.durationMin).toBe(90);
+    const oh = solveProject(mk("oh2")).summary;
+    expect(oh.requiredStoredGal).toBe(Math.round(oh.totalDemandGpm * 60)); // appears automatically
+  });
+
   it("required stored water = total demand × duration", () => {
     const s = solveProject(fmStorage).summary;
     expect(s.requiredStoredGal).toBe(Math.round(s.totalDemandGpm * 60));

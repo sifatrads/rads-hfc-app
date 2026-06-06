@@ -218,6 +218,21 @@ function isDrySystem(model: ProjectModel): boolean {
   return model.meta.fillType === "dry" || model.meta.fillType === "preaction";
 }
 
+/** Minimum water-supply duration (min) by hazard when none is entered — the lower
+ * bound of NFPA 13 Table 19.3.3.1.2 (LH 30 / OH 60 / EH 90), FM DS 3-26 §2.3.1.13
+ * (60), and EN 12845. The AHJ may require longer; the user can override. */
+function defaultDurationMin(model: ProjectModel): number | undefined {
+  const id = model.meta.standardId;
+  const hz = String(model.meta.hazardClass ?? "").toLowerCase();
+  if (id === "nfpa13" || id === "nfpa13r" || id === "nfpa13d" || id === "en12845" || id === "as2118") {
+    if (hz.startsWith("lh") || hz === "light" || hz === "elh") return 30;
+    if (hz.startsWith("eh") || hz.startsWith("hh")) return 90;
+    if (hz.startsWith("oh")) return 60;
+  }
+  if (id === "fmds") return 60; // DS 3-26 non-storage; storage schemes set their own
+  return undefined;
+}
+
 /** NFPA 13 §19.2.3 design-area multiplier: +30% for dry / double-interlock
  * preaction systems (§19.2.3.2), OR a quick-response reduction (up to 40%) for a
  * wet light/ordinary-hazard system with QR sprinklers (§19.2.3.3). The two don't
@@ -496,7 +511,8 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
   const meetsTargetMargin = targetMarginPsi !== undefined && targetMarginPsi > 0 ? marginPsi >= targetMarginPsi - 1e-6 : undefined;
 
   // Stored-water requirement = total demand × supply duration, vs tank capacity.
-  const durationMin = num(model.designBasis, "durationMin");
+  // Duration defaults by hazard (NFPA 13 Table 19.3.3.1.2) when not entered.
+  const durationMin = num(model.designBasis, "durationMin") ?? defaultDurationMin(model);
   const requiredStoredGal = durationMin !== undefined ? Math.round(totalDemandGpm * durationMin) : undefined;
   const availableStoredGal = num(model.network.reservoir, "capacityGal");
   const storedWaterAdequate = requiredStoredGal !== undefined && availableStoredGal !== undefined ? availableStoredGal >= requiredStoredGal : undefined;
