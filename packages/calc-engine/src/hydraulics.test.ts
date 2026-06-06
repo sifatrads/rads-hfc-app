@@ -30,6 +30,16 @@ describe("hydraulics primitives (NFPA 13 §27.2.2)", () => {
     expect(hazenWilliamsPsiPerFoot(500, 120, 4.026)).toBeCloseTo(0.071781, 5); // 500 gpm, 4"
   });
 
+  it("matches FM DS 2-89 published friction-loss tables (independent cross-check, C=120)", () => {
+    // An INDEPENDENT source (FM Global Data Sheet 2-89, Pipe Friction Loss Tables,
+    // Table 2 — Steel Pipe C=120, psi/ft) — a different standards body than NFPA.
+    // The app's Hazen-Williams reproduces them to FM's published precision.
+    expect(hazenWilliamsPsiPerFoot(100, 120, 2.067)).toBeCloseTo(0.094, 3); // 100 gpm, 2"
+    expect(hazenWilliamsPsiPerFoot(250, 120, 2.067)).toBeCloseTo(0.512, 3); // 250 gpm, 2"
+    expect(hazenWilliamsPsiPerFoot(250, 120, 3.068)).toBeCloseTo(0.075, 3); // 250 gpm, 3"
+    expect(hazenWilliamsPsiPerFoot(500, 120, 4.026)).toBeCloseTo(0.072, 3); // 500 gpm, 4" (DS 2-89 worked example)
+  });
+
   it("flow exponent is 1.85 (doubling flow ⇒ loss × 2^1.85)", () => {
     const a = hazenWilliamsPsiPerFoot(100, 120, 2);
     const b = hazenWilliamsPsiPerFoot(200, 120, 2);
