@@ -70,11 +70,12 @@ Out of scope: §7.10.1.1.2 (750 gpm horizontal standpipes), §7.10.1.1.3.1 (>80,
 |---|---|---|---|
 | Non‑storage HC‑1/2/3 density/area | 0.1/1500 · 0.2/2500 · 0.3/2500 | DS 3‑26 Table 2.3.1.10 | `index.test.ts` |
 | Non‑storage hose / duration / min P | 250/250/500 gpm · 60 min · 7 psi | DS 3‑26 §2.3.1.11–.13 | `index.test.ts` |
-| Storage ceiling protection (count @ psi) | Class 1‑4, cartoned‑expanded, uncartoned plastic; K16.8/22.4/25.2 @ 20–40 ft | DS 8‑9 Tables 2–6 | `index.test.ts` |
+| Storage — solid‑piled/palletized (count @ psi) | Class 1‑4, cartoned‑expanded, uncartoned plastic; K16.8/22.4/25.2 @ 20–40 ft | DS 8‑9 Tables 2–6 | `index.test.ts` |
+| Storage — open‑frame rack (min 4 ft aisles) | same commodities; higher demand than solid‑piled | DS 8‑9 Tables 7–10 | `index.test.ts` |
 | Storage hose / duration | by ceiling‑head count (≤12→250/60; 13‑19→500/90; 20+→500/120) | DS 8‑9 Table 14 | `index.test.ts` |
 
-Out of scope (use the specific DS 8‑9 table): open‑frame **rack** storage (Tables 8‑11) + in‑rack
-sprinklers, **dry/upright** systems, **extended‑coverage** storage sprinklers, ceilings **> 40 ft**.
+Out of scope (use the specific DS 8‑9 table): **in‑rack** sprinklers, **dry/upright**
+systems, **extended‑coverage** storage sprinklers, ceilings **> 40 ft**.
 
 ## Independent cross‑validation ✅
 

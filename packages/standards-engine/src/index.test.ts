@@ -81,6 +81,10 @@ describe("standards-engine: FM Global Data Sheets", () => {
     expect(schemes.find((x) => x.id === "fm-c14-k25.2-30")).toMatchObject({ designSprinklers: 9, minPressurePsi: 20 });
     // cartoned expanded plastic K22.4 @ 40 ft = 12 @ 75 psi (Table 4)
     expect(schemes.find((x) => x.id === "fm-cep-k22.4-40")).toMatchObject({ designSprinklers: 12, minPressurePsi: 75 });
+    // open-frame rack (Tables 7-10) is a separate, higher-demand scheme than solid-piled:
+    // K25.2 @ 40 ft is 9 @ 40 psi in racks vs 9 @ 22 psi solid-piled
+    expect(schemes.find((x) => x.id === "fm-rk-c14-k25.2-40")).toMatchObject({ designSprinklers: 9, minPressurePsi: 40 });
+    expect(schemes.find((x) => x.id === "fm-c14-k25.2-40")).toMatchObject({ minPressurePsi: 22 });
     // control-mode CMSA: 15 heads → 500 gpm / 90 min (Table 14)
     const cmsa = schemes.find((x) => x.mode === "control")!;
     expect(cmsa.hoseAllowanceGpm).toBe(500);
