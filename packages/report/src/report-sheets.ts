@@ -144,6 +144,69 @@ function basisOfDesignSpec(model: ProjectModel, sol: ProjectSolution): Spec {
   return { title: "Basis of Design", inner: el.join("") };
 }
 
+// ── compliance checklist (submittal proof-of-compliance page) ──
+function complianceChecklistSpec(model: ProjectModel, sol: ProjectSolution): Spec {
+  const u = units(model);
+  const s = sol.summary;
+  const m = model.meta;
+  const std = standardReferences(m.standardId);
+  const jur = jurisdictionReferences(m.governingCode);
+  const stdId = String(m.standardId ?? "—").toUpperCase();
+  const { x, w } = INNER;
+  let y = CONTENT_TOP + mm(4);
+  const el: string[] = [sectionTitle(x, y, w, "Compliance Checklist")];
+  y += mm(7);
+  el.push(paragraph(x, y, w, `Verification of the design against ${std?.standard ?? stdId}${jur ? ` and ${jur.title}` : ""}.`).svg);
+  y += mm(8);
+
+  // inline coverage / spacing check (NFPA 13 / BNBC 4.4.7 standard-coverage limits)
+  const hz = String(m.hazardClass ?? "oh2").toLowerCase();
+  const lim = hz.startsWith("lh") || hz === "light" || hz === "elh" ? { a: 225, sp: 15 } : hz.startsWith("eh") || hz.startsWith("hh") || hz === "hc-3" ? { a: 100, sp: 12 } : { a: 130, sp: 15 };
+  const feed = new Map<string, number>();
+  for (const p of model.network.pipes) feed.set(p.to, Math.max(feed.get(p.to) ?? 0, (p.lengthFt ?? 0) + (p.additionalLengthFt ?? 0)));
+  const heads = model.network.nodes.filter((n) => n.type === "sprinkler" && (n.kFactor ?? 0) > 0);
+  const overCov = heads.filter((h) => (h.coverageAreaFt2 ?? 0) > lim.a).length;
+  const overSp = heads.filter((h) => (feed.get(h.id) ?? 0) > lim.sp).length;
+  const sprWord = m.systemType === "standpipe" ? "outlet" : m.systemType === "water-mist" ? "nozzle" : "sprinkler";
+  const covRef = jur ? `${jur.code} cov.` : `${stdId} spacing`;
+
+  type Row = { req: string; status: "PASS" | "REVIEW" | "INFO" | "N/A"; ref: string };
+  const rows: Row[] = [
+    { req: "Water supply meets total system + hose demand", status: s.passesSupply ? "PASS" : "REVIEW", ref: `${stdId} Ch.27` },
+    { req: `Minimum pressure maintained at the most remote ${sprWord}`, status: s.meetsMinPressure ? "PASS" : "REVIEW", ref: `${stdId} §27.2` },
+    { req: "Hydraulic calculation balanced / converged", status: s.converged ? "PASS" : "REVIEW", ref: `${stdId} Ch.27` },
+    { req: `Demand applied over the most demanding area (${s.operatingHeads} heads${s.designAreaFt2 ? ` / ${u.areaU(s.designAreaFt2)}` : ""})`, status: "PASS", ref: `${stdId} Fig.19.2.3.1.1` },
+    { req: "Hose-stream allowance included in the demand", status: (s.hoseAllowanceGpm ?? 0) > 0 ? "PASS" : m.systemType === "water-mist" ? "N/A" : "REVIEW", ref: `${stdId} Tbl.19.3.3.1.2` },
+    { req: `Water-supply duration / stored volume${s.requiredStoredGal !== undefined ? ` (${u.galU(s.requiredStoredGal)} @ ${s.durationMin}m)` : ""}`, status: "INFO", ref: `${stdId} supply` },
+    { req: `Sprinkler protection area within the ${hz.toUpperCase()} maximum (${u.areaU(lim.a)})`, status: heads.length === 0 ? "N/A" : overCov === 0 ? "PASS" : "REVIEW", ref: covRef },
+    { req: `Sprinkler spacing within the ${hz.toUpperCase()} maximum (${u.l(lim.sp)} ${u.U.l})`, status: heads.length === 0 ? "N/A" : overSp === 0 ? "PASS" : "REVIEW", ref: covRef },
+    { req: "Design values grounded against the published standard", status: std?.verified ? "PASS" : "REVIEW", ref: std?.edition ? `${stdId} ${std.edition}` : stdId },
+  ];
+
+  const rowH = mm(7.2);
+  // column header
+  el.push(rect(x, y, w, mm(6.5), { fill: C.primary, rx: mm(0.8) }));
+  el.push(T(x + mm(2), y + mm(4.3), "Requirement", { size: mm(2.3), fill: C.white, weight: "700" }));
+  el.push(T(x + w * 0.66, y + mm(4.3), "Result", { size: mm(2.3), fill: C.white, weight: "700" }));
+  el.push(T(x + w - mm(2), y + mm(4.3), "Reference", { size: mm(2.3), fill: C.white, weight: "700", anchor: "end" }));
+  y += mm(6.5);
+  rows.forEach((r, i) => {
+    if (i % 2 === 1) el.push(rect(x, y, w, rowH, { fill: C.zebra }));
+    const tone = r.status === "PASS" ? C.good : r.status === "REVIEW" ? C.bad : r.status === "N/A" ? C.faint : C.muted;
+    el.push(T(x + mm(2), y + mm(4.7), r.req, { size: mm(2.45), fill: C.ink }));
+    el.push(T(x + w * 0.66, y + mm(4.7), r.status, { size: mm(2.6), fill: tone, weight: "700" }));
+    el.push(T(x + w - mm(2), y + mm(4.7), r.ref, { size: mm(2.1), fill: C.muted, anchor: "end" }));
+    y += rowH;
+  });
+  el.push(rect(x, y - rows.length * rowH, w, rows.length * rowH, { stroke: C.line, sw: 0.6, rx: mm(0.8) }));
+
+  const pass = s.passesSupply && s.meetsMinPressure && overCov === 0 && overSp === 0;
+  y += mm(5);
+  el.push(rect(x, y, w, mm(12), { fill: pass ? "#ecfdf5" : "#fff7ed", stroke: pass ? C.good : C.warn, sw: 1, rx: mm(1.4) }));
+  el.push(T(x + mm(4), y + mm(7.5), pass ? "DESIGN MEETS THE CHECKED REQUIREMENTS — subject to engineer review & AHJ acceptance" : "REVIEW REQUIRED — one or more checked items did not pass", { size: mm(3), fill: pass ? C.good : C.warn, weight: "700" }));
+  return { title: "Compliance Checklist", inner: el.join("") };
+}
+
 // ── cover ──
 function coverSpec(model: ProjectModel, sol: ProjectSolution): Spec {
   const u = units(model);
@@ -738,6 +801,7 @@ export function reportSheets(model: ProjectModel, sol: ProjectSolution): Sheet[]
   const specs: Spec[] = [
     coverSpec(model, sol),
     basisOfDesignSpec(model, sol),
+    complianceChecklistSpec(model, sol),
     riserNameplateSpec(model, sol),
     ...(((model.designBasis as Record<string, unknown> | undefined)?.["method"] === "fm-storage") ? [fmStorageSchemeSpec(model, sol)] : []),
     summarySpec(model, sol),
