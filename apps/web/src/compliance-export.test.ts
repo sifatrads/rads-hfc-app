@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseProject } from "@rads/model";
 import { solveProject } from "@rads/solve";
 import { buildComplianceSummary } from "./compliance-export";
@@ -35,6 +38,25 @@ describe("buildComplianceSummary", () => {
     expect(c.references?.clauses.some((cl) => cl.clause.includes("Table 27.2.4.8.1"))).toBe(true);
     expect(c.jurisdiction?.code).toBe("RSC");
     expect(c.jurisdiction?.adopts).toMatch(/NFPA 13/);
+  });
+
+  it("conforms to the published JSON Schema (docs/compliance-export.schema.json)", () => {
+    const schemaPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../docs/compliance-export.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8")) as Record<string, unknown>;
+    // lightweight structural check: required keys + const values, recursively
+    const check = (obj: unknown, sch: Record<string, unknown>, path: string): void => {
+      if (sch["const"] !== undefined) expect(obj, path).toBe(sch["const"]);
+      const props = (sch["properties"] ?? {}) as Record<string, Record<string, unknown>>;
+      for (const k of (sch["required"] as string[] | undefined) ?? []) {
+        expect(obj as Record<string, unknown>, `${path}.${k}`).toHaveProperty(k);
+        const sub = props[k];
+        const v = (obj as Record<string, unknown>)[k];
+        const t = sub?.["type"];
+        if (sub && v != null && (t === "object" || (Array.isArray(t) && t.includes("object")))) check(v, sub, `${path}.${k}`);
+      }
+    };
+    check(c, schema, "$");
+    expect(c.schema).toBe("rads-hfc-compliance/1"); // the check() above also asserts the schema const
   });
 
   it("includes the coverage/spacing + design-area + validation checks and is JSON-serializable", () => {

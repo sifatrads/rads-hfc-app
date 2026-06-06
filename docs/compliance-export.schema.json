@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rads-fhc-app.web.app/schemas/compliance-export.schema.json",
+  "title": "RADS-HFC Compliance Summary",
+  "description": "Machine-readable hand-off of a finished fire-sprinkler hydraulic design, exported by RADS-HFC-APP (the '✓ Compliance' button) for an external review engine (e.g. rads-agentic-ai) to verify each claimed value against the cited standards. All quantities are canonical imperial (psi / gpm / ft / ft²); project.units records the display units.",
+  "type": "object",
+  "required": ["schema", "generatedFor", "project", "designBasis", "demand", "supply", "result", "coverageSpacing", "validation", "disclaimer"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": { "const": "rads-hfc-compliance/1", "description": "Contract version." },
+    "generatedFor": { "type": "string", "description": "Project name." },
+    "project": {
+      "type": "object",
+      "required": ["id", "name", "units"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "standard": { "type": "string", "description": "Display name, e.g. 'NFPA 13 (2019)'." },
+        "standardId": { "type": "string", "description": "Engine id: nfpa13 | nfpa13d | nfpa13r | nfpa14 | nfpa15 | nfpa750 | en12845 | fmds | as2118." },
+        "edition": { "type": "string" },
+        "governingCode": { "type": "string", "description": "Jurisdiction code: bnbc | rsc | ibc." },
+        "occupancyHazard": { "type": "string", "description": "Hazard class id, e.g. oh2." },
+        "systemType": { "type": "string" },
+        "fillType": { "type": "string", "description": "wet | dry | preaction | deluge." },
+        "units": { "type": "string", "enum": ["imperial", "metric"] },
+        "engineer": { "type": "string" },
+        "date": { "type": "string" },
+        "designNotes": { "type": "string", "description": "Free-text notes / assumptions / exclusions." }
+      }
+    },
+    "designBasis": {
+      "type": "object",
+      "required": ["method", "hydraulicMethod"],
+      "properties": {
+        "method": { "type": "string", "description": "density/area | fm-storage | …" },
+        "hydraulicMethod": { "type": "string", "enum": ["hazen-williams", "darcy-weisbach"] },
+        "densityGpmFt2": { "type": "number" },
+        "deliveredDensityGpmFt2": { "type": "number", "description": "Density actually delivered at the most remote sprinkler (discharge / coverage)." },
+        "designAreaFt2": { "type": "number", "description": "Effective design area, including any dry/sloped/QR adjustment." },
+        "designAreaDimFt": { "type": "number", "description": "Remote-area dimension along the branch lines, 1.2·√A (§27.2.4.2.2)." },
+        "dryAreaIncreasePct": { "type": "number" },
+        "operatingSprinklers": { "type": "number" },
+        "designAreaMode": { "type": "string", "description": "auto | manual (locked)." },
+        "sprinklerKFactor": { "type": "number" },
+        "minSprinklerPressurePsi": { "type": "number" },
+        "hoseAllowanceGpm": { "type": "number" },
+        "durationMin": { "type": "number" }
+      }
+    },
+    "demand": {
+      "type": "object",
+      "properties": {
+        "systemFlowGpm": { "type": "number" },
+        "totalDemandGpm": { "type": "number", "description": "System flow + hose allowance." },
+        "requiredSourcePressurePsi": { "type": "number" },
+        "mostRemoteHead": {
+          "type": "object",
+          "required": ["id"],
+          "properties": { "id": { "type": "string" }, "pressurePsi": { "type": "number" }, "flowGpm": { "type": "number" } }
+        }
+      }
+    },
+    "supply": {
+      "type": "object",
+      "required": ["passesSupply"],
+      "properties": {
+        "staticPsi": { "type": "number" },
+        "residualPsi": { "type": "number" },
+        "testFlowGpm": { "type": "number" },
+        "availablePsi": { "type": "number" },
+        "marginPsi": { "type": "number", "description": "available - required at the source." },
+        "passesSupply": { "type": "boolean" },
+        "targetMarginPsi": { "type": "number" },
+        "meetsTargetMargin": { "type": "boolean" },
+        "requiredStoredGal": { "type": "number", "description": "Total demand × duration." },
+        "availableStoredGal": { "type": "number", "description": "Reservoir/tank capacity." },
+        "storedWaterAdequate": { "type": "boolean" },
+        "durationMin": { "type": "number" }
+      }
+    },
+    "result": {
+      "type": "object",
+      "required": ["pass", "meetsMinPressure", "passesSupply", "converged"],
+      "properties": {
+        "pass": { "type": "boolean", "description": "Overall: supply + min pressure + velocity + component rating all met." },
+        "meetsMinPressure": { "type": "boolean" },
+        "passesSupply": { "type": "boolean" },
+        "converged": { "type": "boolean" },
+        "velocityOk": { "type": "boolean" },
+        "maxVelocityFps": { "type": "number" },
+        "velocityLimitFps": { "type": "number" },
+        "withinComponentRating": { "type": "boolean", "description": "Required pressure ≤ component rating (default 175 psi)." },
+        "componentRatingPsi": { "type": "number" }
+      }
+    },
+    "coverageSpacing": {
+      "type": "object",
+      "required": ["hazard", "maxAreaFt2", "maxSpacingFt", "headsChecked", "overCoverage", "overSpacing", "totalCoverageFt2"],
+      "properties": {
+        "hazard": { "type": "string" },
+        "maxAreaFt2": { "type": "number" },
+        "maxSpacingFt": { "type": "number" },
+        "headsChecked": { "type": "number" },
+        "overCoverage": { "type": "number", "description": "Count of heads over the per-head area maximum." },
+        "overSpacing": { "type": "number" },
+        "totalCoverageFt2": { "type": "number" },
+        "protectedAreaFt2": { "type": "number" },
+        "buildingCoverageOk": { "type": "boolean" }
+      }
+    },
+    "designAreaProof": {
+      "type": ["object", "null"],
+      "properties": {
+        "areasChecked": { "type": "number" },
+        "governing": {
+          "type": "object",
+          "required": ["label", "requiredSourcePressurePsi", "marginPsi", "passes"],
+          "properties": {
+            "label": { "type": "string" },
+            "requiredSourcePressurePsi": { "type": "number" },
+            "marginPsi": { "type": "number" },
+            "passes": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "required": ["errors", "warnings"],
+      "properties": {
+        "errors": { "type": "array", "items": { "type": "string" } },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "references": {
+      "type": ["object", "null"],
+      "description": "The design standard's cited clauses.",
+      "properties": {
+        "standard": { "type": "string" },
+        "edition": { "type": "string" },
+        "verified": { "type": "boolean", "description": "true = the app's values were cross-checked against the printed document." },
+        "clauses": { "type": "array", "items": { "$ref": "#/$defs/clauseRef" } }
+      }
+    },
+    "jurisdiction": {
+      "type": ["object", "null"],
+      "description": "The governing jurisdiction code (BNBC / RSC / IBC) and the design standard it adopts.",
+      "properties": {
+        "code": { "type": "string" },
+        "title": { "type": "string" },
+        "adopts": { "type": "string" },
+        "clauses": { "type": "array", "items": { "$ref": "#/$defs/clauseRef" } }
+      }
+    },
+    "disclaimer": { "type": "string" }
+  },
+  "$defs": {
+    "clauseRef": {
+      "type": "object",
+      "required": ["topic", "clause"],
+      "properties": { "topic": { "type": "string" }, "clause": { "type": "string" } }
+    }
+  }
+}
