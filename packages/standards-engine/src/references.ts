@@ -3,7 +3,8 @@
  * basis-of-design narrative. Each design standard lists the specific
  * clauses/tables that govern hazard classification, design demand, hydraulics,
  * C-factors, fittings and minimum pressure — grounded against the real documents
- * where verified (NFPA 13/14, FM DS 3-26), AUDIT-flagged where representative.
+ * where verified (NFPA 13, NFPA 14, NFPA 20, FM DS 3-26 + DS 8-9), AUDIT-flagged
+ * where representative (NFPA 13D/13R/15/750, EN 12845, AS 2118).
  *
  * Governing jurisdiction codes (BNBC / RSC / IBC) sit above the design standard:
  * they ADOPT a design standard (e.g. NFPA 13 for Bangladesh RMG) and add their
@@ -31,7 +32,9 @@ const STANDARD_REFS: Record<string, StandardReference> = {
     verified: true,
     clauses: [
       { topic: "Occupancy hazard classification", clause: "§4.3 (Light / Ordinary / Extra Hazard)" },
-      { topic: "Density/area design approach", clause: "§19.2; Figure 19.2.3.1.1" },
+      { topic: "Density/area design approach", clause: "§19.3.3.2; Figure 19.3.3.1.1" },
+      { topic: "Design-area adjustments (dry +30%, sloped +30%, quick-response reduction — compounded)", clause: "§19.3.3.2.3–.2.8" },
+      { topic: "Remote-area shape (dimension ≥ 1.2·√A along the branch lines)", clause: "§27.2.4.2.1" },
       { topic: "Hose-stream allowance & water-supply duration", clause: "Table 19.3.3.1.2" },
       { topic: "Hydraulic calculation procedure", clause: "Chapter 27" },
       { topic: "Hazen-Williams C-factors", clause: "Table 27.2.4.8.1" },
@@ -62,7 +65,7 @@ const STANDARD_REFS: Record<string, StandardReference> = {
     edition: "2019",
     verified: true,
     clauses: [
-      { topic: "Class I/III: 500 gpm first standpipe + 250 gpm each additional, max 1000 gpm", clause: "§7.10.1.1" },
+      { topic: "Class I/III: 500 gpm first standpipe + 250 gpm each additional; max 1000 gpm (sprinklered) / 1250 gpm (not)", clause: "§7.10.1.1.1–.1.1.5" },
       { topic: "Minimum residual pressure 100 psi (Class I/III) / 65 psi at 1½″ outlets", clause: "§7.8 / §7.10" },
       { topic: "Hydraulic calculation & working plans", clause: "§8 / NFPA 13 Ch. 27" },
     ],
@@ -81,8 +84,8 @@ const STANDARD_REFS: Record<string, StandardReference> = {
     edition: "2019",
     verified: true,
     clauses: [
-      { topic: "Pump-rated performance & 150% overload point", clause: "§4 (rated / churn / 150%)" },
-      { topic: "Suction-pipe velocity limit (≤ 15 ft/s at 150% flow)", clause: "§4.15 / A.4.15" },
+      { topic: "Pump curve: 150% rated capacity at ≥ 65% rated head; churn/shutoff ≤ 140% rated", clause: "§6.2.1 / §6.2.2" },
+      { topic: "Suction-pipe velocity limit (≤ 15 ft/s at 150% rated flow)", clause: "§4.16 / Table 4.28" },
     ],
   },
   nfpa750: {
@@ -109,7 +112,8 @@ const STANDARD_REFS: Record<string, StandardReference> = {
     clauses: [
       { topic: "Non-storage occupancy hazard categories HC-1/2/3 — design demand", clause: "DS 3-26 Table 2.3.1.10 (verified, ≤30 ft / wet)" },
       { topic: "Minimum pressure 7 psi; hose 250/250/500 gpm; 60-min supply", clause: "DS 3-26 §2.3.1.11–2.3.1.13" },
-      { topic: "Storage (ESFR/CMSA) ceiling protection — count-at-pressure", clause: "DS 8-9 Tables 3.3.7.x (representative — AUDIT)" },
+      { topic: "Storage ceiling protection — count-at-pressure (solid-piled, wet, QR pendent)", clause: "DS 8-9 Tables 2–6 (verified); hose/duration Table 14" },
+      { topic: "Storage rack / dry / extended-coverage / > 40 ft ceilings", clause: "DS 8-9 (specific table — confirm per project)" },
       { topic: "Installation & hydraulics", clause: "DS 2-0 / DS 3-0" },
     ],
   },

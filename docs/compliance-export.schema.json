@@ -37,7 +37,7 @@
         "densityGpmFt2": { "type": "number" },
         "deliveredDensityGpmFt2": { "type": "number", "description": "Density actually delivered at the most remote sprinkler (discharge / coverage)." },
         "designAreaFt2": { "type": "number", "description": "Effective design area, including any dry/sloped/QR adjustment." },
-        "designAreaDimFt": { "type": "number", "description": "Remote-area dimension along the branch lines, 1.2·√A (§27.2.4.2.2)." },
+        "designAreaDimFt": { "type": "number", "description": "Remote-area dimension along the branch lines, 1.2·√A (NFPA 13 §27.2.4.2.1)." },
         "dryAreaIncreasePct": { "type": "number" },
         "operatingSprinklers": { "type": "number" },
         "designAreaMode": { "type": "string", "description": "auto | manual (locked)." },
