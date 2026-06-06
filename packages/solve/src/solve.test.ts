@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseProject } from "@rads/model";
+import { cValueMultiplier } from "@rads/standards-engine";
 import { solveProject } from "./solve";
 
 const tree = parseProject({
@@ -257,6 +258,25 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(solveProject(mk("eh1")).summary.durationMin).toBe(90);
     const oh = solveProject(mk("oh2")).summary;
     expect(oh.requiredStoredGal).toBe(Math.round(oh.totalDemandGpm * 60)); // appears automatically
+  });
+
+  it("adjusts fitting equivalent length for the pipe C-factor (NFPA 13 §27.2.3.1.1)", () => {
+    // one pipe with a tee fitting (≈10 ft eq @ C=120 for 2"); copper C=150 → ×1.51
+    const mk = (cFactor: number) => parseProject({
+      schemaVersion: 2,
+      meta: { id: "EQ", name: "eq", standardId: "nfpa13", hazardClass: "oh2", units: "imperial", systemType: "sprinkler" },
+      designBasis: { sprinklerKFactor: 5.6, operatingSprinklers: 1, minSprinklerPressurePsi: 7 },
+      waterSupply: { type: "city", flowTest: { staticPsi: 100, residualPsi: 90, testFlowGpm: 2000 } },
+      network: {
+        nodes: [{ id: "SRC", type: "junction", elevationFt: 0 }, { id: "S1", type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 130 }],
+        pipes: [{ id: "P1", from: "SRC", to: "S1", role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor, lengthFt: 10, fittings: [{ type: "tee", qty: 1, equivalentLengthFt: 10 }] }],
+        valves: [],
+      },
+    });
+    const eqOf = (cFactor: number) => solveProject(mk(cFactor)).gga.links["P1"]!.equivalentLengthFt!;
+    expect(eqOf(120)).toBeCloseTo(10, 6); // C=120 → unchanged
+    expect(eqOf(150)).toBeCloseTo(10 * cValueMultiplier(150), 4); // ≈ 15.1 ft
+    expect(eqOf(100)).toBeCloseTo(10 * cValueMultiplier(100), 4); // ≈ 7.1 ft
   });
 
   it("required stored water = total demand × duration", () => {

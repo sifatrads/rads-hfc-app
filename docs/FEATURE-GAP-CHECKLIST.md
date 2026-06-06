@@ -27,6 +27,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Nominal-vs-Actual ID toggle + manual ID override ✅ DONE
 - [x] Auto-fitting allocation (elbow at direction changes, toggle) ✅ DONE
 - [x] Manual fittings via alphanumeric codes (2E, 1T, GV/BV/CV) ✅ DONE
+- [x] Fitting equivalent-length C-factor adjustment (NFPA 13 §27.2.3.1.1) — C=120 table values scaled to the pipe C (×1.51 copper / ×0.713 dry) in the H-W solve ✅ DONE
 - [x] Fixed pressure-drop per segment (psi) — BFP/meter/filter constant loss ✅ DONE
 - [x] Added/negative length (off-drawing run, ≥0 floor) ✅ DONE
 - [ ] Fittings allocation mode (Pipe-Type-Specific vs physics) — affects equiv-length distribution
