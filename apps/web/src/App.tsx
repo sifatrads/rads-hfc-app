@@ -16,6 +16,7 @@ import { sampleProject } from "./sample";
 import { newProject, splitPipeInModel, deleteNodeInModel, addBranchInModel, addPipeBetweenInModel, setNodeGeometryInModel, mergeModels } from "./network-edit";
 import { useModelHistory } from "./useModelHistory";
 import { checkModel, issueCounts } from "./network-validate";
+import { buildComplianceSummary } from "./compliance-export";
 import { ProjectTab } from "./tabs/ProjectTab";
 import { SummaryTab } from "./tabs/SummaryTab";
 import { AnalysisTab } from "./tabs/AnalysisTab";
@@ -137,6 +138,13 @@ export function App(): JSX.Element {
     download(`${model.meta.id}.json`, JSON.stringify(model, null, 2), "application/json");
     setNote(`Exported ${model.meta.id}.json`);
   }
+  function exportCompliance(): void {
+    if (!model) return;
+    if (!sol) { setNote("Solve the model first — nothing to export."); return; }
+    const summary = buildComplianceSummary(model, sol);
+    download(`${model.meta.id}-compliance.json`, JSON.stringify(summary, null, 2), "application/json");
+    setNote(`Exported ${model.meta.id}-compliance.json for review`);
+  }
   async function mergeFile(file: File): Promise<void> {
     if (!model) return;
     setNote(`Merging ${file.name}…`);
@@ -190,6 +198,7 @@ export function App(): JSX.Element {
         </label>
         <button style={{ ...fileBtn, ...(model ? {} : disabledBtn) }} disabled={!model} title="Save the project as an encrypted .rhfc file" onClick={() => void saveRhfc()}>💾 Save</button>
         <button style={{ ...fileBtn, ...(model ? {} : disabledBtn) }} disabled={!model} title="Export plain JSON" onClick={exportJson}>JSON</button>
+        <button style={{ ...fileBtn, ...(model && sol ? {} : disabledBtn) }} disabled={!model || !sol} title="Export a machine-readable compliance summary (design basis + results + checks + cited standard clauses) for external review" onClick={exportCompliance}>✓ Compliance</button>
         <span style={statusPill}>{status}</span>
         {model && (
           <span
