@@ -160,6 +160,28 @@ function basisOfDesignSpec(model: ProjectModel, sol: ProjectSolution): Spec {
   return { title: "Basis of Design", inner: el.join("") };
 }
 
+// ── table of contents (sheet index, page numbers reflect the full report) ──
+function tocSpec(model: ProjectModel, titles: string[]): Spec {
+  const { x, w } = INNER;
+  let y = CONTENT_TOP + mm(4);
+  const el: string[] = [sectionTitle(x, y, w, "Report Contents")];
+  y += mm(9);
+  // two columns when the report is long, so it always fits one page
+  const perCol = Math.ceil(titles.length / (titles.length > 30 ? 2 : 1));
+  const colW = titles.length > 30 ? (w - mm(8)) / 2 : w;
+  const lh = mm(6);
+  titles.forEach((title, i) => {
+    const col = Math.floor(i / perCol), row = i % perCol;
+    const cx = x + col * (colW + mm(8));
+    const ry = y + row * lh;
+    if (row % 2 === 1) el.push(rect(cx, ry - mm(4), colW, lh, { fill: C.zebra }));
+    el.push(T(cx + mm(2), ry, `${i + 1}.`, { size: mm(2.5), fill: C.muted, weight: "700" }));
+    el.push(T(cx + mm(9), ry, title, { size: mm(2.7), fill: C.ink }));
+    el.push(T(cx + colW - mm(2), ry, String(i + 1), { size: mm(2.6), fill: C.accent, weight: "700", anchor: "end" }));
+  });
+  return { title: "Contents", inner: el.join("") };
+}
+
 // ── compliance checklist (submittal proof-of-compliance page) ──
 function complianceChecklistSpec(model: ProjectModel, sol: ProjectSolution): Spec {
   const u = units(model);
@@ -899,7 +921,11 @@ export function reportSheets(model: ProjectModel, sol: ProjectSolution): Sheet[]
     ...pumpSpecs(model, sol),
     ...bomSpecs(model),
   ];
-  return frameAll(model, specs);
+  // Insert a Contents sheet after the cover; its page numbers reflect the final
+  // ordering (cover = 1, Contents = 2, the rest follow).
+  const titles = [specs[0]!.title, "Contents", ...specs.slice(1).map((s) => s.title)];
+  const ordered = [specs[0]!, tocSpec(model, titles), ...specs.slice(1)];
+  return frameAll(model, ordered);
 }
 
 // named exports used elsewhere / by tests

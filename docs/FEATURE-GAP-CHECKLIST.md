@@ -49,6 +49,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Significant-pipes-only filter (Analysis tab: hide pipes carrying < 1 gpm) ✅ DONE
 - [x] Loss-slope (psi/ft · bar/m) column — friction gradient in the Analysis pipe table ✅ DONE
 - [x] Page-selection for print — choose which report sheets go into the PDF (Report tab) ✅ DONE
+- [x] Report Table of Contents (sheet index) — page 2, every sheet + page number, zebra; two-column when long ✅ DONE
 
 ## Standards & Codes
 
