@@ -21,6 +21,20 @@ export interface PipeMaterial {
   defaultCFactor: number;
   /** nominal size → internal diameter (in). */
   idIn: Record<string, number>;
+  /** Absolute wall roughness ε (ft) for D-W; overrides the family default. */
+  roughnessFt?: number;
+  /** True for project-defined (custom) materials. */
+  custom?: boolean;
+}
+
+/** A project-defined material: a C-factor + optional roughness using an existing
+ * schedule's internal-diameter table (basedOn). */
+export interface CustomMaterialInput {
+  id: string;
+  label: string;
+  cFactor: number;
+  roughnessMm?: number;
+  basedOn?: string;
 }
 
 /** Steel Schedule 10 internal diameters, in. */
@@ -67,9 +81,33 @@ export const PIPE_MATERIALS: PipeMaterial[] = [
 export const DEFAULT_MATERIAL_ID = "steel-sch40";
 const BY_ID = new Map(PIPE_MATERIALS.map((m) => [m.id, m]));
 
+// ── project-defined (custom) materials registry ──
+// The app keeps this in sync with the active project's customMaterials so the
+// solver/scene resolve a custom id's diameter (from basedOn), C and roughness.
+let CUSTOM: PipeMaterial[] = [];
+const CUSTOM_BY_ID = new Map<string, PipeMaterial>();
+
+/** Register the active project's custom materials (replaces any prior set). */
+export function setCustomMaterials(list: CustomMaterialInput[] | undefined): void {
+  CUSTOM = (list ?? [])
+    .filter((c) => c && c.id && c.label && typeof c.cFactor === "number")
+    .map((c) => {
+      const base = BY_ID.get(BY_ID.has(c.basedOn ?? "") ? (c.basedOn as string) : DEFAULT_MATERIAL_ID)!;
+      return { id: c.id, label: c.label, family: base.family, defaultCFactor: c.cFactor, idIn: base.idIn, ...(typeof c.roughnessMm === "number" ? { roughnessFt: c.roughnessMm / 304.8 } : {}), custom: true };
+    });
+  CUSTOM_BY_ID.clear();
+  for (const m of CUSTOM) CUSTOM_BY_ID.set(m.id, m);
+}
+
+/** The currently-registered custom materials. */
+export function customMaterials(): PipeMaterial[] {
+  return CUSTOM;
+}
+
 /** Resolve a raw material string (incl. legacy "copper"/"steel") to a known id. */
 export function resolveMaterialId(raw?: string): string {
   if (!raw) return DEFAULT_MATERIAL_ID;
+  if (CUSTOM_BY_ID.has(raw)) return raw;
   if (BY_ID.has(raw)) return raw;
   const r = raw.toLowerCase();
   if (r.includes("copper")) return "copper-l";
@@ -82,6 +120,7 @@ export function resolveMaterialId(raw?: string): string {
 }
 
 export function pipeMaterial(id?: string): PipeMaterial {
+  if (id && CUSTOM_BY_ID.has(id)) return CUSTOM_BY_ID.get(id)!;
   return BY_ID.get(resolveMaterialId(id))!;
 }
 
@@ -105,5 +144,6 @@ const ROUGHNESS_FT: Record<MaterialFamily, number> = {
   stainless: 0.000007,
 };
 export function roughnessForMaterial(materialId: string | undefined): number {
-  return ROUGHNESS_FT[pipeMaterial(materialId).family] ?? 0.00015;
+  const m = pipeMaterial(materialId);
+  return m.roughnessFt ?? ROUGHNESS_FT[m.family] ?? 0.00015;
 }

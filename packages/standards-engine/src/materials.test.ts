@@ -1,5 +1,25 @@
 import { describe, it, expect } from "vitest";
-import { internalDiameterForMaterial, defaultCFactorForMaterial, resolveMaterialId, pipeMaterial, PIPE_MATERIALS } from "./materials";
+import { internalDiameterForMaterial, defaultCFactorForMaterial, resolveMaterialId, pipeMaterial, PIPE_MATERIALS, setCustomMaterials, roughnessForMaterial, customMaterials } from "./materials";
+
+describe("custom (project-defined) materials", () => {
+  it("registers a custom material over a base schedule's bore + own C/roughness", () => {
+    setCustomMaterials([{ id: "my-pipe", label: "My Pipe", cFactor: 135, roughnessMm: 0.05, basedOn: "copper-l" }]);
+    expect(customMaterials().length).toBe(1);
+    expect(defaultCFactorForMaterial("my-pipe")).toBe(135);
+    // bore taken from the base material (copper-L)
+    expect(internalDiameterForMaterial("my-pipe", "1")).toBeCloseTo(internalDiameterForMaterial("copper-l", "1"), 6);
+    expect(roughnessForMaterial("my-pipe")).toBeCloseTo(0.05 / 304.8, 8);
+    expect(pipeMaterial("my-pipe").custom).toBe(true);
+    expect(resolveMaterialId("my-pipe")).toBe("my-pipe");
+  });
+
+  it("falls back cleanly once custom materials are cleared", () => {
+    setCustomMaterials([]);
+    expect(customMaterials()).toEqual([]);
+    expect(defaultCFactorForMaterial("my-pipe")).toBe(120); // unknown → default steel
+    expect(pipeMaterial("my-pipe").custom).toBeUndefined();
+  });
+});
 
 describe("pipe material database", () => {
   it("looks up internal diameter by material + nominal size", () => {

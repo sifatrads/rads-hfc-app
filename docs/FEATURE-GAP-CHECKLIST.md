@@ -23,7 +23,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 **Already covered:** ✅ Pipe ID · ✅ Nominal size · ✅ Internal diameter · ✅ Length · ✅ Elevation change · ✅ Direction code · ✅ C-factor · ✅ Type-Group/role · ✅ Fittings list (type/qty/equiv-len) · ✅ Inline valve + equiv length
 
 - [x] Multi-material pipe DB (Sch10, Copper K/L/M, CPVC, PVC, Ductile, SS) — per-material ID + C lookup ✅ DONE
-- [ ] Material database, up to 50 user-defined entries — build atop material DB
+- [x] User-defined pipe materials (project-level: label + C-factor + roughness over a base schedule's bore; appears in every Material dropdown + solver) ✅ DONE
 - [x] Nominal-vs-Actual ID toggle + manual ID override ✅ DONE
 - [x] Auto-fitting allocation (elbow at direction changes, toggle) ✅ DONE
 - [x] Manual fittings via alphanumeric codes (2E, 1T, GV/BV/CV) ✅ DONE

@@ -10,6 +10,7 @@ import { buildScene, type AnnotatedScene } from "@rads/scene";
 import { parseProject, type ProjectModel, type Direction } from "@rads/model";
 import type { DxfDoc, DxfAnalysis } from "@rads/dxf-import";
 import { solveProject, type ProjectSolution } from "@rads/solve";
+import { setCustomMaterials } from "@rads/standards-engine";
 import { decodeJSON, encodeJSON, isRhfc } from "@rads/container";
 import { sampleProject } from "./sample";
 import { newProject, splitPipeInModel, deleteNodeInModel, addBranchInModel, addPipeBetweenInModel, setNodeGeometryInModel, mergeModels } from "./network-edit";
@@ -77,6 +78,7 @@ export function App(): JSX.Element {
   // Solve + scene derive from the model so every tab stays in sync with edits.
   const { sol, solveError } = useMemo<{ sol: ProjectSolution | null; solveError?: string }>(() => {
     if (!model) return { sol: null };
+    setCustomMaterials(model.customMaterials); // keep the material registry in sync before solving
     try { return { sol: solveProject(model) }; }
     catch (e) { return { sol: null, solveError: (e as Error).message }; }
   }, [model]);

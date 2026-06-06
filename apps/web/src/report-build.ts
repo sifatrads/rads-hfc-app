@@ -4,10 +4,12 @@
 import type { ProjectModel } from "@rads/model";
 import { solveProject } from "@rads/solve";
 import { buildScene } from "@rads/scene";
+import { setCustomMaterials } from "@rads/standards-engine";
 import { reportSheets, renderDrawingSheetSvg, type Sheet } from "@rads/report";
 
 export function buildReportSheets(model: ProjectModel): { sheets: Sheet[]; error?: string } {
   try {
+    setCustomMaterials(model.customMaterials);
     const sol = solveProject(model);
     // Drawings are schematic (NTS): compress very long mains so a dense grid
     // isn't squeezed into a corner by one long supply run.

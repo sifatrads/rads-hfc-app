@@ -29,6 +29,14 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
   const nodes = model.network.nodes;
   const pipes = model.network.pipes;
   const nodeIds = useMemo(() => nodes.map((n) => n.id), [nodes]);
+  // Project-defined (custom) materials — appear in the material dropdowns + solver.
+  type CustomMat = { id: string; label: string; cFactor: number; roughnessMm?: number; basedOn?: string };
+  const customMats = ((model as { customMaterials?: CustomMat[] }).customMaterials ?? []);
+  const matOptions = [...MATERIAL_OPTIONS, ...customMats.map((c) => ({ id: c.id, label: `${c.label} (custom)` }))];
+  const setCustomMats = (list: CustomMat[]) => onChange(withModel(model, { customMaterials: list }));
+  const addCustomMat = () => setCustomMats([...customMats, { id: `mat-${Date.now().toString(36)}`, label: "Custom pipe", cFactor: 120, basedOn: "steel-sch40" }]);
+  const updCustomMat = (i: number, patch: Partial<CustomMat>) => setCustomMats(customMats.map((c, j) => (j === i ? { ...c, ...patch } : c)));
+  const delCustomMat = (i: number) => setCustomMats(customMats.filter((_, j) => j !== i));
   // Effective C-factor a pipe will solve with (material default, derated for dry
   // steel) — shown in the C cell so it always matches the calc.
   const dryFill = model.meta.fillType === "dry" || model.meta.fillType === "preaction";
@@ -387,6 +395,30 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             </>
           )}
         </Section>
+
+        {/* Custom pipe materials */}
+        <Section title="Custom pipe materials">
+          <div style={hint}>Define proprietary pipe materials (a Hazen-Williams C and optional D-W roughness, using a standard schedule's bore). They appear in every Material dropdown and drive the solver + reports. ⚠ Verify against the manufacturer's data.</div>
+          {customMats.length > 0 && (
+            <div style={tableScroll}>
+              <table style={table}>
+                <thead><tr>{["Label", "C-factor", "Roughness (mm)", "Bore from", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {customMats.map((m, i) => (
+                    <tr key={m.id} style={i % 2 ? { background: C.zebra } : undefined}>
+                      <td style={td}><input style={cellInput} value={m.label} onChange={(e) => updCustomMat(i, { label: e.target.value })} /></td>
+                      <td style={td}><NumCell value={m.cFactor} onChange={(v) => updCustomMat(i, { cFactor: v ?? 120 })} /></td>
+                      <td style={td}><NumCell value={m.roughnessMm} onChange={(v) => updCustomMat(i, { roughnessMm: v })} /></td>
+                      <td style={td}><select style={{ ...cellInput, width: 140 }} value={m.basedOn ?? "steel-sch40"} onChange={(e) => updCustomMat(i, { basedOn: e.target.value })}>{MATERIAL_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select></td>
+                      <td style={td}><button style={btnDanger} onClick={() => delCustomMat(i)} title="Delete material">✕</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div><button style={btnGhost} onClick={addCustomMat}>+ Add material</button></div>
+        </Section>
       </div>
 
       {/* Nodes */}
@@ -444,7 +476,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
               {PIPE_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
             <span style={{ color: C.muted }}>set →</span>
-            <select style={{ ...cellInput, width: 124 }} value="" onChange={(e) => { if (e.target.value) bulkApply({ material: e.target.value, cFactor: undefined }); }}><option value="">material…</option>{MATERIAL_OPTIONS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select>
+            <select style={{ ...cellInput, width: 124 }} value="" onChange={(e) => { if (e.target.value) bulkApply({ material: e.target.value, cFactor: undefined }); }}><option value="">material…</option>{matOptions.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select>
             <select style={{ ...cellInput, width: 64 }} value="" onChange={(e) => { if (e.target.value) bulkApply({ nominalSize: e.target.value }); }}><option value="">size…</option>{NOMINAL_SIZES.map((s) => <option key={s} value={s}>{s}"</option>)}</select>
             <select style={{ ...cellInput, width: 110 }} value="" onChange={(e) => { if (e.target.value) bulkApply({ role: e.target.value }); }}><option value="">role…</option>{PIPE_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>
             <span style={{ color: C.muted }}>({pipes.filter(bulkMatch).length} match)</span>
@@ -463,7 +495,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
                   <td style={td}><select style={cellInput} value={p.role ?? "branch-line"} onChange={(e) => setPipe(i, { role: e.target.value })}>{PIPE_ROLES.map((o) => <option key={o} value={o}>{o}</option>)}</select></td>
                   <td style={td}><select style={{ ...cellInput, width: 64 }} value={p.nominalSize ?? "1"} onChange={(e) => setPipe(i, { nominalSize: e.target.value, ...(p.fittingCode ? { fittings: parseFittingCodes(p.fittingCode, e.target.value) } : {}) })}>{NOMINAL_SIZES.map((o) => <option key={o} value={o}>{o}"</option>)}</select></td>
                   {showAdv && <>
-                    <td style={td}><select style={{ ...cellInput, width: 130 }} value={p.material ?? "steel-sch40"} onChange={(e) => setPipe(i, { material: e.target.value })}>{MATERIAL_OPTIONS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></td>
+                    <td style={td}><select style={{ ...cellInput, width: 130 }} value={p.material ?? "steel-sch40"} onChange={(e) => setPipe(i, { material: e.target.value })}>{matOptions.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></td>
                     <td style={td}><NumCell value={effC(p)} onChange={(v) => setPipe(i, { cFactor: v })} /></td>
                     <td style={td}><NumCell value={dispId(p.internalDiameterIn)} onChange={(v) => setPipe(i, v === undefined ? { idOverride: false, internalDiameterIn: undefined } : { idOverride: true, internalDiameterIn: storId(v) })} /></td>
                   </>}

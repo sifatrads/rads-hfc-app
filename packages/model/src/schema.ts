@@ -230,6 +230,8 @@ export const ProjectModelSchema = z
     designBasis: DesignBasisSchema.optional(),
     waterSupply: WaterSupplySchema.optional(),
     network: NetworkSchema.default({ nodes: [], pipes: [], valves: [] }),
+    /** Project-defined pipe materials (C-factor + roughness over a base schedule). */
+    customMaterials: z.array(z.object({ id: z.string(), label: z.string(), cFactor: z.number(), roughnessMm: z.number().optional(), basedOn: z.string().optional() }).passthrough()).optional(),
     estimatedDemand: z.record(z.unknown()).optional(),
     drawing: z.record(z.unknown()).optional(),
     results: z.record(z.unknown()).optional(),
