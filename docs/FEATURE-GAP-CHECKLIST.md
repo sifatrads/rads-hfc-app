@@ -63,6 +63,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Compliance-path selector (Code picker: NFPA 13/13D/13R/14/EN) ✅ DONE
 - [x] NFPA 20 suction-velocity check (≤15 ft/s at 150% flow) ✅ DONE
 - [x] NFPA 15 deluge / water-spray (all nozzles flow at design density) ✅ DONE
+- [x] Dry-pipe / preaction 30% design-area increase (NFPA 13 §19.2.3.2) — Auto-Peak pulls more heads for dry/preaction; effective area + note on nameplate/checklist/export ✅ DONE
 - [x] Darcy-Weisbach method (flow-dependent f, Swamee-Jain, per-material roughness) ✅ DONE
 - [x] NFPA 750 water mist (Code + System=water-mist → all-nozzle discharge, high pressure, Darcy-Weisbach + fluid viscosity) ✅ DONE
 - [x] EN 12845 (hazard classes, metric densities, C=100, Table 23 equiv-lengths, four-most-unfavourable report, metric data entry) ✅ DONE

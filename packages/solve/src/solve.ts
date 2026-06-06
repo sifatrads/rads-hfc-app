@@ -59,8 +59,10 @@ export interface SolveSummary {
   operatingHeads: number;
   /** True when the operating set was pinned (designBasis.designAreaNodeIds). */
   manualDesignArea?: boolean;
-  /** Design area (ft²) when area-density based. */
+  /** Design area (ft²) when area-density based — includes the dry-system increase. */
   designAreaFt2?: number;
+  /** Design-area increase applied for a dry / preaction system (e.g. 30), if any. */
+  dryAreaIncreasePct?: number;
   /** Required discharge per head to meet the design density (gpm). */
   requiredHeadFlowGpm?: number;
   minSprinklerPressurePsi: number;
@@ -210,8 +212,14 @@ function designAreaSet(model: ProjectModel, sourceId: string, count: number): Se
  * (Schematic proxy for "most-demanding remote rectangle"; true geometric remote
  * area needs dimensioned layout.)
  */
+/** NFPA 13 §19.2.3.2: dry-pipe and double-interlock preaction systems increase
+ * the design area by 30% (without revising the density). */
+function dryAreaFactor(model: ProjectModel): number {
+  return model.meta.fillType === "dry" || model.meta.fillType === "preaction" ? 1.3 : 1;
+}
+
 function autoPeakAreaSet(model: ProjectModel, sourceId: string): Set<string> | undefined {
-  const designArea = num(model.designBasis, "designAreaFt2");
+  const designArea = (num(model.designBasis, "designAreaFt2") ?? 0) * dryAreaFactor(model);
   if (!designArea) return undefined;
   const dist = pathDistances(model, sourceId);
   const spk = model.network.nodes.filter((n) => n.type === "sprinkler" && typeof n.kFactor === "number" && n.kFactor > 0);
@@ -506,7 +514,8 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     ...(remote ? { mostRemoteSprinkler: remote } : {}),
     operatingHeads: designNodeIds.length,
     ...(usedLocked && !opts.designArea ? { manualDesignArea: true } : {}),
-    ...(num(model.designBasis, "designAreaFt2") !== undefined ? { designAreaFt2: num(model.designBasis, "designAreaFt2") } : {}),
+    ...(num(model.designBasis, "designAreaFt2") !== undefined ? { designAreaFt2: Math.round(num(model.designBasis, "designAreaFt2")! * dryAreaFactor(model)) } : {}),
+    ...(dryAreaFactor(model) > 1 && num(model.designBasis, "designAreaFt2") !== undefined ? { dryAreaIncreasePct: 30 } : {}),
     ...(requiredHeadFlowGpm !== undefined ? { requiredHeadFlowGpm } : {}),
     minSprinklerPressurePsi,
     meetsMinPressure: remote ? remote.pressurePsi >= minSprinklerPressurePsi - 0.5 : true,

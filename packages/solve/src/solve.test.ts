@@ -200,6 +200,28 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(tight.velocityOk).toBe(false);
   });
 
+  it("increases the design area 30% for a dry / preaction system (NFPA 13 §19.2.3.2)", () => {
+    // a long single branch so Auto-Peak fills heads up to the design area
+    const nodes: Record<string, unknown>[] = [{ id: "SRC", type: "junction", elevationFt: 0 }];
+    const pipes: Record<string, unknown>[] = [];
+    let prev = "SRC";
+    for (let i = 1; i <= 30; i++) { const id = `S${i}`; nodes.push({ id, type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 100 }); pipes.push({ id: `P${i}`, from: prev, to: id, role: "branch-line", nominalSize: "2-1/2", internalDiameterIn: 2.469, cFactor: 120, lengthFt: 10 }); prev = id; }
+    const base = {
+      schemaVersion: 2,
+      meta: { id: "DRY", name: "dry area", standardId: "nfpa13", hazardClass: "oh2", units: "imperial", systemType: "sprinkler", fillType: "wet" },
+      designBasis: { sprinklerKFactor: 5.6, densityGpmFt2: 0.2, designAreaFt2: 1500, minSprinklerPressurePsi: 7, hoseAllowanceGpm: 250 },
+      waterSupply: { type: "city+fire-pump", flowTest: { staticPsi: 90, residualPsi: 75, testFlowGpm: 4000 }, firePump: { ratedFlowGpm: 1500, ratedPsi: 130, churnPsi: 150 } },
+      network: { nodes, pipes, valves: [] },
+    };
+    const wet = solveProject(parseProject(base)).summary; // 1500 ft² / 100 ft² = 15 heads
+    const dry = solveProject(parseProject({ ...JSON.parse(JSON.stringify(base)), meta: { ...base.meta, fillType: "dry" } })).summary; // 1950 ft² → 20 heads
+    expect(wet.dryAreaIncreasePct).toBeUndefined();
+    expect(wet.operatingHeads).toBe(15);
+    expect(dry.dryAreaIncreasePct).toBe(30);
+    expect(dry.operatingHeads).toBe(20);
+    expect(dry.designAreaFt2).toBe(1950); // 1500 × 1.3
+  });
+
   it("required stored water = total demand × duration", () => {
     const s = solveProject(fmStorage).summary;
     expect(s.requiredStoredGal).toBe(Math.round(s.totalDemandGpm * 60));
