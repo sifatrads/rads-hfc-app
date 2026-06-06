@@ -38,15 +38,17 @@ const DENSITY: Record<string, DesignDensityPoint> = {
 const HOSE: Record<string, number> = { "hc-1": 250, "hc-2": 250, "hc-3": 500 };
 
 // ── FM DS 8-9 ceiling storage protection — count-at-pressure schemes ──
-// ⚠ AUDIT: Representative values consistent with public FM/industry sources.
-// Only a few cells are publicly grounded (K25.2 12@50psi/48ft; K25.2 12@60psi
-// exposed plastic; K16.8 35/52/63psi by ceiling; FM Jul-2015 K22.4/K25.2 cells).
-// Every other psi/N is REPRESENTATIVE and MUST be replaced with the exact current
-// FM 8-9 table cell for the specific commodity/arrangement/height/edition before
-// issuing a design. Do NOT mix with NFPA 13 criteria (they differ).
-// Suppression-mode (ESFR): 250 gpm hose / 60 min. Control-mode (CMSA/CMDA):
-// 500 gpm hose / 120 min. K16.8 is the minimum ceiling K for storage; K14 is
-// legacy (retired >30 ft). >50 ft ceilings may need >12 heads — out of v1 scope.
+// Hose demand + supply duration are GROUNDED to DS 8-9 Table 14 (by ceiling-
+// sprinkler count, NOT by suppression/control mode): ≤12 heads → 250 gpm; 13–19
+// → 500 gpm (60–90 min); 20+ → 500 gpm (120 min). Grounded protection cells:
+// K16.8 → 12 @ 63 psi and K14.0 → 12 @ 90 psi, both at a 40 ft ceiling for
+// uncartoned plastic (DS 8-9, Jul-2024). The per-cell K/N/pressure in the rest of
+// the table are ⚠ REPRESENTATIVE — DS 8-9's protection tables are dense grids that
+// don't extract cleanly; replace each with the exact current DS 8-9 cell for the
+// specific commodity/arrangement/storage+ceiling height before issuing a design,
+// and never mix FM with NFPA 13 criteria. K16.8 is the minimum ceiling K for
+// storage; K14 is legacy (12 @ 90 psi @ 40 ft → now "DNA" at 45 ft per recent
+// revisions). >50 ft ceilings may need >12 heads — out of v1 scope.
 const STORAGE_SCHEMES: StorageScheme[] = [
   { id: "esfr-k14-12-50", label: "ESFR K14.0 — 12 @ 50 psi (legacy ≤30 ft)", mode: "suppression", kFactor: 14.0, designSprinklers: 12, minPressurePsi: 50, hoseAllowanceGpm: 250, durationMin: 60, commodity: "Class 1–4 + cartoned unexp. plastic", maxStorageHeightFt: 25, maxCeilingHeightFt: 30, note: "AUDIT: K14 phased out >30 ft / exposed plastics; retrofit only." },
   { id: "esfr-k16.8-12-35", label: "ESFR K16.8 — 12 @ 35 psi (≤30 ft ceiling)", mode: "suppression", kFactor: 16.8, designSprinklers: 12, minPressurePsi: 35, hoseAllowanceGpm: 250, durationMin: 60, commodity: "Class 1–4 + cartoned unexp. plastic", maxStorageHeightFt: 25, maxCeilingHeightFt: 30, note: "Most-installed low-ceiling ESFR." },
@@ -57,7 +59,7 @@ const STORAGE_SCHEMES: StorageScheme[] = [
   { id: "esfr-k25.2-12-40", label: "ESFR K25.2 — 12 @ 40 psi", mode: "suppression", kFactor: 25.2, designSprinklers: 12, minPressurePsi: 40, hoseAllowanceGpm: 250, durationMin: 60, commodity: "Class 1–4 + cartoned unexp. plastic", maxStorageHeightFt: 35, maxCeilingHeightFt: 40, note: "AUDIT: FM K360 low cell ~20 psi @25/30 ft." },
   { id: "esfr-k25.2-12-50", label: "ESFR K25.2 — 12 @ 50 psi (48 ft ceiling)", mode: "suppression", kFactor: 25.2, designSprinklers: 12, minPressurePsi: 50, hoseAllowanceGpm: 250, durationMin: 60, commodity: "Class 1–4 + cartoned unexp. plastic", maxStorageHeightFt: 40, maxCeilingHeightFt: 48, note: "Flagship tall-warehouse ESFR (publicly grounded, 5 ft aisles)." },
   { id: "esfr-k25.2-12-60", label: "ESFR K25.2 — 12 @ 60 psi (exposed plastic ≤40 ft)", mode: "suppression", kFactor: 25.2, designSprinklers: 12, minPressurePsi: 60, hoseAllowanceGpm: 250, durationMin: 60, commodity: "Exposed (uncartoned) nonexpanded Group A plastic", maxStorageHeightFt: 40, maxCeilingHeightFt: 40, note: "Only ESFR option for exposed plastic (publicly grounded)." },
-  { id: "cmsa-k16.8-15-25", label: "CMSA (large-drop) K16.8 upright — 15 @ 25 psi", mode: "control", kFactor: 16.8, designSprinklers: 15, minPressurePsi: 25, hoseAllowanceGpm: 500, durationMin: 120, commodity: "Class 1–4 / cartoned plastics where ESFR unsuitable", note: "AUDIT: count(12–25)/psi are commodity/height specific — replace with FM cell. Control mode → 500 gpm hose." },
+  { id: "cmsa-k16.8-15-25", label: "CMSA (large-drop) K16.8 upright — 15 @ 25 psi", mode: "control", kFactor: 16.8, designSprinklers: 15, minPressurePsi: 25, hoseAllowanceGpm: 500, durationMin: 90, commodity: "Class 1–4 / cartoned plastics where ESFR unsuitable", note: "Hose/duration per DS 8-9 Table 14: 15 heads → 500 gpm, 90 min. AUDIT: count(12–25)/psi are commodity/height specific — replace with the FM cell." },
 ];
 
 export const fmGlobal: StandardModule = {

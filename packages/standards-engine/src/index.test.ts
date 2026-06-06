@@ -77,10 +77,10 @@ describe("standards-engine: FM Global Data Sheets", () => {
     expect(schemes.length).toBeGreaterThan(0);
     const flagship = schemes.find((x) => x.id === "esfr-k25.2-12-50")!;
     expect(flagship).toMatchObject({ kFactor: 25.2, designSprinklers: 12, minPressurePsi: 50, mode: "suppression", hoseAllowanceGpm: 250, durationMin: 60 });
-    // control-mode carries the larger hose / longer duration
+    // DS 8-9 Table 14: hose/duration by ceiling-head count — 15 heads → 500 gpm, 90 min
     const cmsa = schemes.find((x) => x.mode === "control")!;
     expect(cmsa.hoseAllowanceGpm).toBe(500);
-    expect(cmsa.durationMin).toBe(120);
+    expect(cmsa.durationMin).toBe(90);
   });
 
   it("resolves a storage scheme into an imperial design basis", () => {
