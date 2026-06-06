@@ -325,7 +325,7 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
       { id: "XM", from: "CM1", to: "CM2", role: "cross-main", nominalSize: "3", internalDiameterIn: 3.068, cFactor: 120, lengthFt: 100 },
     ];
     for (const [pfx, root] of [["A", "CM2"], ["B", "CM1"]] as const) {
-      let prev = root;
+      let prev: string = root;
       for (let i = 1; i <= 8; i++) { const id = `${pfx}${i}`; nodes.push({ id, type: "sprinkler", elevationFt: 0, kFactor: 5.6, coverageAreaFt2: 100 }); pipes.push({ id: `P-${id}`, from: prev, to: id, role: "branch-line", nominalSize: "2", internalDiameterIn: 2.067, cFactor: 120, lengthFt: 10 }); prev = id; }
     }
     const m = parseProject({
@@ -338,6 +338,7 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     const sol = solveProject(m);
     // 1.2·√600 = 29.4 ft → ceil(29.4/10) = 3 heads/branch; 600 ft² / 100 = 6 heads = 3 from each of the 2 most-remote branches
     expect(sol.summary.operatingHeads).toBe(6);
+    expect(sol.summary.designAreaDimFt).toBeCloseTo(1.2 * Math.sqrt(600), 1); // 1.2√A ≈ 29.4 ft
     const flows = (id: string) => (sol.results.nodes[id]?.dischargeGpm ?? 0) > 1;
     const aFlow = ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"].filter(flows).length;
     const bFlow = ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8"].filter(flows).length;

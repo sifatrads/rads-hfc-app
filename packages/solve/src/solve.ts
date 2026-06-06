@@ -65,6 +65,8 @@ export interface SolveSummary {
   manualDesignArea?: boolean;
   /** Design area (ft²) when area-density based — includes the dry-system increase. */
   designAreaFt2?: number;
+  /** Remote-area dimension parallel to the branch lines, 1.2·√A (ft) — §27.2.4.2.2. */
+  designAreaDimFt?: number;
   /** Design-area increase applied for a dry / preaction system (e.g. 30), if any. */
   dryAreaIncreasePct?: number;
   /** Quick-response design-area reduction applied (e.g. 25), if any. */
@@ -614,7 +616,7 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
     ...(remote ? { mostRemoteSprinkler: remote } : {}),
     operatingHeads: designNodeIds.length,
     ...(usedLocked && !opts.designArea ? { manualDesignArea: true } : {}),
-    ...(num(model.designBasis, "designAreaFt2") !== undefined ? { designAreaFt2: Math.round(num(model.designBasis, "designAreaFt2")! * designAreaFactor(model)) } : {}),
+    ...(num(model.designBasis, "designAreaFt2") !== undefined ? { designAreaFt2: Math.round(num(model.designBasis, "designAreaFt2")! * designAreaFactor(model)), designAreaDimFt: Math.round(1.2 * Math.sqrt(num(model.designBasis, "designAreaFt2")! * designAreaFactor(model)) * 10) / 10 } : {}),
     ...(isDrySystem(model) && num(model.designBasis, "designAreaFt2") !== undefined ? { dryAreaIncreasePct: 30 } : {}),
     ...(!isDrySystem(model) && designAreaFactor(model) < 1 && num(model.designBasis, "designAreaFt2") !== undefined ? { qrAreaReductionPct: Math.round((1 - designAreaFactor(model)) * 100) } : {}),
     ...(requiredHeadFlowGpm !== undefined ? { requiredHeadFlowGpm } : {}),

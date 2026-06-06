@@ -24,7 +24,7 @@ export interface ComplianceSummary {
   };
   designBasis: {
     method: string; hydraulicMethod: "hazen-williams" | "darcy-weisbach";
-    densityGpmFt2?: number; deliveredDensityGpmFt2?: number; designAreaFt2?: number; dryAreaIncreasePct?: number; operatingSprinklers?: number; designAreaMode?: string;
+    densityGpmFt2?: number; deliveredDensityGpmFt2?: number; designAreaFt2?: number; designAreaDimFt?: number; dryAreaIncreasePct?: number; operatingSprinklers?: number; designAreaMode?: string;
     sprinklerKFactor?: number; minSprinklerPressurePsi?: number; hoseAllowanceGpm?: number; durationMin?: number;
   };
   demand: { systemFlowGpm?: number; totalDemandGpm?: number; requiredSourcePressurePsi?: number; mostRemoteHead?: { id: string; pressurePsi?: number; flowGpm?: number } };
@@ -75,7 +75,7 @@ export function buildComplianceSummary(model: ProjectModel, solution: ProjectSol
     designBasis: {
       method: String(db["method"] ?? "density/area"),
       hydraulicMethod: db["frictionMethod"] === "darcy-weisbach" || db["frictionMethod"] === "dw" ? "darcy-weisbach" : "hazen-williams",
-      densityGpmFt2: numOf(db, "densityGpmFt2"), ...(s.deliveredDensityGpmFt2 !== undefined ? { deliveredDensityGpmFt2: s.deliveredDensityGpmFt2 } : {}), designAreaFt2: s.designAreaFt2 ?? numOf(db, "designAreaFt2"), ...(s.dryAreaIncreasePct ? { dryAreaIncreasePct: s.dryAreaIncreasePct } : {}),
+      densityGpmFt2: numOf(db, "densityGpmFt2"), ...(s.deliveredDensityGpmFt2 !== undefined ? { deliveredDensityGpmFt2: s.deliveredDensityGpmFt2 } : {}), designAreaFt2: s.designAreaFt2 ?? numOf(db, "designAreaFt2"), ...(s.designAreaDimFt ? { designAreaDimFt: s.designAreaDimFt } : {}), ...(s.dryAreaIncreasePct ? { dryAreaIncreasePct: s.dryAreaIncreasePct } : {}),
       operatingSprinklers: numOf(db, "operatingSprinklers") ?? s.operatingHeads, designAreaMode: s.manualDesignArea ? "manual (locked)" : "auto", sprinklerKFactor: numOf(db, "sprinklerKFactor"),
       minSprinklerPressurePsi: r(s.minSprinklerPressurePsi), hoseAllowanceGpm: r(s.hoseAllowanceGpm, 1), durationMin: s.durationMin,
     },

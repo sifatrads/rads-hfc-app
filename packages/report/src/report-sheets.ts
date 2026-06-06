@@ -403,7 +403,7 @@ function riserNameplateSpec(model: ProjectModel, sol: ProjectSolution): Spec {
   const basis = infoBox(rx, y, half, "Design basis", [
     ["Method", String(db?.["method"] ?? "density/area")],
     ["Density", num(db, "densityGpmFt2") !== undefined ? u.densU(num(db, "densityGpmFt2")) : "—"],
-    ["Design area", num(db, "designAreaFt2") !== undefined ? u.areaU(num(db, "designAreaFt2")) : "—"],
+    ["Design area", s.designAreaFt2 !== undefined ? `${u.areaU(s.designAreaFt2)}${s.designAreaDimFt ? ` (1.2√A = ${u.l(s.designAreaDimFt)} ${u.U.l})` : ""}` : "—"],
     ["Sprinkler K-factor", db?.["sprinklerKFactor"] ? String(db["sprinklerKFactor"]) : "—"],
     ["Operating sprinklers", db?.["operatingSprinklers"] ? `${db["operatingSprinklers"]} (set)` : `${s.operatingHeads} (auto-peak)`],
     ["Min sprinkler pressure", u.pU(s.minSprinklerPressurePsi)],
