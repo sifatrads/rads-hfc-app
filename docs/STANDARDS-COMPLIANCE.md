@@ -83,6 +83,25 @@ The core Hazen‑Williams friction calc is checked against **FM DS 2‑89** (Pip
 Tables, Table 2, C=120) — a different standards body — reproducing its published psi/ft to
 printed precision (e.g. 500 gpm / 4″ → FM 0.072, app 0.0718). See `hydraulics.test.ts`.
 
+## Professional‑software cross‑validation — Canute FHC ✅ (design basis) / 📋 (full solve)
+
+A real OH2 job — **TED Bernhardtz Textile, Gazipur (15008099)**, 96 pipes, NFPA 13 2019 —
+was calculated in **Canute FHC** (a widely‑used commercial fire‑hydraulics package). The
+Canute job (DXF + report + decoded input format) lives in `test_data/data from canute/`
+(git‑ignored, local). Its design basis matches the app exactly:
+
+| Quantity | Canute (metric) | → imperial | App basis |
+|---|---|---|---|
+| Hazard / density | OH2, 8.10 mm/min | 0.199 gpm/ft² | OH2 = 0.20 ✓ |
+| Design area | 139 m² | 1 496 ft² | 1 500 ✓ |
+| Highest head above source | 31.69 m | 104.0 ft | (elevation modeled) |
+| **Canute computed source duty** | **1819.7 L/min @ 7.078 bar** | **480.8 gpm @ 102.7 psi** | oracle target |
+
+The DXF‑import test (`dxf-import/import.test.ts`) already confirms the **geometry** matches
+Canute's pipe schedule (91 pipes; longest run 40.841 m). A fully automated **solve‑vs‑Canute**
+comparison (app source duty ≈ 480.8 gpm @ 102.7 psi) needs the complete hydraulic model
+reconstructed from the Canute job — a documented target (📋), not yet an automated test.
+
 ---
 
 ## Representative / not yet grounded ⚠️
