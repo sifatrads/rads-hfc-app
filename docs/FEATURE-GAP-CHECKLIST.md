@@ -44,7 +44,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Design-area proof — solve candidate remote areas, rank by required pressure, flag the governing one (Summary tab) ✅ DONE
 - [x] Significant-pipes-only filter (Analysis tab: hide pipes carrying < 1 gpm) ✅ DONE
 - [x] Loss-slope (psi/ft · bar/m) column — friction gradient in the Analysis pipe table ✅ DONE
-- [ ] Batch print / page-selection — submittal convenience; small
+- [x] Page-selection for print — choose which report sheets go into the PDF (Report tab) ✅ DONE
 
 ## Standards & Codes
 
