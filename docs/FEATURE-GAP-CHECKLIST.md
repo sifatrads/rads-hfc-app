@@ -62,6 +62,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] 1.2·√A rectangular remote-area shape (NFPA 13 §27.2.4.2.2) — branch-aware Auto-Peak: ceil(1.2√A / spacing) heads per branch across the most-remote branch lines; safe fallback to distance-based when topology unclear ✅ DONE
 - [x] Delivered-density verification — density actually delivered at the most-remote head (discharge/coverage) vs design density, explicit on the Compliance Checklist + JSON export ✅ DONE
 - [x] NFPA 14 standpipe auto-sizing (residual at most-remote outlet, per-standpipe flow) ✅ DONE
+- [x] NFPA 14 §7.10.1.1.5 standpipe max-flow cap — 1000 gpm sprinklered / 1250 gpm not (toggle); rest of §7.10 (500+250, 100/65 psi) confirmed vs the doc ✅ DONE
 - [x] NFPA 13D automation (two most-remote heads, no hose allowance) ✅ DONE
 - [x] NFPA 13R automation (four most-remote heads) ✅ DONE
 - [x] Compliance-path selector (Code picker: NFPA 13/13D/13R/14/EN) ✅ DONE

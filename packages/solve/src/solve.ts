@@ -352,10 +352,13 @@ interface StandpipeParams { minResidual: number; firstFlow: number; addFlow: num
 /** NFPA 14 §7.10 design parameters by standpipe class. Class I/III: 100 psi at
  * the most-remote 2½" outlet, 500 gpm first standpipe + 250 each additional,
  * cap 1000 gpm. Class II: 65 psi, 100 gpm. */
-function standpipeClassParams(cls: string | undefined): StandpipeParams {
+function standpipeClassParams(cls: string | undefined, sprinkleredThroughout: boolean): StandpipeParams {
   const c = (cls ?? "I").toUpperCase().replace(/CLASS\s*/i, "").trim();
+  // NFPA 14 §7.8.1 / §7.10.1.1: Class II → 100 gpm @ 65 psi; Class I/III → 500 gpm
+  // (most remote) + 250 gpm each additional @ 100 psi, capped at §7.10.1.1.5:
+  // 1000 gpm for buildings sprinklered throughout per NFPA 13, else 1250 gpm.
   if (c === "II") return { minResidual: 65, firstFlow: 100, addFlow: 0, maxTotal: 100 };
-  return { minResidual: 100, firstFlow: 500, addFlow: 250, maxTotal: 1000 };
+  return { minResidual: 100, firstFlow: 500, addFlow: 250, maxTotal: sprinkleredThroughout ? 1000 : 1250 };
 }
 
 /** Assign NFPA 14 demand to each hose connection: the most-remote gets the first-
@@ -492,7 +495,7 @@ export function solveProject(model: ProjectModel, opts: SolveOptions = {}): Proj
 
   // Standpipe (NFPA 14) vs sprinkler (NFPA 13) design mode.
   const standpipeMode = (model.meta.systemType === "standpipe" || model.meta.standardId === "nfpa14") && model.network.nodes.some((n) => n.type === "hose-station");
-  const spParams = standpipeMode ? standpipeClassParams(model.meta.standpipeClass) : undefined;
+  const spParams = standpipeMode ? standpipeClassParams(model.meta.standpipeClass, (model.designBasis as Record<string, unknown> | undefined)?.["sprinkleredThroughout"] !== false) : undefined;
   const demandOverride = standpipeMode ? standpipeDemands(model, source.id, spParams!) : undefined;
 
   const emitterFlow = (g: GgaResult): number =>

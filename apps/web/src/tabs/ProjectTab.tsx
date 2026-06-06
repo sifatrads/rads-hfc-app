@@ -248,7 +248,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
           {model.meta.systemType === "standpipe" && (
             <Row>
               <Sel label="Standpipe class" value={str(model.meta.standpipeClass, "I")} options={["I", "II", "III"]} onChange={(v) => setMeta("standpipeClass", v)} />
-              <div style={{ flex: 1, alignSelf: "end", fontSize: 11.5, color: C.muted, paddingBottom: 6 }}>Class I/III: 100 psi @ most-remote 2½″, 500+250 gpm/standpipe. Hose connections = “hose-station” nodes.</div>
+              <label style={{ ...checkRow, flex: 1, alignSelf: "end", paddingBottom: 4 }}><input type="checkbox" checked={ds["sprinkleredThroughout"] !== false} onChange={(e) => setBasis("sprinkleredThroughout", e.target.checked ? undefined : false)} /><span>Sprinklered throughout (cap 1000 gpm; off → 1250, §7.10.1.1.5)</span></label>
             </Row>
           )}
           <Row>

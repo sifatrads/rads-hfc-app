@@ -393,6 +393,25 @@ describe("FM DS 8-9 storage (count-at-pressure)", () => {
     expect(solveProject(mk(true)).summary.operatingHeads).toBe(5); // EC → at least 5 sprinklers
   });
 
+  it("caps standpipe demand at 1000 gpm sprinklered / 1250 gpm not (NFPA 14 §7.10.1.1.5)", () => {
+    const mk = (sprinklered: boolean) => {
+      const nodes: Record<string, unknown>[] = [{ id: "SRC", type: "junction", elevationFt: 0 }];
+      const pipes: Record<string, unknown>[] = [];
+      let prev = "SRC";
+      for (let i = 1; i <= 5; i++) { nodes.push({ id: `H${i}`, type: "hose-station", elevationFt: 0 }); pipes.push({ id: `X${i}`, from: prev, to: `H${i}`, role: "cross-main", nominalSize: "8", internalDiameterIn: 7.981, cFactor: 120, lengthFt: 40 }); prev = `H${i}`; }
+      return parseProject({
+        schemaVersion: 2,
+        meta: { id: "SP", name: "standpipe", standardId: "nfpa14", units: "imperial", systemType: "standpipe", standpipeClass: "I" },
+        designBasis: sprinklered ? {} : { sprinkleredThroughout: false },
+        waterSupply: { type: "city+fire-pump", flowTest: { staticPsi: 150, residualPsi: 140, testFlowGpm: 5000 }, firePump: { ratedFlowGpm: 2500, ratedPsi: 200, churnPsi: 220 } },
+        network: { nodes, pipes, valves: [] },
+      });
+    };
+    // 5 standpipes: 500 + 250 + 250 (+ 250) = capped at the max
+    expect(solveProject(mk(true)).summary.totalDemandGpm).toBeCloseTo(1000, 0);
+    expect(solveProject(mk(false)).summary.totalDemandGpm).toBeCloseTo(1250, 0);
+  });
+
   it("required stored water = total demand × duration", () => {
     const s = solveProject(fmStorage).summary;
     expect(s.requiredStoredGal).toBe(Math.round(s.totalDemandGpm * 60));
