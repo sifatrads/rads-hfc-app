@@ -7,7 +7,7 @@
  */
 import type { ProjectModel } from "@rads/model";
 import type { ProjectSolution } from "@rads/solve";
-import { getStandard, C_VALUE_MULTIPLIER, FITTING_EQUIV_LENGTH_FT, pipeMaterial, type StandardId } from "@rads/standards-engine";
+import { getStandard, C_VALUE_MULTIPLIER, FITTING_EQUIV_LENGTH_FT, pipeMaterial, standardReferences, jurisdictionReferences, type StandardId } from "@rads/standards-engine";
 import { mm } from "./paper";
 import { C, T, rect, line, frame, statCards, sectionTitle, table, INNER, CONTENT_TOP, CONTENT_BOTTOM, ROWS_PER_PAGE, PAGE, type Column, type SheetMeta } from "./report-theme";
 
@@ -63,6 +63,85 @@ function infoBox(x: number, y: number, w: number, title: string, rows: [string, 
     ry += rowH;
   });
   return { svg: el.join(""), endY: y + h };
+}
+
+/** Word-wrapped paragraph (T is single-line). Returns SVG + the y after it. */
+function paragraph(x: number, y: number, w: number, text: string, o: { size?: number; fill?: string } = {}): { svg: string; endY: number } {
+  const size = o.size ?? mm(2.55);
+  const maxChars = Math.max(8, Math.floor(w / (size * 0.52))); // avg Helvetica glyph ≈ 0.52 em
+  const lines: string[] = [];
+  let cur = "";
+  for (const word of text.split(/\s+/)) {
+    if (cur && cur.length + 1 + word.length > maxChars) { lines.push(cur); cur = word; }
+    else cur = cur ? `${cur} ${word}` : word;
+  }
+  if (cur) lines.push(cur);
+  const lh = size * 1.55;
+  return { svg: lines.map((ln, i) => T(x, y + i * lh, ln, { size, fill: o.fill ?? C.ink })).join(""), endY: y + lines.length * lh };
+}
+
+// ── basis of design / design philosophy (with standard clause references) ──
+function basisOfDesignSpec(model: ProjectModel, sol: ProjectSolution): Spec {
+  const u = units(model);
+  const s = sol.summary;
+  const m = model.meta;
+  const db = model.designBasis as Record<string, unknown> | undefined;
+  const { x, w } = INNER;
+  const std = standardReferences(m.standardId);
+  const jur = jurisdictionReferences(m.governingCode);
+  const method = (db?.["frictionMethod"] === "darcy-weisbach" || db?.["frictionMethod"] === "dw") ? "Darcy-Weisbach" : "Hazen-Williams";
+  const sysWord = m.systemType === "standpipe" ? "standpipe and hose system" : m.systemType === "water-mist" ? "water mist system" : "automatic sprinkler system";
+  const outlet = m.systemType === "standpipe" ? "hose connection" : m.systemType === "water-mist" ? "nozzle" : "sprinkler";
+  let hazardLabel = String(m.hazardClass ?? "—").toUpperCase();
+  try { const hc = getStandard(m.standardId as StandardId).hazardClasses().find((h) => h.id === m.hazardClass); if (hc) hazardLabel = hc.label; } catch { /* unimplemented */ }
+
+  let y = CONTENT_TOP + mm(4);
+  const el: string[] = [sectionTitle(x, y, w, "Basis of Design")];
+  y += mm(8);
+
+  const stdName = std?.standard ?? String(m.standard ?? m.standardId ?? "the applicable standard");
+  const ed = std?.edition ? `, ${std.edition} Edition` : "";
+  const narrative =
+    `This ${sysWord} for ${m.name} is designed in accordance with ${stdName}${ed}. ` +
+    (jur ? `The installation is governed by ${jur.body} per the ${jur.title}, which mandates design to ${jur.adopts}. ` : "") +
+    `The protected occupancy is classified as ${hazardLabel}. The system is fully hydraulically calculated by the ${method} method — pipe schedules are not used to size pipe — and is proved against the available water supply with a positive safety margin. ` +
+    `The design demand is applied over the hydraulically most demanding (most remote) area, and the minimum pressure at the most remote ${outlet} is maintained as required. ` +
+    (std?.verified ? `Design values are grounded against the published standard.` : `Design values are representative and shall be confirmed against the published standard before issue.`);
+  const p = paragraph(x, y, w, narrative);
+  el.push(p.svg);
+  y = p.endY + mm(5);
+
+  const half = (w - mm(6)) / 2;
+  const rx = x + (w + mm(6)) / 2;
+  const codes = infoBox(x, y, half, "Applicable standards & codes", [
+    ["Design standard", String(m.standardId ?? "—").toUpperCase()],
+    ["Edition", std?.edition ?? "—"],
+    ["Governing code", jur ? jur.code : "—"],
+    ["Occupancy / hazard", hazardLabel],
+    ["System type", `${m.systemType ?? "sprinkler"} · ${m.fillType ?? "wet"}`],
+    ["Grounding", std?.verified ? "Verified vs. published" : "Representative (audit)"],
+  ]);
+  const basis = infoBox(rx, y, half, "Design basis", [
+    ["Hydraulic method", method],
+    ["Density", num(db, "densityGpmFt2") !== undefined ? u.densU(num(db, "densityGpmFt2")) : "—"],
+    ["Design area", num(db, "designAreaFt2") !== undefined ? u.areaU(num(db, "designAreaFt2")) : "—"],
+    ["Operating sprinklers", db?.["operatingSprinklers"] ? `${db["operatingSprinklers"]}` : `${s.operatingHeads} (auto)`],
+    ["Sprinkler K-factor", db?.["sprinklerKFactor"] ? String(db["sprinklerKFactor"]) : "—"],
+    ["Min pressure / hose", `${u.pU(s.minSprinklerPressurePsi)} · ${u.qU(s.hoseAllowanceGpm)}`],
+  ]);
+  el.push(codes.svg, basis.svg);
+  y = Math.max(codes.endY, basis.endY) + mm(7);
+
+  // clause-reference table (governing code first, then design standard)
+  const refRows: string[][] = [];
+  if (jur) for (const c of jur.clauses) refRows.push([c.topic, `${jur.code} — ${c.clause}`]);
+  if (std) for (const c of std.clauses) refRows.push([c.topic, `${String(m.standardId).toUpperCase()} ${c.clause}`]);
+  if (refRows.length) {
+    el.push(sectionTitle(x, y, w, "Standard references"));
+    y += mm(7);
+    el.push(table(x, y, w, [{ label: "Design provision", w: 0.6 }, { label: "Reference", w: 0.4 }], refRows).svg);
+  }
+  return { title: "Basis of Design", inner: el.join("") };
 }
 
 // ── cover ──
@@ -658,6 +737,7 @@ function frameAll(model: ProjectModel, specs: Spec[]): Sheet[] {
 export function reportSheets(model: ProjectModel, sol: ProjectSolution): Sheet[] {
   const specs: Spec[] = [
     coverSpec(model, sol),
+    basisOfDesignSpec(model, sol),
     riserNameplateSpec(model, sol),
     ...(((model.designBasis as Record<string, unknown> | undefined)?.["method"] === "fm-storage") ? [fmStorageSchemeSpec(model, sol)] : []),
     summarySpec(model, sol),

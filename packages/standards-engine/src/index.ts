@@ -13,6 +13,7 @@ export * from "./tables-nfpa13";
 export * from "./materials";
 export * from "./sprinklers";
 export * from "./fluids";
+export * from "./references";
 export { nfpa13, nfpa13d, nfpa13r, nfpa14, en12845, fmGlobal, as2118, nfpa750 };
 
 const REGISTRY: Partial<Record<StandardId, StandardModule>> = {

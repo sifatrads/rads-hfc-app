@@ -241,6 +241,7 @@ export function ProjectTab({ model, onChange, issues }: { model: ProjectModel; o
             <Sel label="Fill type" value={str(model.meta.fillType, "wet")} options={["wet", "dry", "preaction", "deluge"]} onChange={(v) => setMeta("fillType", v)} />
             <Sel label="Hazard" value={str(model.meta.hazardClass, hazardOpts[0])} options={hazardOpts} onChange={(v) => setMeta("hazardClass", v)} />
             <Sel label="Units" value={str(model.meta.units, "imperial")} options={["imperial", "metric"]} onChange={(v) => setMeta("units", v)} />
+            <Sel label="Governing code" value={str(model.meta.governingCode, "none")} options={["none", "bnbc", "rsc", "ibc"]} onChange={(v) => setMeta("governingCode", v === "none" ? undefined : v)} />
           </Row>
           {model.meta.systemType === "standpipe" && (
             <Row>

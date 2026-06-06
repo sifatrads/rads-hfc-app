@@ -42,6 +42,7 @@ Status: ✅ already in app · 🟡 partial · ⬜ missing. Tick `- [ ]` items yo
 - [x] Heads Summary (per-head K/coverage/elev/pressure/flow) ✅ DONE
 - [x] Report of Utilities — BOM (pipe length by material+size, valve/fitting counts) ✅ DONE
 - [x] Design-area proof — solve candidate remote areas, rank by required pressure, flag the governing one (Summary tab) ✅ DONE
+- [x] Basis of Design / Design Philosophy report sheet — narrative + prepared standard clause references (NFPA 13/14, FM DS 3-26 verified; EN/AS/750 representative) + governing-code option (BNBC/RSC/IBC) ✅ DONE
 - [x] Significant-pipes-only filter (Analysis tab: hide pipes carrying < 1 gpm) ✅ DONE
 - [x] Loss-slope (psi/ft · bar/m) column — friction gradient in the Analysis pipe table ✅ DONE
 - [x] Page-selection for print — choose which report sheets go into the PDF (Report tab) ✅ DONE
